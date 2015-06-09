@@ -1,0 +1,14 @@
+*.pyc
+/haplotype-venv/
+/data/
+/releases/
+.DS_Store
+.Rhistory
+.idea/
+*.bck
+data-bck*/
+output/
+tmp/
+temp/
+tmpout*
+__pycache__
