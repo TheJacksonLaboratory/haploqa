@@ -1,5 +1,5 @@
 *.pyc
-/haplotype-venv/
+/haploqa-venv/
 /data/
 /releases/
 .DS_Store
