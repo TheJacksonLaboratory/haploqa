@@ -12,3 +12,7 @@ tmp/
 temp/
 tmpout*
 __pycache__
+imgout/
+imgout-senttodan/
+related-projs/
+haploqa.db

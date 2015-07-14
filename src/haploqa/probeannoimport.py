@@ -1,5 +1,6 @@
 import argparse
 import csv
+import sys
 from haploqa.haploqa import connect_db, default_db_path, init_db
 
 _probe_type_dict = {
@@ -16,7 +17,7 @@ def import_probe_anno(probe_anno_file, con):
         c = con.cursor()
         for row in probe_anno_csv:
             try:
-                marker, chr, position_bp, probe_type = row[:4]
+                marker, chr, position_bp, probe_type = [x.strip() for x in row[:4]]
                 try:
                     position_bp = int(position_bp)
                 except ValueError:
@@ -29,7 +30,7 @@ def import_probe_anno(probe_anno_file, con):
                     ('MegaMUGA', marker, chr, position_bp, probe_type)
                 )
             except:
-                print('failed to import row:', row)
+                print('failed to import row:', row, file=sys.stderr)
                 raise
 
         # print out some info about values
@@ -51,8 +52,10 @@ def main():
         help='the probe annotations file to import')
     args = parser.parse_args()
 
-    init_db(args.sqlite3_db_file)
-    import_probe_anno(args.probe_anno_csv, connect_db(True, args.sqlite3_db_file))
+    con = connect_db(True, args.sqlite3_db_file)
+    init_db(con)
+    import_probe_anno(args.probe_anno_csv, con)
+    con.commit()
 
 
 if __name__ == '__main__':

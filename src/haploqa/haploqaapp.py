@@ -1,7 +1,13 @@
 import flask
-from haploqa import app
+import haploqa.haploqa
+
+app = flask.Flask(__name__)
 
 @app.route('/index.html')
 @app.route('/')
 def index():
     return flask.render_template('index.html')
+
+if __name__ == '__main__':
+    app.debug = True
+    app.run()
