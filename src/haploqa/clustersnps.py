@@ -7,15 +7,13 @@ import matplotlib as mpl
 import pylab
 
 from sklearn import mixture
+from sklearn.cluster import DBSCAN
 
 import haploqa.haploqa as hqa
 
 
-def main():
-    print('running query')
+def cluster_gmm():
     probe_data_by_probeset = hqa.generate_probe_data_by_probeset()
-    print('query done')
-    i = 0
     for i, probeset_data_for_all_samples in enumerate(probe_data_by_probeset):
         print(probeset_data_for_all_samples['probeset_id'])
         probe_data = probeset_data_for_all_samples['probe_data']
@@ -59,7 +57,6 @@ def main():
 
         #do_plot = len(set(Y_)) > 1
         do_plot = True
-
         if do_plot:
             fig = pylab.figure()
             ax = fig.add_subplot(111, aspect='equal')
@@ -96,6 +93,51 @@ def main():
                 bbox_inches='tight'
             )
             plt.clf()
+
+
+def cluster_DBSCAN():
+    probe_data_by_probeset = hqa.generate_probe_data_by_probeset()
+    for i, probeset_data_for_all_samples in enumerate(probe_data_by_probeset):
+        print(probeset_data_for_all_samples['probeset_id'])
+        probe_data = probeset_data_for_all_samples['probe_data']
+        norm_a_vals = [float('nan') if x['probe_a_norm'] is None else x['probe_a_norm'] for x in probe_data]
+        norm_b_vals = [float('nan') if x['probe_b_norm'] is None else x['probe_b_norm'] for x in probe_data]
+
+        X = np.transpose([norm_a_vals, norm_b_vals])
+
+        # remove any non-finite values
+        x_finite = np.isfinite(X)
+        X = X[np.all(x_finite, axis=1), ]
+
+        db = DBSCAN(eps=0.075, min_samples=10).fit(X)
+
+        # # NOTE: 0.075 seems to give the best result
+        # fig = pylab.figure()
+        # for i, eps in enumerate((0.1, 0.075, 0.05, 0.025)):
+        #     db = DBSCAN(eps=eps, min_samples=10).fit(X)
+        #
+        #     clust_label_set = set(db.labels_)
+        #     color_iter = itertools.cycle(['r', 'g', 'b', 'c', 'm'])
+        #     label_colors = dict(zip(clust_label_set - {-1}, color_iter))
+        #     label_colors[-1] = 'k'
+        #
+        #     n_clusters = len(clust_label_set - {-1})
+        #     ax = fig.add_subplot(2, 2, i + 1, aspect='equal')
+        #     ax.set_title('eps={}, # clusts={}'.format(eps, n_clusters))
+        #     ax.scatter(X[:, 0], X[:, 1], .8, color=[label_colors[lbl] for lbl in db.labels_])
+        #
+        # fig.suptitle('DBSCAN Cluster {}'.format(probeset_data_for_all_samples['probeset_id']))
+        # # pylab.show()
+        # fig.savefig(
+        #     'imgout/{}.png'.format(probeset_data_for_all_samples['probeset_id']),
+        #     bbox_inches='tight'
+        # )
+        # plt.clf()
+
+
+def main():
+    #cluster_gmm()
+    cluster_DBSCAN()
 
 
 if __name__ == '__main__':
