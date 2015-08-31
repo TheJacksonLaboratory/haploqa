@@ -22,16 +22,18 @@ def init_db(con):
     c = con.cursor()
 
     c.execute('''
-        CREATE TABLE IF NOT EXISTS probe_anno (
+        CREATE TABLE IF NOT EXISTS snp_anno (
             platform TEXT,
-            probeset_id TEXT,
+            snp_id TEXT,
             chromosome TEXT,
             position_bp INTEGER,
-            probe_status TEXT,
-            PRIMARY KEY (platform, probeset_id)
+            snp_status TEXT,
+            x_probe_call TEXT,
+            y_probe_call TEXT,
+            PRIMARY KEY (platform, snp_id)
         )
     ''')
-    c.execute('''CREATE INDEX IF NOT EXISTS probe_anno_chr_index ON probe_anno (platform, chromosome, position_bp)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS snp_anno_chr_index ON snp_anno (platform, chromosome, position_bp)''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS sample_data (
@@ -39,21 +41,40 @@ def init_db(con):
           sex TEXT,
           diet TEXT,
           notes TEXT,
-          platform TEXT
+          platform TEXT --,
+          --strain1_id TEXT,
+          --strain2_id TEXT
         )
     ''')
 
     c.execute('''
-       CREATE TABLE IF NOT EXISTS probe_intensities (
+       CREATE TABLE IF NOT EXISTS snp_read (
           sample_id TEXT,
-          probeset_id TEXT,
-          probe_a_norm REAL, probe_b_norm REAL,
-          probe_a_raw REAL, probe_b_raw REAL,
-          call_a TEXT, call_b TEXT
+          snp_id TEXT,
+          x_norm REAL, y_norm REAL,
+          x_raw REAL, y_raw REAL,
+          allele1_forward TEXT, allele2_forward TEXT,
+          PRIMARY KEY (sample_id, snp_id)
        )
     ''')
-    # TODO we'll probably need to index by sample_id x probeset_id
-    c.execute('''CREATE INDEX IF NOT EXISTS probe_intensities_probe_id_index ON probe_intensities (probeset_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS snp_read_snp_id_index ON snp_read (snp_id)''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS snp_clusters (
+           snp_id TEXT,
+           -- for F1 clusters strain 1 and 2 will have values (for autosomes
+           -- the first strain will be the one that appears first using python's
+           -- default string sort).
+           --
+           -- For a homozygous strain clusters, strain2_id will contain the
+           -- empty string because NULL is not permitted for primary key columns
+           strain1_id TEXT,
+           strain2_id TEXT,
+           mean_x REAL, mean_y REAL,
+           rot_x_var REAL, rot_y_var REAL,
+           PRIMARY KEY (snp_id, strain1_id, strain2_id)
+        )
+    ''')
 
 
 def get_platforms(con=None):
@@ -61,7 +82,7 @@ def get_platforms(con=None):
         con = connect_db()
 
     c = con.cursor()
-    c.execute('''SELECT DISTINCT platform FROM probe_anno''')
+    c.execute('''SELECT DISTINCT platform FROM snp_anno''')
 
     return [x for x, in c]
 
@@ -95,12 +116,12 @@ def get_valid_chromosomes(platform, con=None):
         con = connect_db()
 
     c = con.cursor()
-    c.execute('''SELECT DISTINCT chromosome FROM probe_anno WHERE platform = ?''', (platform, ))
+    c.execute('''SELECT DISTINCT chromosome FROM snp_anno WHERE platform = ?''', (platform, ))
 
     return [x for x, in c]
 
 
-def get_sample_probe_data(sample_id, chromosome, con=None):
+def get_sample_snp_data(sample_id, chromosome, con=None):
     if con is None:
         con = connect_db()
 
@@ -114,10 +135,10 @@ def get_sample_probe_data(sample_id, chromosome, con=None):
     c.execute(
         '''
             SELECT * FROM
-                probe_intensities AS PI
+                snp_read AS SR
                 INNER JOIN
-                probe_anno AS PA ON PI.probeset_id=PA.probeset_id
-            WHERE PA.platform=? AND PI.sample_id=? AND chromosome=?
+                snp_anno AS PA ON SR.snp_id=PA.snp_id
+            WHERE PA.platform=? AND SR.sample_id=? AND chromosome=?
             ORDER BY position_bp ASC
         ''',
         (platform, sample_id, chromosome)
@@ -126,38 +147,43 @@ def get_sample_probe_data(sample_id, chromosome, con=None):
     return [_dictify_row(c, row) for row in c]
 
 
-# def get_probe_data(probeset_id, con=None):
+# def get_snp_data(snp_id, con=None):
 #     # TODO we need a way to limit by project/sample list/platform etc.
 #     if con is None:
 #         con = connect_db()
 #
 #     c = con.cursor()
 #
-#     c.execute('''SELECT * FROM probe_intensities WHERE probeset_id=?''', (probeset_id, ))
+#     c.execute('''SELECT * FROM snp_read WHERE snp_id=?''', (snp_id, ))
 #
 #
 
-def generate_probe_data_by_probeset(con=None):
+def generate_snp_data(con=None):
+    """
+    Returns a SNP data generator. The results are grouped by SNP ID
+    :param con:
+    :return:
+    """
     # TODO we need a way to limit by project/sample list/platform etc.
     if con is None:
         con = connect_db()
 
     c = con.cursor()
 
-    c.execute('''SELECT * FROM probe_intensities ORDER BY probeset_id''')
+    c.execute('''SELECT * FROM snp_read ORDER BY snp_id''')
     curr_dict = None
     for row in c:
         row_dict = _dictify_row(c, row)
-        if curr_dict is None or curr_dict['probeset_id'] != row_dict['probeset_id']:
+        if curr_dict is None or curr_dict['snp_id'] != row_dict['snp_id']:
             if curr_dict is not None:
                 yield curr_dict
 
             curr_dict = {
-                'probeset_id': row_dict['probeset_id'],
-                'probe_data': [row_dict],
+                'snp_id': row_dict['snp_id'],
+                'snp_data': [row_dict],
             }
         else:
-            curr_dict['probe_data'].append(row_dict)
+            curr_dict['snp_data'].append(row_dict)
 
     if curr_dict is not None:
         yield curr_dict

@@ -44,7 +44,9 @@ def import_sample_anno(sample_anno_file, platform, con):
                 # TODO: Any others can be imported into seperate attribute tables.
                 special_attributes = ('sample_id', 'sex', 'diet', 'notes', 'platform')
                 insert_vals = tuple(map(get_val, special_attributes))
-                c.execute('''INSERT INTO sample_data VALUES (?, ?, ?, ?, ?)''', insert_vals)
+                # TODO I had to add the "OR IGNORE" for the
+                # UNC_Villena_GIGMUGV01_20141012_FinalReport data. Find out why this is
+                c.execute('''INSERT OR IGNORE INTO sample_data VALUES (?, ?, ?, ?, ?)''', insert_vals)
             except:
                 print('failed to import row:', row, file=sys.stderr)
                 raise

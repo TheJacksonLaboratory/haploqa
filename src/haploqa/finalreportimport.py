@@ -18,6 +18,7 @@ data_col_hdrs = {snp_name_col_hdr, sample_id_col_hdr, x_raw_col_hdr,
                  y_raw_col_hdr, x_col_hdr, y_col_hdr, allele1_fwd_col_hdr,
                  allele2_fwd_col_hdr}
 
+
 def import_final_report(final_report_file, con):
     with open(final_report_file, 'r') as final_report_handle:
 
@@ -87,7 +88,7 @@ def import_final_report(final_report_file, con):
                                 prev_sample = sample_id
 
                             c.execute(
-                                '''INSERT INTO probe_intensities VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                                '''INSERT OR IGNORE INTO snp_read VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                                 (sample_id, snp_name, x, y, x_raw, y_raw, allele1_fwd, allele2_fwd),
                             )
 

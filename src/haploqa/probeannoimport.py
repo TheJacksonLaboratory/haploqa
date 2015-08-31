@@ -3,21 +3,21 @@ import csv
 import sys
 from haploqa.haploqa import connect_db, default_db_path, init_db
 
-_probe_type_dict = {
+_snp_type_dict = {
     'A': 'biallelic SNP with good performance',
     'A, B': 'Marker with unknown performance'
 }
 
-def import_probe_anno(probe_anno_file, con):
-    with open(probe_anno_file, 'r') as probe_anno_file_handle:
-        probe_anno_csv = csv.reader(probe_anno_file_handle)
+def import_snp_anno(snp_anno_file, con):
+    with open(snp_anno_file, 'r') as snp_anno_file_handle:
+        snp_anno_csv = csv.reader(snp_anno_file_handle)
 
         # throw out the header
-        next(probe_anno_csv)
+        next(snp_anno_csv)
         c = con.cursor()
-        for row in probe_anno_csv:
+        for row in snp_anno_csv:
             try:
-                marker, chr, position_bp, probe_type = [x.strip() for x in row[:4]]
+                marker, chr, position_bp, snp_type = [x.strip() for x in row[:4]]
                 try:
                     position_bp = int(position_bp)
                 except ValueError:
@@ -26,18 +26,18 @@ def import_probe_anno(probe_anno_file, con):
                     position_bp = None
 
                 c.execute(
-                    '''INSERT INTO probe_anno VALUES (?, ?, ?, ?, ?)''',
-                    ('MegaMUGA', marker, chr, position_bp, probe_type)
+                    '''INSERT INTO snp_anno VALUES (?, ?, ?, ?, ?)''',
+                    ('MegaMUGA', marker, chr, position_bp, snp_type)
                 )
             except:
                 print('failed to import row:', row, file=sys.stderr)
                 raise
 
         # print out some info about values
-        c.execute('SELECT DISTINCT chromosome FROM probe_anno')
+        c.execute('SELECT DISTINCT chromosome FROM snp_anno')
         print('unique chromosome:', [chr for chr, in c])
-        c.execute('SELECT DISTINCT probe_status FROM probe_anno')
-        print('unique probe_status:', [ps for ps, in c])
+        c.execute('SELECT DISTINCT snp_status FROM snp_anno')
+        print('unique snp_status:', [ps for ps, in c])
 
 
 def main():
@@ -48,13 +48,13 @@ def main():
         default=default_db_path,
         help='the SQLite3 DB file that will be written to')
     parser.add_argument(
-        'probe_anno_csv',
+        'snp_anno_csv',
         help='the probe annotations file to import')
     args = parser.parse_args()
 
     con = connect_db(True, args.sqlite3_db_file)
     init_db(con)
-    import_probe_anno(args.probe_anno_csv, con)
+    import_snp_anno(args.snp_anno_csv, con)
     con.commit()
 
 

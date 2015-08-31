@@ -14,7 +14,12 @@ rm -f haploqa.db
 #python -m haploqa.probeannoimport haploqa.db "docs/Mouse 14may2014/MegaMUGA Marker Annotation 11Oct2012.csv"
 #python -m haploqa.finalreportimport haploqa.db "docs/Mouse 14may2014/Jax_Lab_Osborne_MEGMUGV01_20140512_FinalReport.txt"
 
-DATA_DIR="/Volumes/redhotdog/MegaMUGA-from-melania/181_Ellison_DO/Jackson_Laboratory_Harrison_MEGMUGV01_20150210/"
-python -m haploqa.sampleannoimport haploqa.db MegaMUGA "${DATA_DIR}/Sample_Map.txt"
-python -m haploqa.probeannoimport haploqa.db "docs/Mouse 14may2014/MegaMUGA Marker Annotation 11Oct2012.csv"
-python -m haploqa.finalreportimport haploqa.db "${DATA_DIR}/Jackson_Laboratory_Harrison_MEGMUGV01_20150210_FinalReport.txt"
+#DATA_DIR="/Volumes/redhotdog/MegaMUGA-from-melania/181_Ellison_DO/Jackson_Laboratory_Harrison_MEGMUGV01_20150210/"
+#python -m haploqa.sampleannoimport haploqa.db MegaMUGA "${DATA_DIR}/Sample_Map.txt"
+#python -m haploqa.probeannoimport haploqa.db "data/Mouse 14may2014/MegaMUGA Marker Annotation 11Oct2012.csv"
+#python -m haploqa.finalreportimport haploqa.db "${DATA_DIR}/Jackson_Laboratory_Harrison_MEGMUGV01_20150210_FinalReport.txt"
+
+DATA_DIR="/Users/kss/projects/muga-haploqa/data/UNC_Villena_GIGMUGV01_20141012/"
+python -m haploqa.sampleannoimport haploqa.db GIGAMuga "${DATA_DIR}/Sample_Map.txt"
+python -m haploqa.snpmapimport haploqa.db GIGAMuga "${DATA_DIR}/SNP_Map.txt"
+python -m haploqa.finalreportimport haploqa.db "${DATA_DIR}/UNC_Villena_GIGMUGV01_20141012_FinalReport.txt"

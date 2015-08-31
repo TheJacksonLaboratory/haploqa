@@ -13,6 +13,6 @@ temp/
 tmpout*
 __pycache__
 imgout/
-imgout-senttodan/
+imgout-*/
 related-projs/
 haploqa.db

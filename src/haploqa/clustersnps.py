@@ -3,7 +3,6 @@ import math
 
 import numpy as np
 from scipy import linalg
-from scipy.stats import norm
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pylab
@@ -12,17 +11,18 @@ from sklearn import mixture
 from sklearn.cluster import DBSCAN
 
 import haploqa.haploqa as hqa
+import haploqa.haplohmm as hhmm
 
 
 def cluster_gmm():
-    probe_data_by_probeset = hqa.generate_probe_data_by_probeset()
-    for i, probeset_data_for_all_samples in enumerate(probe_data_by_probeset):
-        print(probeset_data_for_all_samples['probeset_id'])
-        probe_data = probeset_data_for_all_samples['probe_data']
-        norm_a_vals = [float('nan') if x['probe_a_norm'] is None else x['probe_a_norm'] for x in probe_data]
-        norm_b_vals = [float('nan') if x['probe_b_norm'] is None else x['probe_b_norm'] for x in probe_data]
+    snp_data_grouped_by_snp = hqa.generate_snp_data()
+    for i, snp_data_for_all_samples in enumerate(snp_data_grouped_by_snp):
+        print(snp_data_for_all_samples['snp_id'])
+        snp_data = snp_data_for_all_samples['snp_data']
+        x_vals = [float('nan') if x['x_norm'] is None else x['x_norm'] for x in snp_data]
+        y_vals = [float('nan') if x['y_norm'] is None else x['y_norm'] for x in snp_data]
 
-        X = np.transpose([norm_a_vals, norm_b_vals])
+        X = np.transpose([x_vals, y_vals])
 
         # remove any non-finite values
         x_finite = np.isfinite(X)
@@ -40,8 +40,8 @@ def cluster_gmm():
 
                 model.fit(X)
                 info_crit = model.bic(X)
-                print('Probe ID: {}, # Clusts: {}, BIC: {}'.format(
-                    probeset_data_for_all_samples['probeset_id'],
+                print('SNP ID: {}, # Clusts: {}, BIC: {}'.format(
+                    snp_data_for_all_samples['snp_id'],
                     n_components,
                     info_crit
                 ))
@@ -84,28 +84,28 @@ def cluster_gmm():
                     ell.set_alpha(0.5)
                     ax.add_artist(ell)
 
-            fig.suptitle('Probe ID: {}, # Clusts: {}, BIC: {}'.format(
-                probeset_data_for_all_samples['probeset_id'],
+            fig.suptitle('SNP ID: {}, # Clusts: {}, BIC: {}'.format(
+                snp_data_for_all_samples['snp_id'],
                 best_n_components,
                 lowest_info_crit
             ))
             # pylab.show()
             fig.savefig(
-                'imgout/{}-best.png'.format(probeset_data_for_all_samples['probeset_id']),
+                'imgout/{}-best.png'.format(snp_data_for_all_samples['snp_id']),
                 bbox_inches='tight'
             )
             plt.clf()
 
 
 def test_cluster_DBSCAN():
-    probe_data_by_probeset = hqa.generate_probe_data_by_probeset()
-    for i, probeset_data_for_all_samples in enumerate(probe_data_by_probeset):
-        print(probeset_data_for_all_samples['probeset_id'])
-        probe_data = probeset_data_for_all_samples['probe_data']
-        norm_a_vals = [float('nan') if x['probe_a_norm'] is None else x['probe_a_norm'] for x in probe_data]
-        norm_b_vals = [float('nan') if x['probe_b_norm'] is None else x['probe_b_norm'] for x in probe_data]
+    snp_data_grouped_by_snp = hqa.generate_snp_data()
+    for i, snp_data_for_all_samples in enumerate(snp_data_grouped_by_snp):
+        print(snp_data_for_all_samples['snp_id'])
+        snp_data = snp_data_for_all_samples['snp_data']
+        norm_x_vals = [float('nan') if x['x_norm'] is None else x['x_norm'] for x in snp_data]
+        norm_y_vals = [float('nan') if x['y_norm'] is None else x['y_norm'] for x in snp_data]
 
-        X = np.transpose([norm_a_vals, norm_b_vals])
+        X = np.transpose([norm_x_vals, norm_y_vals])
 
         # remove any non-finite values
         x_finite = np.isfinite(X)
@@ -126,54 +126,24 @@ def test_cluster_DBSCAN():
             ax.set_title('eps={}, # clusts={}'.format(eps, n_clusters))
             ax.scatter(X[:, 0], X[:, 1], .8, color=[label_colors[lbl] for lbl in db.labels_])
 
-        fig.suptitle('DBSCAN Cluster {}'.format(probeset_data_for_all_samples['probeset_id']))
+        fig.suptitle('DBSCAN Cluster {}'.format(snp_data_for_all_samples['snp_id']))
         # pylab.show()
         fig.savefig(
-            'imgout/{}.png'.format(probeset_data_for_all_samples['probeset_id']),
+            'imgout/{}.png'.format(snp_data_for_all_samples['snp_id']),
             bbox_inches='tight'
         )
         plt.close('all')
 
-
-def inverse_rot(x, y):
-    '''
-    Returns a 2D rotation matrix which will invert thetas rotation
-    :param theta: the rotation angle to invert
-    :return: the rotation matrix which will inverse thetas rotation
-    '''
-
-    # a 2D rotation matrix looks like:
-    #
-    # R = | cos(theta), -sin(theta) |
-    #     | sin(theta), cos(theta)  |
-    #
-    # in order to invert the rotation we can just transpose the matrix giving
-    #
-    # R = |  cos(theta), sin(theta) |
-    #     | -sin(theta), cos(theta) |
-
-    hyp = math.sqrt(x * x + y * y)
-    if hyp == 0:
-        return np.array([
-            [0.0, 0.0],
-            [0.0, 0.0],
-        ])
-    else:
-        cos_theta = x / hyp
-        sin_theta = y / hyp
-        return np.array([
-            [cos_theta,  sin_theta],
-            [-sin_theta, cos_theta],
-        ])
-
-
 def cluster_DBSCAN():
-    probe_data_by_probeset = hqa.generate_probe_data_by_probeset()
-    for i, probeset_data_for_all_samples in enumerate(probe_data_by_probeset):
-        probeset_id = probeset_data_for_all_samples['probeset_id']
-        probe_data = probeset_data_for_all_samples['probe_data']
-        norm_a_vals = [float('nan') if x['probe_a_norm'] is None else x['probe_a_norm'] for x in probe_data]
-        norm_b_vals = [float('nan') if x['probe_b_norm'] is None else x['probe_b_norm'] for x in probe_data]
+    db_con = hqa.connect_db()
+    snp_data_grouped_by_snp = hqa.generate_snp_data(db_con)
+
+    #c = db_con.cursor()
+    for i, snp_data_for_all_samples in enumerate(snp_data_grouped_by_snp):
+        snp_id = snp_data_for_all_samples['snp_id']
+        snp_data = snp_data_for_all_samples['snp_data']
+        norm_a_vals = [float('nan') if x['snp_a_norm'] is None else x['snp_a_norm'] for x in snp_data]
+        norm_b_vals = [float('nan') if x['snp_b_norm'] is None else x['snp_b_norm'] for x in snp_data]
 
         X = np.transpose([norm_a_vals, norm_b_vals])
 
@@ -188,7 +158,7 @@ def cluster_DBSCAN():
         db = DBSCAN(eps=eps, min_samples=5).fit(X)
         label_set = {lbl for lbl in db.labels_ if lbl != -1}
 
-        print('{} # clusters: {}'.format(probeset_id, len(label_set)))
+        print('{} # clusters: {}'.format(snp_id, len(label_set)))
 
         do_plot = False
         if do_plot:
@@ -198,12 +168,13 @@ def cluster_DBSCAN():
             label_colors[-1] = 'k'
 
             ax = fig.add_subplot(111, aspect='equal')
-            ax.set_title('{} eps={}, # clusts={}'.format(probeset_id, eps, len(label_set)))
+            ax.set_title('{} eps={}, # clusts={}'.format(snp_id, eps, len(label_set)))
             ax.scatter(X[:, 0], X[:, 1], .8, color=[label_colors[lbl] for lbl in db.labels_])
             max_range = np.max(X)
             ax.set_xlim([0, max_range])
             ax.set_ylim([0, max_range])
 
+        clusters = []
         for cluster_label in label_set:
             clust_points = X[db.labels_ == cluster_label, :]
             clust_points_t = np.transpose(clust_points)
@@ -211,10 +182,15 @@ def cluster_DBSCAN():
             mean_x, mean_y = clust_mean
 
             # we need a rotation matrix for each cluster mean
-            clust_rot_mat = inverse_rot(mean_x, mean_y)
+            clust_rot_mat = hhmm.inverse_rot(mean_x, mean_y)
             rotated_cluster_points = clust_rot_mat.dot(clust_points_t)
 
             rot_x_var, rot_y_var = np.var(rotated_cluster_points, 1)
+
+            clusters.append({
+                'mean_x': mean_x, 'mean_y': mean_y,
+                'rot_x_var': rot_x_var, 'rot_y_var': rot_y_var,
+            })
 
             if do_plot:
                 theta = math.atan(mean_y / mean_x)
@@ -228,12 +204,35 @@ def cluster_DBSCAN():
                 ellipse.set_alpha(0.3)
                 ax.add_artist(ellipse)
 
+        # c.execute(
+        #     '''
+        #         INSERT INTO snp_clusters (
+        #             snp_id,
+        #             strain1_id,
+        #             strain2_id,
+        #             mean_x,
+        #             mean_y,
+        #             rot_var_x,
+        #             rot_var_y
+        #         ) VALUES (
+        #             :snp_id,
+        #             :strain1_id,
+        #             :strain2_id,
+        #             :mean_x,
+        #             :mean_y,
+        #             :rot_x_var,
+        #             :rot_y_var)
+        #     ''',
+        #     ('MegaMUGA', marker, chr, position_bp, snp_type)
+        # )
         if do_plot:
             fig.savefig(
-                'imgout/{}.png'.format(probeset_data_for_all_samples['probeset_id']),
+                'imgout/{}.png'.format(snp_data_for_all_samples['snp_id']),
                 bbox_inches='tight'
             )
             plt.close('all')
+
+    #db_con.commit()
 
 
 def main():
