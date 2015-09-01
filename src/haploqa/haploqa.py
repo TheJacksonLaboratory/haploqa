@@ -147,17 +147,6 @@ def get_sample_snp_data(sample_id, chromosome, con=None):
     return [_dictify_row(c, row) for row in c]
 
 
-# def get_snp_data(snp_id, con=None):
-#     # TODO we need a way to limit by project/sample list/platform etc.
-#     if con is None:
-#         con = connect_db()
-#
-#     c = con.cursor()
-#
-#     c.execute('''SELECT * FROM snp_read WHERE snp_id=?''', (snp_id, ))
-#
-#
-
 def generate_snp_data(con=None):
     """
     Returns a SNP data generator. The results are grouped by SNP ID
@@ -187,3 +176,13 @@ def generate_snp_data(con=None):
 
     if curr_dict is not None:
         yield curr_dict
+
+
+def get_snp_annotations(chromosome, con=None):
+    if con is None:
+        con = connect_db()
+
+    c = con.cursor()
+
+    c.execute('''SELECT * FROM snp_anno WHERE chromosome=? ORDER BY position_bp''', (chromosome, ))
+    return [_dictify_row(c, row) for row in c]

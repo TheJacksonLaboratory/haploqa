@@ -73,6 +73,9 @@ def main():
     import_sample_anno(args.sample_annotation_txt, args.platform, con)
     con.commit()
 
+    con.cursor().execute('ANALYZE')
+    con.commit()
+
 
 if __name__ == '__main__':
     main()

@@ -2,6 +2,8 @@ import math
 import numpy as np
 from scipy.stats import norm
 
+import haploqa as hqa
+
 
 def prob_density(cluster, point_x, point_y):
     """
@@ -68,12 +70,10 @@ def _scale_vector_to_one(v):
     """
     Scales the given vector in place such that sum(v) == 1
     """
-    v_sum = np.sum(v)
-    for i in range(v.size):
-        v[i] /= v_sum
+    v /= np.sum(v)
 
 
-def _scale_matrix_to_one(m):
+def _scale_matrix_rows_to_one(m):
     """
     Scales the given vector in place such that all np.sum(m, 1) == 1
     """
@@ -81,6 +81,40 @@ def _scale_matrix_to_one(m):
     row_sums = np.sum(m, 1)
     row_sums = np.reshape(row_sums, (-1, 1))
     m /= row_sums
+
+
+def sample_ids_to_ab_codes(sample_ids, chromosome, con=None):
+    """
+    Look up a matrix of AB codes for the given sample IDs.
+    :param sample_ids:  the sample IDs
+    :param chromosome: the chromosome
+    :return: a matrix of AB codes. The numerical genotype codes used are: 0->N, 1->A, 2->B, 3->H
+    """
+    # TODO we need to do something with platform in here
+    if con is None:
+        con = hqa.connect_db()
+
+    snp_annos
+
+    allele1_forward_mat = None
+    allele2_forward_mat = None
+    for i, sample_id in enumerate(sample_ids):
+        sample_calls = hqa.get_sample_snp_data(sample_id, chromosome, con)
+        allele1_forward_list = [x['allele1_forward'] for x in sample_calls]
+        allele2_forward_list = [x['allele2_forward'] for x in sample_calls]
+
+        if allele1_forward_mat is None:
+            # rows are snps and columns are samples
+            # TODO is np.dtype('<U1') the best type to use here? Will it cause any problems with python 2.7?
+            allele1_forward_mat = np.zeros((len(sample_calls), len(sample_ids)), dtype=np.dtype('<U1'))
+            allele2_forward_mat = np.zeros((len(sample_calls), len(sample_ids)), dtype=np.dtype('<U1'))
+
+        allele1_forward_mat[:, i] = allele1_forward_list
+        allele2_forward_mat[:, i] = allele2_forward_list
+
+    ab_codes = np.zeros(allele1_forward_mat.shape, dtype=np.uint8)
+
+    #TODO finish me!
 
 
 class SnpHaploHMM:
@@ -138,7 +172,7 @@ class SnpHaploHMM:
         self.init_probs = init_probs
 
         # scale and assign transition probs
-        _scale_matrix_to_one(trans_probs)
+        _scale_matrix_rows_to_one(trans_probs)
         self.trans_probs = trans_probs
 
         # scale and assign observation probs

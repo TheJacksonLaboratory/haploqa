@@ -20,6 +20,8 @@ data_col_hdrs = {snp_name_col_hdr, sample_id_col_hdr, x_raw_col_hdr,
 
 
 def import_final_report(final_report_file, con):
+    analyze_at_insert_number = 100000
+    insert_count = 0
     with open(final_report_file, 'r') as final_report_handle:
 
         c = con.cursor()
@@ -91,6 +93,12 @@ def import_final_report(final_report_file, con):
                                 '''INSERT OR IGNORE INTO snp_read VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                                 (sample_id, snp_name, x, y, x_raw, y_raw, allele1_fwd, allele2_fwd),
                             )
+                            insert_count += 1
+
+                            if insert_count == analyze_at_insert_number:
+                                print('performing ANALYZE to maintain insert performance')
+                                c.execute('ANALYZE')
+                                analyze_at_insert_number *= 4
 
 
 def main():
@@ -111,6 +119,9 @@ def main():
     con = connect_db(True, args.sqlite3_db_file)
     init_db(con)
     import_final_report(args.final_report, con)
+    con.commit()
+
+    con.cursor('ANALYZE')
     con.commit()
 
 
