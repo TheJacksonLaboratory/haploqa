@@ -8,7 +8,10 @@ default_db_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'
 
 def connect_db(create_if_missing=False, db_path=default_db_path):
     if create_if_missing or os.path.exists(db_path):
-        return sqlite3.connect(db_path)
+        con = sqlite3.connect(db_path)
+        con.cursor().execute('PRAGMA journal_mode=WAL')
+
+        return con
     else:
         raise Exception(db_path + ' not found')
 
@@ -53,11 +56,12 @@ def init_db(con):
           snp_id TEXT,
           x_norm REAL, y_norm REAL,
           x_raw REAL, y_raw REAL,
-          allele1_forward TEXT, allele2_forward TEXT,
-          PRIMARY KEY (sample_id, snp_id)
+          allele1_forward TEXT, allele2_forward TEXT --,
+          --PRIMARY KEY (sample_id, snp_id)
        )
     ''')
-    c.execute('''CREATE INDEX IF NOT EXISTS snp_read_snp_id_index ON snp_read (snp_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS snp_read_snp_index ON snp_read (snp_id)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS snp_read_sample_snp_index ON snp_read (sample_id, snp_id)''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS snp_clusters (

@@ -94,25 +94,27 @@ def sample_ids_to_ab_codes(sample_ids, chromosome, con=None):
     if con is None:
         con = hqa.connect_db()
 
-    snp_annos
+    sample_count = len(sample_ids)
 
-    allele1_forward_mat = None
-    allele2_forward_mat = None
+    snp_ids, x_calls, y_calls = zip(*[
+        (anno['snp_id'], anno['x_probe_call'], anno['y_probe_call'])
+        for anno in hqa.get_snp_annotations(chromosome, con)
+    ])
+    x_calls = np.array(x_calls)
+    y_calls = np.array(y_calls)
+    snp_count = len(snp_ids)
+
+    allele1_forward_mat = np.zeros((snp_count, sample_count), dtype=np.dtype('<U1'))
+    allele2_forward_mat = np.zeros((snp_count, sample_count), dtype=np.dtype('<U1'))
     for i, sample_id in enumerate(sample_ids):
         sample_calls = hqa.get_sample_snp_data(sample_id, chromosome, con)
         allele1_forward_list = [x['allele1_forward'] for x in sample_calls]
         allele2_forward_list = [x['allele2_forward'] for x in sample_calls]
 
-        if allele1_forward_mat is None:
-            # rows are snps and columns are samples
-            # TODO is np.dtype('<U1') the best type to use here? Will it cause any problems with python 2.7?
-            allele1_forward_mat = np.zeros((len(sample_calls), len(sample_ids)), dtype=np.dtype('<U1'))
-            allele2_forward_mat = np.zeros((len(sample_calls), len(sample_ids)), dtype=np.dtype('<U1'))
-
         allele1_forward_mat[:, i] = allele1_forward_list
         allele2_forward_mat[:, i] = allele2_forward_list
 
-    ab_codes = np.zeros(allele1_forward_mat.shape, dtype=np.uint8)
+    ab_codes = np.zeros((snp_count, sample_count), dtype=np.uint8)
 
     #TODO finish me!
 

@@ -1,5 +1,6 @@
 import argparse
 import csv
+import time
 from haploqa.haploqa import connect_db, default_db_path, init_db
 
 header_tag = '[header]'
@@ -8,23 +9,31 @@ tags = {header_tag, data_tag}
 
 snp_name_col_hdr = 'SNP Name'
 sample_id_col_hdr = 'Sample ID'
-x_raw_col_hdr = 'X Raw'
-y_raw_col_hdr = 'Y Raw'
+# x_raw_col_hdr = 'X Raw'
+# y_raw_col_hdr = 'Y Raw'
 x_col_hdr = 'X'
 y_col_hdr = 'Y'
 allele1_fwd_col_hdr = 'Allele1 - Forward'
 allele2_fwd_col_hdr = 'Allele2 - Forward'
-data_col_hdrs = {snp_name_col_hdr, sample_id_col_hdr, x_raw_col_hdr,
-                 y_raw_col_hdr, x_col_hdr, y_col_hdr, allele1_fwd_col_hdr,
-                 allele2_fwd_col_hdr}
+data_col_hdrs = {
+    snp_name_col_hdr, sample_id_col_hdr,
+    #x_raw_col_hdr, y_raw_col_hdr,
+    x_col_hdr, y_col_hdr,
+    allele1_fwd_col_hdr, allele2_fwd_col_hdr
+}
 
 
-def import_final_report(final_report_file, con):
-    analyze_at_insert_number = 100000
-    insert_count = 0
+def import_final_report(final_report_file, con, drop_indexes_during_insert=False):
+    # analyze_at_insert_number = 100000
+    # insert_count = 0
+
+    prev_time = time.time()
     with open(final_report_file, 'r') as final_report_handle:
 
         c = con.cursor()
+        if drop_indexes_during_insert:
+            c.execute('''DROP INDEX snp_read_snp_index''')
+            c.execute('''DROP INDEX snp_read_sample_snp_index''')
 
         final_report_table = csv.reader(final_report_handle, delimiter='\t')
 
@@ -78,27 +87,35 @@ def import_final_report(final_report_file, con):
                         else:
                             snp_name = string_val(snp_name_col_hdr)
                             sample_id = string_val(sample_id_col_hdr)
-                            x_raw = int_val(x_raw_col_hdr)
-                            y_raw = int_val(y_raw_col_hdr)
+                            x_raw = None #int_val(x_raw_col_hdr)
+                            y_raw = None #int_val(y_raw_col_hdr)
                             x = float_val(x_col_hdr)
                             y = float_val(y_col_hdr)
                             allele1_fwd = string_val(allele1_fwd_col_hdr)
                             allele2_fwd = string_val(allele2_fwd_col_hdr)
 
                             if prev_sample != sample_id:
-                                print('importing sample:', sample_id)
+                                curr_time = time.time()
+
+                                print('took {:.1f} sec. importing sample: {}'.format(curr_time - prev_time, sample_id))
+                                prev_time = curr_time
                                 prev_sample = sample_id
 
                             c.execute(
-                                '''INSERT OR IGNORE INTO snp_read VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                                '''INSERT INTO snp_read VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                                 (sample_id, snp_name, x, y, x_raw, y_raw, allele1_fwd, allele2_fwd),
                             )
-                            insert_count += 1
 
-                            if insert_count == analyze_at_insert_number:
-                                print('performing ANALYZE to maintain insert performance')
-                                c.execute('ANALYZE')
-                                analyze_at_insert_number *= 4
+                            # insert_count += 1
+                            # if insert_count == analyze_at_insert_number:
+                            #     print('performing ANALYZE to maintain insert performance')
+                            #     c.execute('ANALYZE')
+                            #     analyze_at_insert_number *= 4
+
+        if drop_indexes_during_insert:
+            c.execute('''CREATE INDEX snp_read_snp_index ON snp_read (snp_id)''')
+            c.execute('''CREATE INDEX snp_read_sample_snp_index ON snp_read (sample_id, snp_id)''')
+        c.execute('ANALYZE')
 
 
 def main():
@@ -117,12 +134,14 @@ def main():
     args = parser.parse_args()
 
     con = connect_db(True, args.sqlite3_db_file)
-    init_db(con)
-    import_final_report(args.final_report, con)
-    con.commit()
-
-    con.cursor('ANALYZE')
-    con.commit()
+    try:
+        init_db(con)
+        import_final_report(args.final_report, con)
+        con.cursor().execute('ANALYZE')
+        con.commit()
+    except:
+        con.rollback()
+        raise
 
 
 if __name__ == '__main__':
