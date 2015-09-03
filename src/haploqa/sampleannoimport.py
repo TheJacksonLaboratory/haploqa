@@ -9,7 +9,7 @@ def import_sample_anno(sample_anno_file, platform, con):
         # synonyms help us identify special headers when they're not using the canonical column name
         header_synonyms = {
             'gender': 'sex',
-            'id': 'sample_id'
+            'id': 'sample_id',
         }
 
         name = name.lower()

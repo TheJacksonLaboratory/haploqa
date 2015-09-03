@@ -1,5 +1,6 @@
 import argparse
 import csv
+from os.path import splitext, basename
 import pymongo
 import time
 
@@ -45,7 +46,6 @@ def _within_chr_snp_indices(platform_id, db):
             snp_count_per_chr[prev_chr] = snp_index
             snp_index = 0
             prev_chr = snp['chromosome']
-        print(snp['snp_id'])
         snp_chr_indexes[snp['snp_id']] = {
             'index': snp_index,
             'chromosome': snp['chromosome'],
@@ -57,7 +57,14 @@ def _within_chr_snp_indices(platform_id, db):
     return platform_chrs, snp_count_per_chr, snp_chr_indexes
 
 
-def import_final_report(final_report_file, platform_id, db):
+def _save_or_create(collection, obj):
+    if '_id' in obj:
+        collection.replace_one({'_id': obj['_id']}, obj)
+    else:
+        collection.insert_one(obj)
+
+
+def import_final_report(final_report_file, platform_id, sample_tags, db):
     platform_chrs, snp_count_per_chr, snp_chr_indexes = _within_chr_snp_indices(platform_id, db)
 
     prev_time = time.time()
@@ -65,11 +72,11 @@ def import_final_report(final_report_file, platform_id, db):
 
         final_report_table = csv.reader(final_report_handle, delimiter='\t')
 
-        #prev_sample = None
         samples = db.samples
         curr_section = None
         data_header_indexes = None
-        seen_samples = set()
+        curr_sample = None
+
         for row_index, row in enumerate(final_report_table):
             def fmt_err(msg, cause=None):
                 ex = Exception('Format Error in {} line {}: {}'.format(final_report_file, row_index + 1, msg))
@@ -122,40 +129,57 @@ def import_final_report(final_report_file, platform_id, db):
                             allele1_fwd = string_val(allele1_fwd_col_hdr)
                             allele2_fwd = string_val(allele2_fwd_col_hdr)
 
-                            if sample_id not in seen_samples:
-                                # we're seeing this sample for the first time so we should add an initialized sample
-                                # doc to mongo
-                                seen_samples.add(sample_id)
+                            if curr_sample is None or sample_id != curr_sample['sample_id']:
+                                if curr_sample is not None:
+                                    _save_or_create(samples, curr_sample)
+
                                 curr_time = time.time()
                                 print('took {:.1f} sec. importing sample: {}'.format(curr_time - prev_time, sample_id))
                                 prev_time = curr_time
 
-                                chr_dict = dict()
-                                for chr in platform_chrs:
-                                    curr_snp_count = snp_count_per_chr[chr]
-                                    chr_dict[chr] = {
-                                        'xs': [float('nan')] * curr_snp_count,
-                                        'ys': [float('nan')] * curr_snp_count,
-                                        'allele1_fwds': ['-'] * curr_snp_count,
-                                        'allele2_fwds': ['-'] * curr_snp_count,
+                                curr_sample = samples.find_one({'sample_id': sample_id})
+                                if curr_sample is None:
+                                    chr_dict = dict()
+                                    for chr in platform_chrs:
+                                        curr_snp_count = snp_count_per_chr[chr]
+                                        chr_dict[chr] = {
+                                            'xs': [float('nan')] * curr_snp_count,
+                                            'ys': [float('nan')] * curr_snp_count,
+                                            'allele1_fwds': ['-'] * curr_snp_count,
+                                            'allele2_fwds': ['-'] * curr_snp_count,
+                                        }
+
+                                    curr_sample = {
+                                        'sample_id': sample_id,
+                                        'chromosome_data': chr_dict,
+                                        'tags': sample_tags,
+                                        'unannotated_snps': [],
                                     }
 
-                                samples.insert_one({
-                                    'sample_id': sample_id,
-                                    'chromosome_data': chr_dict,
+                            try:
+                                snp_chr_index = snp_chr_indexes[snp_name]
+                            except KeyError:
+                                snp_chr_index = None
+                            if snp_chr_index is not None:
+                                snp_chr = snp_chr_index['chromosome']
+                                snp_index = snp_chr_index['index']
+
+                                curr_sample_chr = curr_sample['chromosome_data'][snp_chr]
+                                curr_sample_chr['xs'][snp_index] = x
+                                curr_sample_chr['ys'][snp_index] = y
+                                curr_sample_chr['allele1_fwds'][snp_index] = allele1_fwd
+                                curr_sample_chr['allele2_fwds'][snp_index] = allele2_fwd
+                            else:
+                                curr_sample['unannotated_snps'].append({
+                                    'snp_name': snp_name,
+                                    'x': x,
+                                    'y': y,
+                                    'allele1_fwd': allele1_fwd,
+                                    'allele2_fwd': allele2_fwd,
                                 })
 
-                            snp_chr_index = snp_chr_indexes[snp_name]
-                            snp_chr = snp_chr_index['chromosome']
-                            snp_index = snp_chr_index['index']
-                            samples.update({'sample_id': sample_id}, {
-                                '$set': {
-                                    'chromosome_data.' + snp_chr + '.xs.' + str(snp_index): x,
-                                    'chromosome_data.' + snp_chr + '.ys.' + str(snp_index): y,
-                                    'chromosome_data.' + snp_chr + '.allele1_fwds.' + str(snp_index): allele1_fwd,
-                                    'chromosome_data.' + snp_chr + '.allele2_fwds.' + str(snp_index): allele2_fwd,
-                                }
-                            })
+        if curr_sample is not None:
+            _save_or_create(samples, curr_sample)
 
 
 def main():
@@ -173,7 +197,8 @@ def main():
              'SNP Name, Sample ID, X, Y, Allele1 - Forward, Allele2 - Forward')
     args = parser.parse_args()
 
-    import_final_report(args.final_report, args.platform, mds.init_db())
+    report_name = splitext(basename(args.final_report))[0]
+    import_final_report(args.final_report, args.platform, [report_name, args.platform], mds.init_db())
 
 
 if __name__ == '__main__':
