@@ -54,6 +54,13 @@ def chr_cmp(chrom1, chrom2):
 
 
 def import_snp_anno(snp_anno_file, platform_id, db):
+    complimentary_nucleobases = {
+        'A': 'T',
+        'T': 'A',
+        'G': 'C',
+        'C': 'G',
+    }
+
     with open(snp_anno_file, 'r') as snp_anno_file_handle:
         snp_anno_table = csv.reader(snp_anno_file_handle, delimiter='\t')
 
@@ -81,6 +88,11 @@ def import_snp_anno(snp_anno_file, platform_id, db):
                 if not snp_match:
                     raise Exception('unexpected snp calls format: ' + snp_calls)
                 x_probe_call, y_probe_call = snp_match.groups()
+                if get_val('ilmn strand') != get_val('customer strand'):
+                    # TODO this seems to work but is it the right thing to do?
+                    x_probe_call = complimentary_nucleobases[x_probe_call]
+                    y_probe_call = complimentary_nucleobases[y_probe_call]
+
                 chromosome = get_val('chromosome')
                 snps.insert_one({
                     'platform_id': platform_id,

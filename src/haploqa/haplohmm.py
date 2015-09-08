@@ -2,7 +2,13 @@ import math
 import numpy as np
 from scipy.stats import norm
 
-import haploqa as hqa
+import haploqa.mongods as mds
+
+
+_n_code = 0
+_a_code = 1
+_b_code = 2
+_h_code = 3
 
 
 def prob_density(cluster, point_x, point_y):
@@ -83,40 +89,61 @@ def _scale_matrix_rows_to_one(m):
     m /= row_sums
 
 
-def sample_ids_to_ab_codes(sample_ids, chromosome, con=None):
+def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
     """
     Look up a matrix of AB codes for the given sample IDs.
     :param sample_ids:  the sample IDs
     :param chromosome: the chromosome
     :return: a matrix of AB codes. The numerical genotype codes used are: 0->N, 1->A, 2->B, 3->H
     """
-    # TODO we need to do something with platform in here
-    if con is None:
-        con = hqa.connect_db()
+    if db is None:
+        db = mds.get_db()
 
     sample_count = len(sample_ids)
 
-    snp_ids, x_calls, y_calls = zip(*[
-        (anno['snp_id'], anno['x_probe_call'], anno['y_probe_call'])
-        for anno in hqa.get_snp_annotations(chromosome, con)
-    ])
-    x_calls = np.array(x_calls)
-    y_calls = np.array(y_calls)
-    snp_count = len(snp_ids)
-
-    allele1_forward_mat = np.zeros((snp_count, sample_count), dtype=np.dtype('<U1'))
-    allele2_forward_mat = np.zeros((snp_count, sample_count), dtype=np.dtype('<U1'))
+    x_calls = None
+    y_calls = None
+    ab_codes = None
+    snp_count = 0
     for i, sample_id in enumerate(sample_ids):
-        sample_calls = hqa.get_sample_snp_data(sample_id, chromosome, con)
-        allele1_forward_list = [x['allele1_forward'] for x in sample_calls]
-        allele2_forward_list = [x['allele2_forward'] for x in sample_calls]
+        curr_sample = db.samples.find_one({'sample_id': sample_id})
+        if curr_sample is None:
+            raise Exception('failed to find a sample named "{}"'.format(sample_id))
 
-        allele1_forward_mat[:, i] = allele1_forward_list
-        allele2_forward_mat[:, i] = allele2_forward_list
+        if i == 0:
+            platform_id = curr_sample['platform_id']
+            snps = mds.get_snps(platform_id, chromosome)
+            x_calls = []
+            y_calls = []
+            for snp in snps:
+                snp_count += 1
+                x_calls.append(snp['x_probe_call'])
+                y_calls.append(snp['y_probe_call'])
+            x_calls = np.array(x_calls)
+            y_calls = np.array(y_calls)
+            ab_codes = np.empty((snp_count, sample_count), dtype=np.uint8)
+            ab_codes.fill(255)
 
-    ab_codes = np.zeros((snp_count, sample_count), dtype=np.uint8)
+        allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
+        allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])
 
-    #TODO finish me!
+        # here we convert nucleotides (GACT and '-' for no call) into AB codes
+        allele1_is_a = allele1_fwds == x_calls
+        allele2_is_a = allele2_fwds == x_calls
+        allele1_is_b = allele1_fwds == y_calls
+        allele2_is_b = allele2_fwds == y_calls
+        alleles_are_het = np.logical_or(
+            np.logical_and(allele1_is_a, allele2_is_b),
+            np.logical_and(allele1_is_b, allele2_is_a))
+        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = _a_code
+        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = _b_code
+        ab_codes[alleles_are_het, i] = _h_code
+        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = _n_code
+
+        if np.any(ab_codes[:, i] == 255):
+            raise Exception('found unexpected SNP codes in sample: {}'.format(sample_id))
+
+    return ab_codes
 
 
 class SnpHaploHMM:
@@ -131,7 +158,7 @@ class SnpHaploHMM:
             the initial haplotype probs. must satisfy: len(init_probs) == N. The values
             of init_probs will be scaled such that sum(init_probs) == 1
         :param trans_probs:
-            the haplotype transition probabilities. This must be either an NxN matrix.
+            the haplotype transition probabilities. This must be an NxN matrix.
             All of the cells are the probability of
             P(transition to column_index haplotype | currently in row_index haplotype)
             The rows of this matrix will be scaled such that each row sums to 1.
@@ -227,6 +254,8 @@ class SnpHaploHMM:
                     # else hom from observation (A or B)
                     else:
                         self.obs_prob_matrix[i, j] = self.het_obs_probs[1]
+        print(self.obs_prob_matrix)
+
 
     def viterbi(self, haplotype_ab_codes, observation_ab_codes):
         """
@@ -264,24 +293,34 @@ class SnpHaploHMM:
         for t in range(1, obs_count):
             prev_log_likelihoods = curr_log_likelihoods
             curr_log_likelihoods = np.zeros(self.hidden_state_count, dtype=np.float64)
-            curr_from_states = from_state_lattice[t - 1, :]
+            #curr_from_states = from_state_lattice[t - 1, :]
 
             for to_state in range(self.hidden_state_count):
                 from_log_likelihoods = prev_log_likelihoods + log_trans_probs[:, to_state]
+                #print(from_log_likelihoods)
                 max_from_state = np.argmax(from_log_likelihoods)
-                curr_from_states[to_state] = max_from_state
+                #print(max_from_state)
+                #curr_from_states[to_state] = max_from_state
+                from_state_lattice[t - 1, to_state] = max_from_state
                 curr_log_likelihoods[to_state] = from_log_likelihoods[max_from_state]
 
             curr_log_obs_probs = log_obs_prob_matrix[haplotype_ab_codes[t, :], observation_ab_codes[t]]
+            if len(set(curr_log_obs_probs.tolist())) > 1:
+                print('obs code')
+                print(np.array(['N', 'A', 'B', 'H'])[observation_ab_codes[t]])
+                print('hap codes')
+                print(np.array(['N', 'A', 'B', 'H'])[haplotype_ab_codes[t, :]])
+                print(curr_log_obs_probs)
             curr_log_likelihoods += curr_log_obs_probs
 
         # backtrace through the most likely path starting with the final state
+        #print(from_state_lattice)
         max_final_state = np.argmax(curr_log_likelihoods)
         max_final_likelihood = np.argmax(curr_log_likelihoods)
         max_likelihood_states = np.zeros(obs_count, dtype=np.uint16)
         max_likelihood_states[obs_count - 1] = max_final_state
         for t in reversed(range(obs_count - 1)):
-            max_likelihood_states[t] = from_state_lattice[max_likelihood_states[t + 1]]
+            max_likelihood_states[t] = from_state_lattice[t, max_likelihood_states[t + 1]]
 
         return max_likelihood_states, max_final_likelihood
 
@@ -309,9 +348,39 @@ class SnpHaploHMM:
 
 
 def main():
-    test_hmm = SnpHaploHMM(
-        np.ones(4)
-    )
+    #print(sample_ids_to_ab_codes(['UM-001', 'JAX-002', 'JAX-005', 'JAX-007', 'JAX-008', 'NIH_TVD_YS-B1'], '19'))
+
+    # flat initial probs
+    init_probs = np.ones(3, dtype=np.float64)
+
+    # 100 times more likely to stay in current state than to transition to any other specific haplotype
+    trans_probs = np.array([
+        [100, 1,   1],
+        [1,   100, 1],
+        [1,   1,   100],
+    ], dtype=np.float64)
+    hom_obs_probs = np.array([
+        50,     # matching homozygous
+        0.5,    # opposite homozygous
+        1,      # het
+        1,      # no read
+    ], dtype=np.float64)
+    het_obs_probs = np.array([
+        50,     # het obs
+        2,      # hom obs
+        2,      # no read obs
+    ], dtype=np.float64)
+    n_obs_probs = np.ones(3, dtype=np.float64)
+
+    test_hmm = SnpHaploHMM(init_probs, trans_probs, hom_obs_probs, het_obs_probs, n_obs_probs)
+
+    print('getting AB Codes')
+    ab_codes = sample_ids_to_ab_codes(['UM-001', 'JAX-002', 'JAX-007', 'JAX-005'], '19')
+    print('performing viterbi')
+    np.set_printoptions(threshold=np.nan)
+    best_path = test_hmm.viterbi(haplotype_ab_codes=ab_codes[:, 1:], observation_ab_codes=ab_codes[:, 1])
+    #print(best_path)
+    print('done with viterbi')
 
 if __name__ == '__main__':
     main()

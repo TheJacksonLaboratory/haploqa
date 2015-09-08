@@ -151,6 +151,7 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
 
                                     curr_sample = {
                                         'sample_id': sample_id,
+                                        'platform_id': platform_id,
                                         'chromosome_data': chr_dict,
                                         'tags': sample_tags,
                                         'unannotated_snps': [],
