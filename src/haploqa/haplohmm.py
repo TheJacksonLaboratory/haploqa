@@ -11,6 +11,22 @@ _b_code = 2
 _h_code = 3
 
 
+def _solve_quad(a, b, c):
+    """
+    Find solutions for the given quadratic equation where
+    :param a: quadratic coefficient
+    :param b: linear coefficient
+    :param c: constant term
+    :return: the pair of values for x that solves ax^2 + bx + c = 0
+    """
+    # TODO there are more numerically stable implementations you should look into using
+    sqrt_term = np.sqrt(b ** 2 - 4 * a * c)
+    x1 = (-b + sqrt_term) / (2 * a)
+    x2 = (-b - sqrt_term) / (2 * a)
+
+    return x1, x2
+
+
 def prob_density(cluster, point_x, point_y):
     """
     Find the probability density of the given cluster at x, y
@@ -41,11 +57,11 @@ def prob_density(cluster, point_x, point_y):
 
 
 def inverse_rot(x, y):
-    '''
+    """
     Returns a 2D rotation matrix which will invert thetas rotation
     :param theta: the rotation angle to invert
     :return: the rotation matrix which will inverse thetas rotation
-    '''
+    """
 
     # a 2D rotation matrix looks like:
     #
@@ -148,20 +164,15 @@ def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
 
 class SnpHaploHMM:
 
-    def __init__(self, init_probs, trans_probs, hom_obs_probs, het_obs_probs, n_obs_probs):
+    def __init__(self, trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs):
         """
         construct a SNP Haplotype HMM. Note that the observation probabilities have a different structure
         than you would see in a standard HMM. This is because the valid observations change on
         a per SNP basis. We define N to be the number of haplotypes
 
-        :param init_probs:
-            the initial haplotype probs. must satisfy: len(init_probs) == N. The values
-            of init_probs will be scaled such that sum(init_probs) == 1
-        :param trans_probs:
-            the haplotype transition probabilities. This must be an NxN matrix.
-            All of the cells are the probability of
-            P(transition to column_index haplotype | currently in row_index haplotype)
-            The rows of this matrix will be scaled such that each row sums to 1.
+        :param trans_prob:
+            the probability of transitioning from one haplotype to another in the space of
+            a single SNP
         :param hom_obs_probs:
             a categorical distribution describing P(obs | homozygous read from hidden state).
             The values in this array will be scaled such that sum(hom_obs_probs) == 1.
@@ -194,15 +205,7 @@ class SnpHaploHMM:
             2) observation is heterozygous (N->H)
         """
 
-        self.hidden_state_count = init_probs.size
-
-        # scale and assign initial probs
-        _scale_vector_to_one(init_probs)
-        self.init_probs = init_probs
-
-        # scale and assign transition probs
-        _scale_matrix_rows_to_one(trans_probs)
-        self.trans_probs = trans_probs
+        self.trans_prob = trans_prob
 
         # scale and assign observation probs
         _scale_vector_to_one(hom_obs_probs)
@@ -215,47 +218,47 @@ class SnpHaploHMM:
         # pack the sparse observation probs into a dense matrix for quick lookup
         # using codes where row is hidden state encoded as 0->N, 1->A, 2->B, 3->H and column
         # is observation encoded as 0->N, 1->A, 2->B, 3->H
-        self.obs_prob_matrix = np.zeros((4, 4), dtype=np.float64)
-        for i in range(4):
-            for j in range(4):
-                # if no read from hidden state
-                if i == 0:
-                    # if N from observation
-                    if j == 0:
-                        self.obs_prob_matrix[i, j] = self.n_obs_probs[0]
-                    # if hom from observation
-                    elif j == 1 or j == 2:
-                        self.obs_prob_matrix[i, j] = self.n_obs_probs[1]
-                    # else het from observation
+        self.obs_prob_matrix = np.zeros((4, 4, 4), dtype=np.float64)
+        for hap1_call in range(4):
+            for hap2_call in range(4):
+                for obs_call in range(4):
+                    # if no read from hidden state (we consider it a "no read" if either
+                    # parent is N or H)
+                    if hap1_call == _n_code or hap2_call == _n_code or hap1_call == _h_code or hap2_call == _h_code:
+                        # if N from observation
+                        if obs_call == _n_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.n_obs_probs[0]
+                        # if hom from observation
+                        elif obs_call == _a_code or obs_call == _b_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.n_obs_probs[1]
+                        # else het from observation
+                        else:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.n_obs_probs[2]
+                    # if hom from hidden state
+                    elif hap1_call == hap2_call:
+                        # if N from observation
+                        if obs_call == _n_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[3]
+                        # if het from observation
+                        elif obs_call == _h_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[2]
+                        # if matching hom from observation
+                        elif obs_call == hap1_call:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[0]
+                        # else non-matching hom from observation
+                        else:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[1]
+                    # else het from hidden state
                     else:
-                        self.obs_prob_matrix[i, j] = self.n_obs_probs[2]
-                # if hom from hidden state
-                elif i == 1 or i == 2:
-                    # if N from observation
-                    if j == 0:
-                        self.obs_prob_matrix[i, j] = self.hom_obs_probs[3]
-                    # if het from observation
-                    elif j == 3:
-                        self.obs_prob_matrix[i, j] = self.hom_obs_probs[2]
-                    # if matching hom from observation
-                    elif j == i:
-                        self.obs_prob_matrix[i, j] = self.hom_obs_probs[0]
-                    # else non-matching hom from observation
-                    else:
-                        self.obs_prob_matrix[i, j] = self.hom_obs_probs[1]
-                # else het from hidden state
-                else:
-                    # if N from observation
-                    if j == 0:
-                        self.obs_prob_matrix[i, j] = self.het_obs_probs[2]
-                    # if het from observation
-                    elif j == 3:
-                        self.obs_prob_matrix[i, j] = self.het_obs_probs[0]
-                    # else hom from observation (A or B)
-                    else:
-                        self.obs_prob_matrix[i, j] = self.het_obs_probs[1]
-        print(self.obs_prob_matrix)
-
+                        # if N from observation
+                        if obs_call == _n_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.het_obs_probs[2]
+                        # if het from observation
+                        elif obs_call == _h_code:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.het_obs_probs[0]
+                        # else hom from observation (A or B)
+                        else:
+                            self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.het_obs_probs[1]
 
     def viterbi(self, haplotype_ab_codes, observation_ab_codes):
         """
@@ -266,7 +269,6 @@ class SnpHaploHMM:
             a 2D matrix where row_index == snp_index and col_index == haplotype_index (which must
             match the haplotype indices used in the transition probs).
             The numerical genotype codes used should be: 0->N, 1->A, 2->B, 3->H
-
         :param observation_ab_codes:
             a vector of genotype observations the length of observation_ab_codes should match
             the row count of haplotype_ab_codes
@@ -279,49 +281,56 @@ class SnpHaploHMM:
               haplotype indices
             * log_likelihood is the log likelihood of this hidden state sequence
         """
-        obs_count = observation_ab_codes.size
+        obs_count, haplotype_count = haplotype_ab_codes.shape
 
-        log_init_probs = np.log(self.init_probs)
-        log_trans_probs = np.log(self.trans_probs)
+        state_hap1_indices, state_hap2_indices = np.triu_indices(haplotype_count)
+        state_count = state_hap1_indices.size
+
+        # initialize transition probabilities
+        log_transition_to_new_state_prob = np.log(self.trans_prob / (state_count - 1))
+        log_transition_to_same_state_prob = np.log(1.0 - self.trans_prob)
+        log_trans_probs = np.empty((state_count, state_count), dtype=np.float64)
+        log_trans_probs[:] = log_transition_to_new_state_prob
+        np.fill_diagonal(log_trans_probs, log_transition_to_same_state_prob)
+
+        # set uniform initial probs
+        log_init_prob = np.log(1.0 / state_count)
         log_obs_prob_matrix = np.log(self.obs_prob_matrix)
 
         # initialize viterbi using first observations and the init_probs
-        curr_log_obs_probs = log_obs_prob_matrix[haplotype_ab_codes[0, :], observation_ab_codes[0]]
-        curr_log_likelihoods = log_init_probs + curr_log_obs_probs
+        curr_log_obs_probs = log_obs_prob_matrix[
+            haplotype_ab_codes[0, state_hap1_indices],
+            haplotype_ab_codes[0, state_hap2_indices],
+            observation_ab_codes[0]]
+        curr_log_likelihoods = log_init_prob + curr_log_obs_probs
 
-        from_state_lattice = np.zeros((obs_count - 1, self.hidden_state_count), dtype=np.uint16)
+        from_state_lattice = np.zeros((obs_count - 1, state_count), dtype=np.uint16)
         for t in range(1, obs_count):
             prev_log_likelihoods = curr_log_likelihoods
-            curr_log_likelihoods = np.zeros(self.hidden_state_count, dtype=np.float64)
-            #curr_from_states = from_state_lattice[t - 1, :]
+            curr_log_likelihoods = np.zeros(state_count, dtype=np.float64)
 
-            for to_state in range(self.hidden_state_count):
+            for to_state in range(state_count):
+                # TODO is log_trans_probs[:, to_state] right??
                 from_log_likelihoods = prev_log_likelihoods + log_trans_probs[:, to_state]
-                #print(from_log_likelihoods)
                 max_from_state = np.argmax(from_log_likelihoods)
-                #print(max_from_state)
-                #curr_from_states[to_state] = max_from_state
                 from_state_lattice[t - 1, to_state] = max_from_state
                 curr_log_likelihoods[to_state] = from_log_likelihoods[max_from_state]
 
-            curr_log_obs_probs = log_obs_prob_matrix[haplotype_ab_codes[t, :], observation_ab_codes[t]]
-            if len(set(curr_log_obs_probs.tolist())) > 1:
-                print('obs code')
-                print(np.array(['N', 'A', 'B', 'H'])[observation_ab_codes[t]])
-                print('hap codes')
-                print(np.array(['N', 'A', 'B', 'H'])[haplotype_ab_codes[t, :]])
-                print(curr_log_obs_probs)
+            curr_log_obs_probs = log_obs_prob_matrix[
+                haplotype_ab_codes[t, state_hap1_indices],
+                haplotype_ab_codes[t, state_hap2_indices],
+                observation_ab_codes[t]]
             curr_log_likelihoods += curr_log_obs_probs
 
         # backtrace through the most likely path starting with the final state
-        #print(from_state_lattice)
         max_final_state = np.argmax(curr_log_likelihoods)
-        max_final_likelihood = np.argmax(curr_log_likelihoods)
+        max_final_likelihood = curr_log_likelihoods[max_final_state]
         max_likelihood_states = np.zeros(obs_count, dtype=np.uint16)
         max_likelihood_states[obs_count - 1] = max_final_state
         for t in reversed(range(obs_count - 1)):
             max_likelihood_states[t] = from_state_lattice[t, max_likelihood_states[t + 1]]
 
+        max_likelihood_states = [(state_hap1_indices[s], state_hap2_indices[s]) for s in max_likelihood_states]
         return max_likelihood_states, max_final_likelihood
 
     def log_likelihood(self, haplotype_ab_codes, observation_ab_codes):
@@ -348,17 +357,11 @@ class SnpHaploHMM:
 
 
 def main():
-    #print(sample_ids_to_ab_codes(['UM-001', 'JAX-002', 'JAX-005', 'JAX-007', 'JAX-008', 'NIH_TVD_YS-B1'], '19'))
 
-    # flat initial probs
-    init_probs = np.ones(3, dtype=np.float64)
+    #############################################################################
+    ## This main function is just some smoke-signal test code for this module. ##
+    #############################################################################
 
-    # 100 times more likely to stay in current state than to transition to any other specific haplotype
-    trans_probs = np.array([
-        [100, 1,   1],
-        [1,   100, 1],
-        [1,   1,   100],
-    ], dtype=np.float64)
     hom_obs_probs = np.array([
         50,     # matching homozygous
         0.5,    # opposite homozygous
@@ -372,15 +375,32 @@ def main():
     ], dtype=np.float64)
     n_obs_probs = np.ones(3, dtype=np.float64)
 
-    test_hmm = SnpHaploHMM(init_probs, trans_probs, hom_obs_probs, het_obs_probs, n_obs_probs)
+    trans_prob = 0.01
+    test_hmm = SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
 
+    # Each sample is a different set of parental strains but only 129S, B6J, FVB for the most part
+    # Thanks
+    # MO
     print('getting AB Codes')
-    ab_codes = sample_ids_to_ab_codes(['UM-001', 'JAX-002', 'JAX-007', 'JAX-005'], '19')
-    print('performing viterbi')
-    np.set_printoptions(threshold=np.nan)
-    best_path = test_hmm.viterbi(haplotype_ab_codes=ab_codes[:, 1:], observation_ab_codes=ab_codes[:, 1])
-    #print(best_path)
-    print('done with viterbi')
+    for chr in (str(i) for i in range(1, 20)):
+        print('chromosome', chr)
+        ab_codes = sample_ids_to_ab_codes(
+            [
+                # only 'C57BL/6NJm39418', '129S7m', 'FVB001', are expected to really be parental strains
+                'UM-004', 'C57BL/6NJm39418', '129S7m', 'FVB001', 'C3H/HeNTac', 'BALB/cByJm',
+                'NOR/LtJm32299', 'NON/ShiLtJm38111', 'SJL/Jm35807', 'ALR/LtJm34133', 'CZECHII/EiJ',
+                'ZALENDE/EiJ', 'SPRET/EiJ', 'ALR/LtJm34133',
+            ],
+            chr,
+        )
+        print('performing viterbi')
+        np.set_printoptions(threshold=np.nan)
+        max_likelihood_states, max_final_likelihood = test_hmm.viterbi(
+            haplotype_ab_codes=ab_codes[:, 1:],
+            observation_ab_codes=ab_codes[:, 0])
+        print(max_likelihood_states)
+        print(max_final_likelihood)
+        print('done with viterbi')
 
 if __name__ == '__main__':
     main()

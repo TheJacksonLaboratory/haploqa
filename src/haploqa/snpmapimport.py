@@ -119,7 +119,7 @@ def main():
     parser = argparse.ArgumentParser(description='import SNP annotations')
     parser.add_argument(
         'platform',
-        help='the platform for the data we are importing. eg: MegaMUGA'
+        help='the platform for the data we are importing. eg: MegaMUGA or GigaMUGA'
     )
     parser.add_argument(
         'snp_annotation_txt',

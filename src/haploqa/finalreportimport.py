@@ -68,6 +68,7 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
     platform_chrs, snp_count_per_chr, snp_chr_indexes = _within_chr_snp_indices(platform_id, db)
 
     prev_time = time.time()
+    all_sample_ids = set()
     with open(final_report_file, 'r') as final_report_handle:
 
         final_report_table = csv.reader(final_report_handle, delimiter='\t')
@@ -132,6 +133,7 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
                             if curr_sample is None or sample_id != curr_sample['sample_id']:
                                 if curr_sample is not None:
                                     _save_or_create(samples, curr_sample)
+                                all_sample_ids.add(sample_id)
 
                                 curr_time = time.time()
                                 print('took {:.1f} sec. importing sample: {}'.format(curr_time - prev_time, sample_id))
@@ -181,6 +183,8 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
 
         if curr_sample is not None:
             _save_or_create(samples, curr_sample)
+
+    mds.post_proc_samples(all_sample_ids, db)
 
 
 def main():
