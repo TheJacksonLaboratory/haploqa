@@ -57,13 +57,6 @@ def _within_chr_snp_indices(platform_id, db):
     return platform_chrs, snp_count_per_chr, snp_chr_indexes
 
 
-def _save_or_create(collection, obj):
-    if '_id' in obj:
-        collection.replace_one({'_id': obj['_id']}, obj)
-    else:
-        collection.insert_one(obj)
-
-
 def import_final_report(final_report_file, platform_id, sample_tags, db):
     platform_chrs, snp_count_per_chr, snp_chr_indexes = _within_chr_snp_indices(platform_id, db)
 
@@ -131,33 +124,42 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
                             allele2_fwd = string_val(allele2_fwd_col_hdr)
 
                             if curr_sample is None or sample_id != curr_sample['sample_id']:
-                                if curr_sample is not None:
-                                    _save_or_create(samples, curr_sample)
+                                if sample_id in all_sample_ids:
+                                    raise Exception('Final report must be grouped by sample ID but it is not')
+
                                 all_sample_ids.add(sample_id)
+
+                                if curr_sample is not None:
+                                    mds.post_proc_sample(curr_sample)
+                                    samples.replace_one(
+                                        {'sample_id': curr_sample['sample_id']},
+                                        curr_sample,
+                                        upsert=True,
+                                    )
 
                                 curr_time = time.time()
                                 print('took {:.1f} sec. importing sample: {}'.format(curr_time - prev_time, sample_id))
                                 prev_time = curr_time
 
-                                curr_sample = samples.find_one({'sample_id': sample_id})
-                                if curr_sample is None:
-                                    chr_dict = dict()
-                                    for chr in platform_chrs:
-                                        curr_snp_count = snp_count_per_chr[chr]
-                                        chr_dict[chr] = {
-                                            'xs': [float('nan')] * curr_snp_count,
-                                            'ys': [float('nan')] * curr_snp_count,
-                                            'allele1_fwds': ['-'] * curr_snp_count,
-                                            'allele2_fwds': ['-'] * curr_snp_count,
-                                        }
-
-                                    curr_sample = {
-                                        'sample_id': sample_id,
-                                        'platform_id': platform_id,
-                                        'chromosome_data': chr_dict,
-                                        'tags': sample_tags,
-                                        'unannotated_snps': [],
+                                # curr_sample = samples.find_one({'sample_id': sample_id})
+                                # if curr_sample is None:
+                                chr_dict = dict()
+                                for chr in platform_chrs:
+                                    curr_snp_count = snp_count_per_chr[chr]
+                                    chr_dict[chr] = {
+                                        'xs': [float('nan')] * curr_snp_count,
+                                        'ys': [float('nan')] * curr_snp_count,
+                                        'allele1_fwds': ['-'] * curr_snp_count,
+                                        'allele2_fwds': ['-'] * curr_snp_count,
                                     }
+
+                                curr_sample = {
+                                    'sample_id': sample_id,
+                                    'platform_id': platform_id,
+                                    'chromosome_data': chr_dict,
+                                    'tags': sample_tags,
+                                    'unannotated_snps': [],
+                                }
 
                             try:
                                 snp_chr_index = snp_chr_indexes[snp_name]
@@ -182,9 +184,12 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
                                 })
 
         if curr_sample is not None:
-            _save_or_create(samples, curr_sample)
-
-    mds.post_proc_samples(all_sample_ids, db)
+            mds.post_proc_sample(curr_sample)
+            samples.replace_one(
+                {'sample_id': curr_sample['sample_id']},
+                curr_sample,
+                upsert=True,
+            )
 
 
 def main():

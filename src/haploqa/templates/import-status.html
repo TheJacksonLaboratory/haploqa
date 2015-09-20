@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+
+{% block title %}Importing Sample Data{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script>
+        var taskID = '{{ task_id }}';
+        var intervalDelayMS = 5000;
+
+        $(function() {
+            var importTaskProgressBar = $('#import-task-progress');
+            var successAlert = $('#success-alert');
+            var successfulAlertLink = $('#successful-alert-link');
+            var errorAlert = $('#error-alert');
+            var errorAlertMessage = $('#error-alert-message');
+
+            function hanleError(data) {
+                console.log('failure occurred');
+                console.log(data);
+                importTaskProgressBar.text('data import failed');
+                importTaskProgressBar.removeClass('active progress-bar-striped');
+                importTaskProgressBar.addClass('progress-bar-danger');
+                if(data.error_message) {
+                    errorAlertMessage.text(data.error_message);
+                } else {
+                    errorAlertMessage.text('unknown server error');
+                }
+                errorAlert.css('display', '');
+            }
+
+            function checkStatus() {
+                $.getJSON("{{ url_for('sample_import_status_json', task_id=task_id) }}", function(data) {
+                    console.log(data);
+                    if(data.ready) {
+                        console.log('OK the data is ready');
+                        if(data.failed) {
+                            // this shouldn't normally happen since we set the error code
+                            hanleError(data);
+                        } else {
+                            importTaskProgressBar.removeClass('active progress-bar-striped');
+                            importTaskProgressBar.text('Data Import Complete');
+                            successfulAlertLink.prop('href', '../tag/' + encURIComp(data.result_tag) + '.html');
+                            successAlert.css('display', '');
+                        }
+                    } else {
+                        window.setTimeout(checkStatus, intervalDelayMS);
+                    }
+                }).fail(hanleError);
+            }
+            checkStatus();
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Importing Sample Data</h1>
+    </div>
+
+    <p>
+        This page gives status for the sample data upload. It will typically require about two or three seconds
+        per GigaMUGA sample for import to complete. MegaMUGA imports should progress significantly faster. Once the import
+        is complete this page will display a link which allows you to edit and analyze the samples which have been uploaded.
+    </p>
+
+    <!-- a bootstrap progress bar for the import -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="progress">
+                <div
+                        id="import-task-progress"
+                        class="progress-bar progress-bar-striped active"
+                        role="progressbar"
+                        aria-valuenow="100"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        style="width: 100%">
+                    Importing Sample Data
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="success-alert" class="alert alert-success" role="alert" style="display: none;">
+        <strong>Success:</strong>
+        <span id="success-alert-message">
+            All samples have been successfully imported. You can view and edit all of the uploaded samples
+            <a id="successful-alert-link" href="#">here</a>.
+        </span>
+    </div>
+
+    <div id="error-alert" class="alert alert-danger" role="alert" style="display: none;">
+        <strong>Error:</strong> <span id="error-alert-message"></span>
+    </div>
+
+{% endblock %}

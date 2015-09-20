@@ -1,0 +1,189 @@
+{% extends "layout.html" %}
+
+{% block title %}Samples Details for {{ sample.sample_id }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+<!--
+    <script type="text/javascript" src="{{ url_for('static', filename='Tokenize-2.5.1/jquery.tokenize.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='Tokenize-2.5.1/jquery.tokenize.css') }}">
+-->
+    <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <script type="text/javascript" src="//code.jquery.com/ui/1.11.1/jquery-ui.js"></script>
+    <link href="//code.jquery.com/ui/1.11.1/themes/smoothness/jquery-ui.css" type="text/css" rel="stylesheet">
+    <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/bootstrap-tokenfield.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/css/bootstrap-tokenfield.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+    <script>
+        var otherSamples = [
+            {% for other_sample in other_samples %}
+            {
+                label: '{{ other_sample.sample_id }}',
+                value: '{{ other_sample._id }}'
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+    </script>
+    <script>
+        var intervalDelayMS = 2500;
+        $(function() {
+            var svg = d3.select('#hapkaryoplot-svg');
+            var hapKaryoPlot = new HaploKaryoPlot({
+                svg: svg,
+                width: 900,
+                height: 700,
+                chrSizes: mm10ChrSizes
+            });
+
+            var cursorStatusPopup = d3.select("#cursor-status");
+            var hideCursorPopup = function() {
+                cursorStatusPopup.style("display", null);
+            };
+            hapKaryoPlot.mouseOverHaplotype = function(currHaplo, haploData) {
+                console.log('mouse over');
+                console.log(currHaplo);
+                var popupOffset = 20;
+                var xPos = d3.event.pageX + popupOffset;
+                var yPos = d3.event.pageY + popupOffset;
+                cursorStatusPopup.style({
+                    display: "block",
+                    top: yPos + "px",
+                    left: xPos + "px"
+                });
+                $('#cursor-haplotype1').text(
+                        haploData.haplotype_samples[currHaplo.haplotype_index_1].sample_id);
+                $('#cursor-haplotype2').text(
+                        haploData.haplotype_samples[currHaplo.haplotype_index_2].sample_id);
+            };
+            hapKaryoPlot.mouseOutHaplotype = hideCursorPopup;
+
+            var contribStrainsTokens = $('#contrib-strains-tokens');
+            contribStrainsTokens.tokenfield({
+                autocomplete: {
+                    source: otherSamples,
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 2
+                },
+                showAutocompleteOnFocus: false
+            });
+
+            contribStrainsTokens.on('tokenfield:createtoken', function(e) {
+                var value = e.attrs.value;
+
+                return otherSamples.some(function(samp) {
+                    return samp.value === value;
+                });
+            });
+
+            $('#save-contrib-strains-btn').click(function() {
+                var contribStrainIds = contribStrainsTokens.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                });
+                $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('contrib_strains_json', mongo_id=sample._id) }}",
+                    data: {
+                        contributing_strain_ids: JSON.stringify(contribStrainIds)
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        console.log('saved contributing strains:');
+                        console.log(data);
+                    }
+                });
+            });
+
+            contribStrainsTokens.tokenfield('setTokens', {{ contrib_strain_tokens|tojson }});
+
+            //http://localhost:5000/sample/55f85c8a6606aff0950df55a/viterbi-haplotypes.json
+            function updateHaplotypes() {
+                $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
+                    hapKaryoPlot.updateHaplotypes(data);
+                    window.setTimeout(updateHaplotypes, intervalDelayMS);
+                });
+            }
+            updateHaplotypes();
+        });
+    </script>
+    <style>
+        #cursor-status {
+            display: none;
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.75);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Samples Details for {{ sample.sample_id }}</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th colspan="2">Summary data for {{ sample.sample_id }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><th>Platform</th><td>{{ sample.platform_id }}</td></tr>
+                    <tr><th>% Het. Calls</th><td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td></tr>
+                    <tr><th>% Hom. Calls</th><td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td></tr>
+                    <tr><th>% No Calls</th><td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td></tr>
+                    <tr><th>tags</th>
+                        <td>{{ sample.tags|join(', ') }}</td>
+                    </tr>
+                    <tr><th>% Concordant SNPs</th>
+                        <td>{{ call_concordance.total_concordant }} / {{ call_concordance.total_informative }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <h1>Sample Haplotypes</h1>
+    </div>
+
+    <p>
+        You can modify the "Contributing Haplotype Strains" below and click "Save Contributing Strains". This will
+        cause the haplotype structure of this strain to be inferred based on these settings (using a hidden markov
+        model) and rendered in a plot below.
+    </p>
+
+    <div class="row">
+        <div class="col-md-12">
+        </div>
+    </div>
+
+    <form>
+        <div class="form-group">
+            <label for="contrib-strains-tokens">Contributing Haplotype Strains:</label>
+            <input type="text" class="form-control" id="contrib-strains-tokens"/>
+        </div>
+
+        <div class="form-group">
+            <button id="save-contrib-strains-btn" class="btn btn-default" type="button" value="Upload Samples">
+                Save Contributing Strains
+            </button>
+        </div>
+    </form>
+
+    <div class="row">
+        <div class="col-md-12">
+            <svg id="hapkaryoplot-svg" width="900" height="700" style="display: block; margin-left: auto; margin-right: auto;"></svg>
+        </div>
+    </div>
+
+    <div id="cursor-status">
+        <table id="cursor-status-table">
+            <tr><td>Haplotype 1:</td><td id="cursor-haplotype1"></td></tr>
+            <tr><td>Haplotype 2:</td><td id="cursor-haplotype2"></td></tr>
+        </table>
+    </div>
+{% endblock %}

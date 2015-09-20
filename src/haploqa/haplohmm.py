@@ -1,3 +1,4 @@
+from bson.objectid import ObjectId
 import math
 import numpy as np
 from scipy.stats import norm
@@ -108,7 +109,8 @@ def _scale_matrix_rows_to_one(m):
 def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
     """
     Look up a matrix of AB codes for the given sample IDs.
-    :param sample_ids:  the sample IDs
+    :param sample_ids:  the sample IDs. If isinstance(sample_id, ObjectId) we look this up as an
+                        '_id' otherwise we use 'sample_id' for lookup
     :param chromosome: the chromosome
     :return: a matrix of AB codes. The numerical genotype codes used are: 0->N, 1->A, 2->B, 3->H
     """
@@ -122,7 +124,11 @@ def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
     ab_codes = None
     snp_count = 0
     for i, sample_id in enumerate(sample_ids):
-        curr_sample = db.samples.find_one({'sample_id': sample_id})
+        if isinstance(sample_id, ObjectId):
+            curr_sample = db.samples.find_one({'_id': sample_id})
+        else:
+            curr_sample = db.samples.find_one({'sample_id': sample_id})
+
         if curr_sample is None:
             raise Exception('failed to find a sample named "{}"'.format(sample_id))
 
@@ -330,7 +336,10 @@ class SnpHaploHMM:
         for t in reversed(range(obs_count - 1)):
             max_likelihood_states[t] = from_state_lattice[t, max_likelihood_states[t + 1]]
 
-        max_likelihood_states = [(state_hap1_indices[s], state_hap2_indices[s]) for s in max_likelihood_states]
+        max_likelihood_states = [
+            (int(state_hap1_indices[s]), int(state_hap2_indices[s]))
+            for s in max_likelihood_states
+        ]
         return max_likelihood_states, max_final_likelihood
 
     def log_likelihood(self, haplotype_ab_codes, observation_ab_codes):
@@ -340,7 +349,7 @@ class SnpHaploHMM:
         :param observation_ab_codes:
         :return:
         """
-        pass
+        raise Exception('implement me')
 
     def forward_scan(self, haplotype_ab_codes, observation_ab_codes):
         """
@@ -350,17 +359,18 @@ class SnpHaploHMM:
         :return:
         """
 
-        forward_likelihoods = None
-        forward_scaling_factors = None
-
-        return forward_likelihoods, forward_scaling_factors
+        # forward_likelihoods = None
+        # forward_scaling_factors = None
+        #
+        # return forward_likelihoods, forward_scaling_factors
+        raise Exception('implement me')
 
 
 def main():
 
-    #############################################################################
-    ## This main function is just some smoke-signal test code for this module. ##
-    #############################################################################
+    ###########################################################################
+    # This main function is just some smoke-signal test code for this module. #
+    ###########################################################################
 
     hom_obs_probs = np.array([
         50,     # matching homozygous

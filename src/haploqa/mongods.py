@@ -37,63 +37,28 @@ def get_snps(platform_id, chromosome, db=None):
     ])
 
 
-def _post_proc_sample(samples, sample):
+def post_proc_sample(sample):
     print('post-processing sample: ' + sample['sample_id'])
 
-    hom_total_count = 0
-    het_total_count = 0
-    n_total_count = 0
+    sample['homozygous_count'] = 0
+    sample['heterozygous_count'] = 0
+    sample['no_read_count'] = 0
+    sample['contributing_strains'] = []
 
-    for chr_name, chr_dict in sample['chromosome_data'].items():
-        hom_chr_count = 0
-        het_chr_count = 0
-        n_chr_count = 0
+    for chr_dict in sample['chromosome_data'].values():
+        chr_dict['homozygous_count'] = 0
+        chr_dict['heterozygous_count'] = 0
+        chr_dict['no_read_count'] = 0
 
         allele1_fwds = chr_dict['allele1_fwds']
         allele2_fwds = chr_dict['allele2_fwds']
         for i in range(len(allele1_fwds)):
             if allele1_fwds[i] == '-' or allele2_fwds[i] == '-':
-                n_chr_count += 1
+                chr_dict['no_read_count'] += 1
             elif allele1_fwds[i] == allele2_fwds[i]:
-                hom_chr_count += 1
+                chr_dict['homozygous_count'] += 1
             else:
-                het_chr_count += 1
-        hom_total_count += hom_chr_count
-        het_total_count += het_chr_count
-        n_total_count += n_chr_count
-
-        samples.update_one(
-            {'sample_id': sample['sample_id']},
-            {
-                '$set': {
-                    'chromosome_data.' + chr_name + '.homozygous_count': hom_chr_count,
-                    'chromosome_data.' + chr_name + '.heterozygous_count': het_chr_count,
-                    'chromosome_data.' + chr_name + '.no_read_count': n_chr_count,
-                }
-            }
-        )
-
-    samples.update_one(
-        {'sample_id': sample['sample_id']},
-        {
-            '$set': {
-                'homozygous_count': hom_total_count,
-                'heterozygous_count': het_total_count,
-                'no_read_count': n_total_count,
-            }
-        }
-    )
-
-
-def post_proc_samples(sample_ids=None, db=None):
-    if db is None:
-        db = get_db()
-
-    if sample_ids is None:
-        for sample in db.samples.find({}):
-            _post_proc_sample(db.samples, sample)
-
-    else:
-        for sample_id in sample_ids:
-            for sample in db.samples.find({'sample_id': sample_id}):
-                _post_proc_sample(db.samples, sample)
+                chr_dict['heterozygous_count'] += 1
+        sample['homozygous_count'] += chr_dict['homozygous_count']
+        sample['heterozygous_count'] += chr_dict['heterozygous_count']
+        sample['no_read_count'] += chr_dict['no_read_count']
