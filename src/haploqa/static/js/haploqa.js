@@ -9,6 +9,13 @@ function decURIComp(str) {
     return decodeURIComponent(str).replace(/\\f/g, '/').replace(/\\b/g, '\\');
 }
 
+function showErrorMessage(msg) {
+    var modalDialog = $('#error-modal');
+    var errorModalMessage = $('#error-modal-message');
+    modalDialog.modal();
+    errorModalMessage.text(msg);
+}
+
 /**
  * @typedef {Object} GenoInterval
  * @property {string} chr
@@ -57,7 +64,7 @@ function HaploKaryoPlot(params) {
 
     var genomeScale = d3.scale.linear()
         .domain([minStartBp, maxEndBp])
-        .range([yAxisSize, width]);
+        .range([yAxisSize, width - yAxisSize - 2]);
     var genomeAxis = d3.svg.axis()
         .scale(genomeScale)
         .orient("bottom");
@@ -98,14 +105,16 @@ function HaploKaryoPlot(params) {
                 .attr("y", function(d) { return chrOrdinalScale(d.chr); })
                 .attr("height", chrOrdinalScale.rangeBand()) //function(d) { return height - y(d.value); })
                 .attr("width", function(d) {return genomeScale(d.size)}); //x.rangeBand());
-        $.each(haploData.viterbi_haplotypes, function(chr, haplos) {
-            haplos.forEach(function(currHaplo) {
+        $.each(haploData.viterbi_haplotypes.chromosome_data, function(chr, haplos) {
+            haplos.haplotype_blocks.forEach(function(currHaplo) {
                 if(currHaplo.haplotype_index_1 === currHaplo.haplotype_index_2) {
                     plotContentsGroup.append("rect")
                         .attr("class", "bar")
                         .attr("x", genomeScale(currHaplo.start_position_bp))
-                        .attr("y", chrOrdinalScale(chr))
-                        .attr("height", chrOrdinalScale.rangeBand())
+                        //.attr("y", chrOrdinalScale(chr))
+                        //.attr("height", chrOrdinalScale.rangeBand())
+                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                        .attr("height", chrOrdinalScale.rangeBand() / 2.0)
                         .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
                         .attr("class", "hap" + (currHaplo.haplotype_index_1 + 1))
                         .on("mousemove", function() {
@@ -118,11 +127,14 @@ function HaploKaryoPlot(params) {
                             }
                         });
                 } else {
+                    // TODO these bars may be flipped!
                     plotContentsGroup.append("rect")
                         .attr("class", "bar")
                         .attr("x", genomeScale(currHaplo.start_position_bp))
-                        .attr("y", chrOrdinalScale(chr))
-                        .attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                        //.attr("y", chrOrdinalScale(chr))
+                        //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                        .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                         .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
                         .attr("class", "hap" + (currHaplo.haplotype_index_1 + 1))
                         .on("mousemove", function() {
@@ -137,8 +149,10 @@ function HaploKaryoPlot(params) {
                     plotContentsGroup.append("rect")
                         .attr("class", "bar")
                         .attr("x", genomeScale(currHaplo.start_position_bp))
-                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
-                        .attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                        //.attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                        //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                        .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0))
+                        .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                         .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
                         .attr("class", "hap" + (currHaplo.haplotype_index_2 + 1))
                         .on("mousemove", function() {
@@ -152,6 +166,31 @@ function HaploKaryoPlot(params) {
                         });
                 }
             });
+
+            if(haplos.concordance_bins) {
+                haplos.concordance_bins.forEach(function(currBin) {
+                    var concordanceScore = currBin.concordant_count / currBin.informative_count;
+                    concordanceScore -= .5;
+                    concordanceScore *= 2;
+                    if(concordanceScore < 0) {
+                        concordanceScore = 0;
+                    }
+
+                    concordanceScore = 1.0 - concordanceScore;
+                    //console.log('concordanceScore');
+                    //console.log(currBin);
+                    //console.log(currBin.concordant_count);
+                    //console.log(currBin.informative_count);
+                    //console.log(concordanceScore);
+                    var height = concordanceScore * chrOrdinalScale.rangeBand() / 2.0;
+                    plotContentsGroup.append("rect")
+                        .style('fill', 'red')
+                        .attr("x", genomeScale(currBin.start_position_bp))
+                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - height)
+                        .attr("height", height)
+                        .attr("width", genomeScale(currBin.end_position_bp) - genomeScale(currBin.start_position_bp));
+                });
+            }
         });
     };
 

@@ -4,15 +4,7 @@
 
 {% block head %}
     {{ super() }}
-<!--
-    <script type="text/javascript" src="{{ url_for('static', filename='Tokenize-2.5.1/jquery.tokenize.js') }}"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='Tokenize-2.5.1/jquery.tokenize.css') }}">
--->
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
-    <script type="text/javascript" src="//code.jquery.com/ui/1.11.1/jquery-ui.js"></script>
-    <link href="//code.jquery.com/ui/1.11.1/themes/smoothness/jquery-ui.css" type="text/css" rel="stylesheet">
-    <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/bootstrap-tokenfield.js') }}"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/css/bootstrap-tokenfield.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
     <script>
         var otherSamples = [
@@ -23,15 +15,105 @@
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         ];
-    </script>
-    <script>
+        var sampleTags = {{ sample.tags|tojson }};
+        var allTags = {{ all_tags|tojson }};
         var intervalDelayMS = 2500;
+
         $(function() {
+            var editTagsPanel = $('#edit-tags-panel');
+            var editTagsInput = $('#edit-tags-input');
+            var readonlyTagsPanel = $('#readonly-tags-panel');
+            var tagLinksPanel = $('#tag-links');
+
+            var sampleUpdateSpinner = $('#sample-update-spinner');
+            var editSampleButton = $('#edit-sample-button');
+            var saveSampleButton = $('#save-sample-button');
+            var cancelSampleButton = $('#cancel-sample-button');
+
+            function updateSampleTags(newSampleTags) {
+                sampleTags = newSampleTags;
+                tagLinksPanel.empty();
+                newSampleTags.forEach(function(tag, i) {
+                    if(i >= 1) {
+                        tagLinksPanel.append(document.createTextNode(', '));
+                    }
+                    tagLinksPanel.append('<a href="../tag/' + encURIComp(tag) + '.html">' + tag + '</a>');
+                });
+            }
+            updateSampleTags(sampleTags);
+
+            editTagsInput.tokenfield({
+                autocomplete: {
+                    source: allTags.map(function(tag) {
+                        return {
+                            label: tag,
+                            value: tag
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            });
+            editTagsInput.tokenfield('setTokens', sampleTags.map(function(tag) {
+                return {
+                    label: tag,
+                    value: tag
+                }
+            }));
+
+            editSampleButton.click(function() {
+                // remove the "display: none" style from the edit panel to show it then hide
+                // the read-only panel
+                editTagsPanel.css('display', '');
+                readonlyTagsPanel.css('display', 'none');
+            });
+            cancelSampleButton.click(function() {
+                editTagsPanel.css('display', 'none');
+                readonlyTagsPanel.css('display', '');
+            });
+            var saveTagRequest = null;
+            saveSampleButton.click(function() {
+                if(saveTagRequest !== null) {
+                    saveTagRequest.abort();
+                    saveTagRequest = null;
+                    sampleUpdateSpinner.css('display', 'none');
+                }
+
+                editTagsPanel.css('display', 'none');
+                readonlyTagsPanel.css('display', '');
+                sampleUpdateSpinner.css('display', '');
+
+                var newTags = editTagsInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                });
+                saveTagRequest = $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('tags_json', mongo_id=sample._id) }}",
+                    data: {
+                        tags: JSON.stringify(newTags)
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        console.log('saved contributing tags:');
+                        console.log(data);
+                        updateSampleTags(data.tags);
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occured while updating tags.');
+                }).always(function() {
+                    saveTagRequest = null;
+                    sampleUpdateSpinner.css('display', 'none');
+                });
+            });
+
             var svg = d3.select('#hapkaryoplot-svg');
             var hapKaryoPlot = new HaploKaryoPlot({
                 svg: svg,
                 width: 900,
-                height: 700,
+                height: 900,
                 chrSizes: mm10ChrSizes
             });
 
@@ -40,8 +122,6 @@
                 cursorStatusPopup.style("display", null);
             };
             hapKaryoPlot.mouseOverHaplotype = function(currHaplo, haploData) {
-                console.log('mouse over');
-                console.log(currHaplo);
                 var popupOffset = 20;
                 var xPos = d3.event.pageX + popupOffset;
                 var yPos = d3.event.pageY + popupOffset;
@@ -65,7 +145,8 @@
                     autoFocus: true,
                     minLength: 2
                 },
-                showAutocompleteOnFocus: false
+                showAutocompleteOnFocus: false,
+                createTokensOnBlur: true
             });
 
             contribStrainsTokens.on('tokenfield:createtoken', function(e) {
@@ -91,19 +172,32 @@
                         console.log('saved contributing strains:');
                         console.log(data);
                     }
+                }).fail(function() {
+                    showErrorMessage('An error occured while updating contributing strains for haplotypes.');
                 });
             });
 
             contribStrainsTokens.tokenfield('setTokens', {{ contrib_strain_tokens|tojson }});
 
+            var haploSnpConcordance = $('#haplo-snp-concordance');
             //http://localhost:5000/sample/55f85c8a6606aff0950df55a/viterbi-haplotypes.json
             function updateHaplotypes() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
+                    console.log('data');
+                    console.log(data);
                     hapKaryoPlot.updateHaplotypes(data);
+                    var concordantPercent = data.viterbi_haplotypes.concordant_percent;
+                    haploSnpConcordance.text(
+                            concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
+                }).fail(function() {
+                    showErrorMessage('An error occured while updating haplotypes.');
+                }).always(function() {
                     window.setTimeout(updateHaplotypes, intervalDelayMS);
                 });
             }
             updateHaplotypes();
+
+            $('[data-toggle="tooltip"]').tooltip()
         });
     </script>
     <style>
@@ -114,6 +208,14 @@
             pointer-events: none;
             white-space: nowrap;
         }
+
+        .help-icon {
+            visibility: hidden;
+        }
+
+        tr:hover .help-icon {
+            visibility: visible;
+        }
     </style>
 {% endblock %}
 
@@ -122,24 +224,121 @@
         <h1>Samples Details for {{ sample.sample_id }}</h1>
     </div>
 
+    <div>
+        <span>
+            <button id="edit-sample-button" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
+            </button>
+            <span id="sample-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
+        </span>
+
+        <span>
+            <button id="save-sample-button" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Tags
+            </button>
+            <button id="cancel-sample-button" type="button" class="btn btn-default">
+                <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel Edits
+            </button>
+        </span>
+    </div>
+
     <div class="row">
         <div class="col-md-12">
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th colspan="2">Summary data for {{ sample.sample_id }}</th>
+                        <th colspan="2">Summary data for {{ sample.sample_id }}:</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><th>Platform</th><td>{{ sample.platform_id }}</td></tr>
-                    <tr><th>% Het. Calls</th><td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td></tr>
-                    <tr><th>% Hom. Calls</th><td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td></tr>
-                    <tr><th>% No Calls</th><td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td></tr>
-                    <tr><th>tags</th>
-                        <td>{{ sample.tags|join(', ') }}</td>
+                    <tr>
+                        <th>
+                            Platform
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>{{ sample.platform_id }}</td>
                     </tr>
-                    <tr><th>% Concordant SNPs</th>
-                        <td>{{ call_concordance.total_concordant }} / {{ call_concordance.total_informative }}</td>
+                    <tr>
+                        <th>
+                            % Het. Calls
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td></tr>
+                    <tr>
+                        <th>
+                            % Hom. Calls
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
+                    </tr>
+                    <tr>
+                        <th>
+                            % No Calls
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
+                    </tr>
+                    <tr>
+                        <th>
+                            % Haplotype & SNP Concordance
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td id="haplo-snp-concordance">
+                            {% if sample.viterbi_haplotypes.concordant_percent == None %}
+                                N/A
+                            {% else %}
+                                {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr id="tags-table-row">
+                        <th>
+                            tags
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span id="edit-tags-panel" class="form-group" style="display: none;">
+                                <input id="edit-tags-input" type="text" class="form-control"/>
+                            </span>
+                            <span id="readonly-tags-panel">
+                                {#
+                                {% for tag in sample.tags %}
+                                    <a href="{{ url_for('sample_tag_html', tag_id=tag) }}">{{ tag }}</a>{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                                #}
+                                <span id="tag-links"></span>
+                            </span>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -176,7 +375,10 @@
 
     <div class="row">
         <div class="col-md-12">
-            <svg id="hapkaryoplot-svg" width="900" height="700" style="display: block; margin-left: auto; margin-right: auto;"></svg>
+            <svg
+                    id="hapkaryoplot-svg"
+                    width="900" height="900"
+                    style="display: block; margin-left: auto; margin-right: auto;"></svg>
         </div>
     </div>
 

@@ -6,10 +6,10 @@ from scipy.stats import norm
 import haploqa.mongods as mds
 
 
-_n_code = 0
-_a_code = 1
-_b_code = 2
-_h_code = 3
+N_CODE = 0
+A_CODE = 1
+B_CODE = 2
+H_CODE = 3
 
 
 def _solve_quad(a, b, c):
@@ -106,6 +106,42 @@ def _scale_matrix_rows_to_one(m):
     m /= row_sums
 
 
+def samples_to_ab_codes(samples, chromosome, snps):
+    snp_count = 0
+    x_calls = []
+    y_calls = []
+    for snp in snps:
+        snp_count += 1
+        x_calls.append(snp['x_probe_call'])
+        y_calls.append(snp['y_probe_call'])
+    x_calls = np.array(x_calls)
+    y_calls = np.array(y_calls)
+    ab_codes = np.empty((snp_count, len(samples)), dtype=np.uint8)
+    ab_codes.fill(255)
+
+    for i, curr_sample in enumerate(samples):
+        allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
+        allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])
+
+        # here we convert nucleotides (GACT and '-' for no call) into AB codes
+        allele1_is_a = allele1_fwds == x_calls
+        allele2_is_a = allele2_fwds == x_calls
+        allele1_is_b = allele1_fwds == y_calls
+        allele2_is_b = allele2_fwds == y_calls
+        alleles_are_het = np.logical_or(
+            np.logical_and(allele1_is_a, allele2_is_b),
+            np.logical_and(allele1_is_b, allele2_is_a))
+        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = A_CODE
+        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = B_CODE
+        ab_codes[alleles_are_het, i] = H_CODE
+        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = N_CODE
+
+        if np.any(ab_codes[:, i] == 255):
+            raise Exception('found unexpected SNP codes in sample: {}'.format(curr_sample))
+
+    return ab_codes
+
+
 def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
     """
     Look up a matrix of AB codes for the given sample IDs.
@@ -157,10 +193,10 @@ def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
         alleles_are_het = np.logical_or(
             np.logical_and(allele1_is_a, allele2_is_b),
             np.logical_and(allele1_is_b, allele2_is_a))
-        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = _a_code
-        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = _b_code
-        ab_codes[alleles_are_het, i] = _h_code
-        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = _n_code
+        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = A_CODE
+        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = B_CODE
+        ab_codes[alleles_are_het, i] = H_CODE
+        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = N_CODE
 
         if np.any(ab_codes[:, i] == 255):
             raise Exception('found unexpected SNP codes in sample: {}'.format(sample_id))
@@ -230,12 +266,12 @@ class SnpHaploHMM:
                 for obs_call in range(4):
                     # if no read from hidden state (we consider it a "no read" if either
                     # parent is N or H)
-                    if hap1_call == _n_code or hap2_call == _n_code or hap1_call == _h_code or hap2_call == _h_code:
+                    if hap1_call == N_CODE or hap2_call == N_CODE or hap1_call == H_CODE or hap2_call == H_CODE:
                         # if N from observation
-                        if obs_call == _n_code:
+                        if obs_call == N_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.n_obs_probs[0]
                         # if hom from observation
-                        elif obs_call == _a_code or obs_call == _b_code:
+                        elif obs_call == A_CODE or obs_call == B_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.n_obs_probs[1]
                         # else het from observation
                         else:
@@ -243,10 +279,10 @@ class SnpHaploHMM:
                     # if hom from hidden state
                     elif hap1_call == hap2_call:
                         # if N from observation
-                        if obs_call == _n_code:
+                        if obs_call == N_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[3]
                         # if het from observation
-                        elif obs_call == _h_code:
+                        elif obs_call == H_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.hom_obs_probs[2]
                         # if matching hom from observation
                         elif obs_call == hap1_call:
@@ -257,10 +293,10 @@ class SnpHaploHMM:
                     # else het from hidden state
                     else:
                         # if N from observation
-                        if obs_call == _n_code:
+                        if obs_call == N_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.het_obs_probs[2]
                         # if het from observation
-                        elif obs_call == _h_code:
+                        elif obs_call == H_CODE:
                             self.obs_prob_matrix[hap1_call, hap2_call, obs_call] = self.het_obs_probs[0]
                         # else hom from observation (A or B)
                         else:
@@ -310,6 +346,8 @@ class SnpHaploHMM:
             observation_ab_codes[0]]
         curr_log_likelihoods = log_init_prob + curr_log_obs_probs
 
+        # step forward in time updating the "from" state likelihoods for each
+        # "to" state at each step
         from_state_lattice = np.zeros((obs_count - 1, state_count), dtype=np.uint16)
         for t in range(1, obs_count):
             prev_log_likelihoods = curr_log_likelihoods
@@ -385,7 +423,7 @@ def main():
     ], dtype=np.float64)
     n_obs_probs = np.ones(3, dtype=np.float64)
 
-    trans_prob = 0.01
+    trans_prob = 0.001
     test_hmm = SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
 
     # Each sample is a different set of parental strains but only 129S, B6J, FVB for the most part

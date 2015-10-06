@@ -5,11 +5,22 @@
     <title>{% block title %}{% endblock %}</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- JQuery -->
+    <link href="//code.jquery.com/ui/1.11.1/themes/smoothness/jquery-ui.css" type="text/css" rel="stylesheet">
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
+    <script type="text/javascript" src="//code.jquery.com/ui/1.11.1/jquery-ui.js"></script>
 
     <!-- bootstrap stuff -->
     <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-3.3.5-dist/css/bootstrap.min.css') }}">
     <script src="{{ url_for('static', filename='bootstrap-3.3.5-dist/js/bootstrap.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/css/bootstrap-tokenfield.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/bootstrap-tokenfield.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='font-awesome-4.4.0/css/font-awesome.min.css') }}">
+
+    <!-- D3 -->
+    <script type="text/javascript" src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
+
     <script src="{{ url_for('static', filename='js/haploqa.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/haploqa.css') }}">
     {% endblock %}
@@ -19,6 +30,23 @@
 <!--div id="content" class="container-fluid"-->
 <div id="content" class="container">
     {% block content %}{% endblock %}
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span
+                            aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                    <h4 class="modal-title" id="myModalLabel">An Error Occurred</h4>
+                </div>
+                <div id="error-modal-message" class="modal-body"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div id="footer">
