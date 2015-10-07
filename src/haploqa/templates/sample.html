@@ -7,6 +7,17 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
     <script>
+
+        function arraysEq(arr1, arr2) {
+            if(arr1.length !== arr2.length) {
+                return false;
+            } else {
+                return arr1.every(function(elem1, i) {
+                    return elem1 === arr2[i];
+                });
+            }
+        }
+
         var otherSamples = [
             {% for other_sample in other_samples %}
             {
@@ -15,14 +26,15 @@
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         ];
+        var sampleID = "{{ sample.sample_id }}";
         var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
+        var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
         var intervalDelayMS = 2500;
 
         $(function() {
             var editTagsPanel = $('#edit-tags-panel');
             var editTagsInput = $('#edit-tags-input');
-            var readonlyTagsPanel = $('#readonly-tags-panel');
             var tagLinksPanel = $('#tag-links');
 
             var sampleUpdateSpinner = $('#sample-update-spinner');
@@ -30,17 +42,12 @@
             var saveSampleButton = $('#save-sample-button');
             var cancelSampleButton = $('#cancel-sample-button');
 
-            function updateSampleTags(newSampleTags) {
-                sampleTags = newSampleTags;
-                tagLinksPanel.empty();
-                newSampleTags.forEach(function(tag, i) {
-                    if(i >= 1) {
-                        tagLinksPanel.append(document.createTextNode(', '));
-                    }
-                    tagLinksPanel.append('<a href="../tag/' + encURIComp(tag) + '.html">' + tag + '</a>');
-                });
-            }
-            updateSampleTags(sampleTags);
+            var readonlyHaplotypesPanel = $('#readonly-haplotypes-panel');
+            var editHaplotypesPanel = $('#edit-haplotypes-panel');
+
+            var readonlySampleIDPanel = $('#readonly-sampleid');
+            var editSampleIDPanel = $('#edit-sampleid-panel');
+            var editSampleIDInput = $('#edit-sampleid-input');
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -57,22 +64,97 @@
                 showAutocompleteOnFocus: true,
                 createTokensOnBlur: true
             });
-            editTagsInput.tokenfield('setTokens', sampleTags.map(function(tag) {
-                return {
-                    label: tag,
-                    value: tag
-                }
-            }));
+            function updateSampleTags(newSampleTags) {
+                sampleTags = newSampleTags;
+                tagLinksPanel.empty();
+                newSampleTags.forEach(function(tag, i) {
+                    if(i >= 1) {
+                        tagLinksPanel.append(document.createTextNode(', '));
+                    }
+                    tagLinksPanel.append('<a href="../tag/' + encURIComp(tag) + '.html">' + tag + '</a>');
+                });
+                editTagsInput.tokenfield('setTokens', newSampleTags.map(function(tag) {
+                    return {
+                        label: tag,
+                        value: tag
+                    }
+                }));
+            }
+            updateSampleTags(sampleTags);
+
+            var contribStrainTokensInput = $('#contrib-strains-tokens');
+            contribStrainTokensInput.tokenfield({
+                autocomplete: {
+                    source: otherSamples,
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 2
+                },
+                showAutocompleteOnFocus: false,
+                createTokensOnBlur: true
+            });
+            contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
+                var value = e.attrs.value;
+
+                return otherSamples.some(function(samp) {
+                    return samp.value === value;
+                });
+            });
+            function updateHaplotypeStrains(newContribStrainTokens) {
+                contribStrainTokens = newContribStrainTokens;
+                readonlyHaplotypesPanel.empty();
+                newContribStrainTokens.forEach(function(strain, i) {
+                    if(i >= 1) {
+                        readonlyHaplotypesPanel.append(document.createTextNode(', '));
+                    }
+                    readonlyHaplotypesPanel.append('<a href="' + encURIComp(strain.value) + '.html">' + strain.label + '</a>');
+                });
+                contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
+            }
+            updateHaplotypeStrains(contribStrainTokens);
+
+            function updateSampleID(newSampleID) {
+                sampleID = newSampleID;
+
+                $('[data-sampleid]').text(newSampleID);
+                editSampleIDInput.val(newSampleID);
+            }
+            updateSampleID(sampleID);
 
             editSampleButton.click(function() {
-                // remove the "display: none" style from the edit panel to show it then hide
-                // the read-only panel
+                // hide some stuff and show some stuff to switch from read-only mode to edit mode
+                editSampleButton.parent().css('display', 'none');
+                readonlySampleIDPanel.css('display', 'none');
+                tagLinksPanel.css('display', 'none');
+                readonlyHaplotypesPanel.css('display', 'none');
+
+                saveSampleButton.parent().css('display', '');
+                editSampleIDPanel.css('display', '');
                 editTagsPanel.css('display', '');
-                readonlyTagsPanel.css('display', 'none');
+                editHaplotypesPanel.css('display', '');
             });
-            cancelSampleButton.click(function() {
+
+            function switchToReadonlyView() {
+                // hide some stuff and show some stuff to switch from edit mode to read-only mode
+                saveSampleButton.parent().css('display', 'none');
+                editSampleIDPanel.css('display', 'none');
                 editTagsPanel.css('display', 'none');
-                readonlyTagsPanel.css('display', '');
+                editHaplotypesPanel.css('display', 'none');
+
+                editSampleButton.parent().css('display', '');
+                readonlySampleIDPanel.css('display', '');
+                tagLinksPanel.css('display', '');
+                readonlyHaplotypesPanel.css('display', '');
+            }
+
+            cancelSampleButton.click(function() {
+                switchToReadonlyView();
+
+                // restore old values to inputs so that if the user clicks edit again they
+                // won't be presented with the values that they just cancelled.
+                updateSampleTags(sampleTags);
+                updateHaplotypeStrains(contribStrainTokens);
+                updateSampleID(sampleID);
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -82,31 +164,57 @@
                     sampleUpdateSpinner.css('display', 'none');
                 }
 
-                editTagsPanel.css('display', 'none');
-                readonlyTagsPanel.css('display', '');
-                sampleUpdateSpinner.css('display', '');
-
+                var postData = {};
                 var newTags = editTagsInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
                 });
+                var tagsChanged = !arraysEq(newTags, sampleTags);
+                if(tagsChanged) {
+                    postData['tags'] = JSON.stringify(newTags);
+                }
+
+                var newContribStrainTokens = contribStrainTokensInput.tokenfield('getTokens');
+                var newContribStrainIds = newContribStrainTokens.map(function(x) {
+                    return x.value;
+                });
+                var oldContribStrainIds = contribStrainTokens.map(function(x) {
+                    return x.value;
+                });
+                var contribStrainsChanged = !arraysEq(newContribStrainIds, oldContribStrainIds);
+                if(contribStrainsChanged) {
+                    postData['contributing_strain_ids'] = JSON.stringify(newContribStrainIds)
+                }
+
+                var newSampleID = editSampleIDInput.val();
+                var sampleIDChanged = newSampleID !== sampleID;
+                if(sampleIDChanged) {
+                    postData['sample_id'] = newSampleID;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
-                    url: "{{ url_for('tags_json', mongo_id=sample._id) }}",
-                    data: {
-                        tags: JSON.stringify(newTags)
-                    },
+                    url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
+                    data: postData,
                     dataType: 'json',
                     success: function(data) {
-                        console.log('saved contributing tags:');
-                        console.log(data);
-                        updateSampleTags(data.tags);
+                        if(tagsChanged) {
+                            updateSampleTags(data.tags);
+                        }
+                        if(contribStrainsChanged) {
+                            updateHaplotypeStrains(newContribStrainTokens);
+                        }
+                        if(sampleIDChanged) {
+                            updateSampleID(newSampleID);
+                        }
                     }
                 }).fail(function() {
-                    showErrorMessage('An error occured while updating tags.');
+                    showErrorMessage('An error occured while saving sample.');
                 }).always(function() {
                     saveTagRequest = null;
                     sampleUpdateSpinner.css('display', 'none');
                 });
+
+                switchToReadonlyView();
             });
 
             var svg = d3.select('#hapkaryoplot-svg');
@@ -137,51 +245,8 @@
             };
             hapKaryoPlot.mouseOutHaplotype = hideCursorPopup;
 
-            var contribStrainsTokens = $('#contrib-strains-tokens');
-            contribStrainsTokens.tokenfield({
-                autocomplete: {
-                    source: otherSamples,
-                    delay: 100,
-                    autoFocus: true,
-                    minLength: 2
-                },
-                showAutocompleteOnFocus: false,
-                createTokensOnBlur: true
-            });
-
-            contribStrainsTokens.on('tokenfield:createtoken', function(e) {
-                var value = e.attrs.value;
-
-                return otherSamples.some(function(samp) {
-                    return samp.value === value;
-                });
-            });
-
-            $('#save-contrib-strains-btn').click(function() {
-                var contribStrainIds = contribStrainsTokens.tokenfield('getTokens').map(function(x) {
-                    return x.value;
-                });
-                $.ajax({
-                    type: "POST",
-                    url: "{{ url_for('contrib_strains_json', mongo_id=sample._id) }}",
-                    data: {
-                        contributing_strain_ids: JSON.stringify(contribStrainIds)
-                    },
-                    dataType: 'json',
-                    success: function(data) {
-                        console.log('saved contributing strains:');
-                        console.log(data);
-                    }
-                }).fail(function() {
-                    showErrorMessage('An error occured while updating contributing strains for haplotypes.');
-                });
-            });
-
-            contribStrainsTokens.tokenfield('setTokens', {{ contrib_strain_tokens|tojson }});
-
             var haploSnpConcordance = $('#haplo-snp-concordance');
-            //http://localhost:5000/sample/55f85c8a6606aff0950df55a/viterbi-haplotypes.json
-            function updateHaplotypes() {
+            function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
                     console.log('data');
                     console.log(data);
@@ -192,10 +257,10 @@
                 }).fail(function() {
                     showErrorMessage('An error occured while updating haplotypes.');
                 }).always(function() {
-                    window.setTimeout(updateHaplotypes, intervalDelayMS);
+                    window.setTimeout(updateHaplotypeSVG, intervalDelayMS);
                 });
             }
-            updateHaplotypes();
+            updateHaplotypeSVG();
 
             $('[data-toggle="tooltip"]').tooltip()
         });
@@ -221,7 +286,7 @@
 
 {% block content %}
     <div class="page-header">
-        <h1>Samples Details for {{ sample.sample_id }}</h1>
+        <h1>Samples Details for <span data-sampleid>{{ sample.sample_id }}</span></h1>
     </div>
 
     <div>
@@ -232,9 +297,9 @@
             <span id="sample-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
         </span>
 
-        <span>
+        <span style="display: none;">
             <button id="save-sample-button" type="button" class="btn btn-default">
-                <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Tags
+                <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Edits
             </button>
             <button id="cancel-sample-button" type="button" class="btn btn-default">
                 <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel Edits
@@ -245,12 +310,24 @@
     <div class="row">
         <div class="col-md-12">
             <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th colspan="2">Summary data for {{ sample.sample_id }}:</th>
-                    </tr>
-                </thead>
                 <tbody>
+                    <tr>
+                        <th>
+                            Sample ID:
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span id="edit-sampleid-panel" class="form-group" style="display: none;">
+                                <input id="edit-sampleid-input" type="text" class="form-control"/>
+                            </span>
+                            <span id="readonly-sampleid" data-sampleid>{{ sample.sample_id }}</span>
+                        </td>
+                    </tr>
                     <tr>
                         <th>
                             Platform
@@ -330,14 +407,7 @@
                             <span id="edit-tags-panel" class="form-group" style="display: none;">
                                 <input id="edit-tags-input" type="text" class="form-control"/>
                             </span>
-                            <span id="readonly-tags-panel">
-                                {#
-                                {% for tag in sample.tags %}
-                                    <a href="{{ url_for('sample_tag_html', tag_id=tag) }}">{{ tag }}</a>{% if not loop.last %}, {% endif %}
-                                {% endfor %}
-                                #}
-                                <span id="tag-links"></span>
-                            </span>
+                            <span id="tag-links"></span>
                         </td>
                     </tr>
                 </tbody>
@@ -355,21 +425,13 @@
         model) and rendered in a plot below.
     </p>
 
-    <div class="row">
-        <div class="col-md-12">
-        </div>
-    </div>
+    <div><strong>Contributing Haplotype Strains:</strong></div>
 
-    <form>
+    <div id="readonly-haplotypes-panel"></div>
+
+    <form id="edit-haplotypes-panel" style="display: none;">
         <div class="form-group">
-            <label for="contrib-strains-tokens">Contributing Haplotype Strains:</label>
             <input type="text" class="form-control" id="contrib-strains-tokens"/>
-        </div>
-
-        <div class="form-group">
-            <button id="save-contrib-strains-btn" class="btn btn-default" type="button" value="Upload Samples">
-                Save Contributing Strains
-            </button>
         </div>
     </form>
 

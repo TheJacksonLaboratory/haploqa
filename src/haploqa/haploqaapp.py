@@ -202,24 +202,33 @@ def sample_html(mongo_id):
     )
 
 
-@app.route('/sample/<mongo_id>/contributing-strains.json', methods=['GET', 'POST'])
-def contrib_strains_json(mongo_id):
+@app.route('/sample/<mongo_id>.json', methods=['POST'])
+def update_sample(mongo_id):
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
-    if flask.request.method == 'POST':
-        form = flask.request.form
+
+    task_ids = []
+
+    form = flask.request.form
+    update_dict = dict()
+    if 'sample_id' in form:
+        update_dict['sample_id'] = form['sample_id']
+
+    if 'tags' in form:
+        update_dict['tags'] = json.loads(form['tags'])
+
+    if 'contributing_strain_ids' in form:
         new_strain_ids = json.loads(form['contributing_strain_ids'])
         new_strain_ids = [ObjectId(x) for x in new_strain_ids]
         haplotype_inference_uuid = str(uuid.uuid4())
 
         # we need to update the document and invalidate existing haplotypes
+        update_dict['contributing_strains'] = new_strain_ids
+        update_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
         db.samples.update_one(
             {'_id': obj_id},
             {
-                '$set': {
-                    'contributing_strains': new_strain_ids,
-                    'haplotype_inference_uuid': haplotype_inference_uuid,
-                },
+                '$set': update_dict,
                 '$unset': {
                     'viterbi_haplotypes': '',
                 },
@@ -232,32 +241,17 @@ def contrib_strains_json(mongo_id):
             platform = db.platforms.find_one({'platform_id': sample['platform_id']})
             sample_obj_id = str(sample['_id'])
             for chr_id in platform['chromosomes']:
-                infer_haplotype_structure_task.delay(
+                t = infer_haplotype_structure_task.delay(
                     sample_obj_id,
                     chr_id,
                     haplotype_inference_uuid,
                 )
+                task_ids.append(t.task_id)
 
-    sample = db.samples.find_one({'_id': obj_id}, {'contributing_strains': 1})
+    elif len(update_dict):
+        db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
-    return flask.jsonify(contributing_strains=[str(x) for x in sample['contributing_strains']])
-
-
-@app.route('/sample/<mongo_id>/tags.json', methods=['GET', 'POST'])
-def tags_json(mongo_id):
-    db = mds.get_db()
-    obj_id = ObjectId(mongo_id)
-    tags = []
-    if flask.request.method == 'POST':
-        form = flask.request.form
-        tags = json.loads(form['tags'])
-        db.samples.update_one({'_id': obj_id}, {'$set': {'tags': tags}})
-    else:
-        sample = db.samples.find_one({'_id': obj_id}, {'tags': 1})
-        if sample is not None and 'tags' in sample:
-            tags = sample['tags']
-
-    return flask.jsonify(tags=tags)
+    return flask.jsonify(task_ids=task_ids)
 
 
 @app.route('/sample/<mongo_id>/viterbi-haplotypes.json')
@@ -295,73 +289,6 @@ def sample_data_import_task(platform_id, sample_map_filename, final_report_filen
             os.remove(final_report_filename)
 
     return sample_group_name
-
-
-'''
-def _haplo_call_concordance(sample, db):
-    # This needs to be done on a per-chromosome basis. All of ther per-chr values should then
-    # be summed at the end of each call to infer_haplotype_structure_task. We should also add
-    # "discordant SNPs" to return dict
-
-    total_informative = 0
-    total_concordant = 0
-
-    if 'viterbi_haplotypes' in sample:
-        platform_id = sample['platform_id']
-        #chrs = db.platforms.find_one({'platform_id': platform_id}, {'chromosomes': 1})
-        for chr, chr_haplos in sample['viterbi_haplotypes'].items():
-            contrib_strains_alleles = [
-                db.samples.find_one(
-                    {'_id': samp_id},
-                    {
-                        'chromosome_data.' + chr + '.allele1_fwds': 1,
-                        'chromosome_data.' + chr + '.allele2_fwds': 1,
-                    }
-                )['chromosome_data'][chr]
-                for samp_id in sample['contributing_strains']
-            ]
-            sample_alleles = sample['chromosome_data'][chr]
-
-            snps = list(mds.get_snps(platform_id, chr, db))
-            snp_index = 0
-            for haplo in chr_haplos:
-                print(haplo)
-                print(len(contrib_strains_alleles))
-                while snp_index < len(snps) and snps[snp_index]['position_bp'] < haplo['start_position_bp']:
-                    snp_index += 1
-
-                while snp_index < len(snps) and snps[snp_index]['position_bp'] <= haplo['end_position_bp']:
-                    hap_strain1_alleles = contrib_strains_alleles[haplo['haplotype_index_1']]
-                    hap_strain1_allele1 = hap_strain1_alleles['allele1_fwds'][snp_index]
-                    hap_strain1_allele2 = hap_strain1_alleles['allele2_fwds'][snp_index]
-
-                    hap_strain2_alleles = contrib_strains_alleles[haplo['haplotype_index_2']]
-                    hap_strain2_allele1 = hap_strain2_alleles['allele1_fwds'][snp_index]
-                    hap_strain2_allele2 = hap_strain2_alleles['allele2_fwds'][snp_index]
-
-                    # only consider homozygous haplotype locations
-                    if hap_strain1_allele1 == hap_strain1_allele2 and hap_strain1_allele1 != '-' and \
-                       hap_strain2_allele1 == hap_strain2_allele2 and hap_strain2_allele1 != '-':
-
-                        # we can now make a comparison. We call this SNP concordant if it has a SNP from
-                        # each haplotype strain
-                        haplo_call_set = {hap_strain1_allele1, hap_strain2_allele1}
-                        sample_call_set = {
-                            sample_alleles['allele1_fwds'][snp_index],
-                            sample_alleles['allele2_fwds'][snp_index],
-                        }
-
-                        if haplo_call_set == sample_call_set:
-                            total_concordant += 1
-                        total_informative += 1
-
-                    snp_index += 1
-
-    return {
-        'total_informative': total_informative,
-        'total_concordant': total_concordant,
-    }
-'''
 
 
 CONCORDANCE_BIN_SIZE = 200
