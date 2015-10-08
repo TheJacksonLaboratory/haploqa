@@ -198,7 +198,7 @@
                     dataType: 'json',
                     success: function(data) {
                         if(tagsChanged) {
-                            updateSampleTags(data.tags);
+                            updateSampleTags(newTags);
                         }
                         if(contribStrainsChanged) {
                             updateHaplotypeStrains(newContribStrainTokens);
