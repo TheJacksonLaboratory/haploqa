@@ -21,6 +21,10 @@ app.config.update(
 app.jinja_env.globals.update(isnan=math.isnan)
 
 
+# WSGI needs an "application" variable
+application = app
+
+
 def _unique_temp_filename():
     return os.path.join(tempfile.tempdir, str(uuid.uuid4()))
 
@@ -471,4 +475,4 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
 
 if __name__ == '__main__':
     app.debug = True
-    app.run()
+    app.run(host='0.0.0.0')
