@@ -20,7 +20,11 @@
                     <th>% Het. Calls</th>
                     <th>% Hom. Calls</th>
                     <th>% No Call</th>
+                    {% if tag_id == 'haplotype-strain' %}
+                    <th>Color</th>
+                    {% else %}
                     <th>% Haplotype & SNP Concordance</th>
+                    {% endif %}
                 </tr>
                 </thead>
                 <tbody>
@@ -31,6 +35,9 @@
                         <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
+                        {% if tag_id == 'haplotype-strain' %}
+                        <td><span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span></td>
+                        {% else %}
                         <td>
                             {% if sample.viterbi_haplotypes.concordant_percent == None %}
                                 N/A
@@ -38,6 +45,7 @@
                                 {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
                             {% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr><td colspan="5">No samples found for tag: {{ tag_id }}</td></tr>

@@ -21,6 +21,9 @@ app.config.update(
 app.jinja_env.globals.update(isnan=math.isnan)
 
 
+HAPLOTYPE_TAG = 'haplotype-strain'
+
+
 def _unique_temp_filename():
     return os.path.join(tempfile.tempdir, str(uuid.uuid4()))
 
@@ -153,6 +156,11 @@ def _add_concordant_percent(sample):
             viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
 
 
+def _add_color(sample):
+    if 'color' not in sample:
+        sample['color'] = '#000000'
+
+
 @app.route('/tag/<tag_id>.html')
 def sample_tag_html(tag_id):
     # this tag_id uses a home-grown forward slash escape.
@@ -183,11 +191,17 @@ def sample_html(mongo_id):
     obj_id = ObjectId(mongo_id)
     sample = db.samples.find_one({'_id': obj_id})
     _add_call_percents(sample)
-    other_samples = db.samples.find({'_id': {'$ne': obj_id}}, {'chromosome_data': 0, 'unannotated_snps': 0})
-    other_samples = list(other_samples)
+    _add_color(sample)
+    haplotype_samples = db.samples.find(
+        {'tags': HAPLOTYPE_TAG},
+        {'chromosome_data': 0, 'unannotated_snps': 0},
+    )
+    haplotype_samples = list(haplotype_samples)
+    for x in haplotype_samples:
+        _add_color(x)
     contrib_strain_tokens = [
         {'value': str(x['_id']), 'label': x['sample_id']}
-        for x in other_samples
+        for x in haplotype_samples
         if x['_id'] in sample['contributing_strains']
     ]
 
@@ -196,7 +210,7 @@ def sample_html(mongo_id):
     return flask.render_template(
         'sample.html',
         sample=sample,
-        other_samples=other_samples,
+        haplotype_samples=haplotype_samples,
         contrib_strain_tokens=contrib_strain_tokens,
         all_tags=all_tags,
     )
@@ -216,6 +230,9 @@ def update_sample(mongo_id):
 
     if 'tags' in form:
         update_dict['tags'] = json.loads(form['tags'])
+
+    if 'color' in form:
+        update_dict['color'] = form['color']
 
     if 'contributing_strain_ids' in form:
         new_strain_ids = json.loads(form['contributing_strain_ids'])
@@ -261,9 +278,11 @@ def viterbi_haplotypes_json(mongo_id):
     sample = db.samples.find_one({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1})
     _add_concordant_percent(sample)
     haplotype_samples = [
-        db.samples.find_one({'_id': x}, {'sample_id': 1})
+        db.samples.find_one({'_id': x}, {'sample_id': 1, 'color': 1})
         for x in sample['contributing_strains']
     ]
+    for x in haplotype_samples:
+        _add_color(x)
     haplotype_samples = [
         {'obj_id': str(x['_id']), 'sample_id': x['sample_id']}
         for x in haplotype_samples

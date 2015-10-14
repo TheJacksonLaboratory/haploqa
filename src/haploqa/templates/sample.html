@@ -18,15 +18,21 @@
             }
         }
 
-        var otherSamples = [
-            {% for other_sample in other_samples %}
+        var haplotypeSamples = [
+            {% for haplotype_sample in haplotype_samples %}
             {
-                label: '{{ other_sample.sample_id }}',
-                value: '{{ other_sample._id }}'
+                label: '{{ haplotype_sample.sample_id }}',
+                value: '{{ haplotype_sample._id }}'
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         ];
+        var haplotypeColors = {
+            {% for haplotype_sample in haplotype_samples %}
+                '{{ haplotype_sample._id }}': '{{ haplotype_sample.color }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
         var sampleID = "{{ sample.sample_id }}";
+        var sampleColor = "{{ sample.color }}";
         var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
         var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
@@ -49,6 +55,19 @@
             var editSampleIDPanel = $('#edit-sampleid-panel');
             var editSampleIDInput = $('#edit-sampleid-input');
 
+            var editSampleColorPanel = $('#edit-sample-color');
+            var editColorComponent = $('#edit-color-component');
+            var readonlySampleColorPanel = $('#readonly-sample-color');
+            var sampleColorIcon = $('#sample-color-icon');
+            var sampleColorText = $('#sample-color-text');
+            var colorTableRow = $('#color-table-row');
+            editColorComponent.minicolors({
+                theme: 'bootstrap',
+                change: function(value, opacity) {
+                    console.log(value);
+                }
+            });
+
             editTagsInput.tokenfield({
                 autocomplete: {
                     source: allTags.map(function(tag) {
@@ -67,12 +86,19 @@
             function updateSampleTags(newSampleTags) {
                 sampleTags = newSampleTags;
                 tagLinksPanel.empty();
+                var haplotypeStrainTagPresent = false;
                 newSampleTags.forEach(function(tag, i) {
+                    if(tag === 'haplotype-strain') {
+                        haplotypeStrainTagPresent = true;
+                    }
+
                     if(i >= 1) {
                         tagLinksPanel.append(document.createTextNode(', '));
                     }
                     tagLinksPanel.append('<a href="../tag/' + encURIComp(tag) + '.html">' + tag + '</a>');
                 });
+                colorTableRow.css('display', haplotypeStrainTagPresent ? '' : 'none');
+
                 editTagsInput.tokenfield('setTokens', newSampleTags.map(function(tag) {
                     return {
                         label: tag,
@@ -85,18 +111,17 @@
             var contribStrainTokensInput = $('#contrib-strains-tokens');
             contribStrainTokensInput.tokenfield({
                 autocomplete: {
-                    source: otherSamples,
+                    source: haplotypeSamples,
                     delay: 100,
-                    autoFocus: true,
-                    minLength: 2
+                    autoFocus: true
                 },
-                showAutocompleteOnFocus: false,
+                showAutocompleteOnFocus: true,
                 createTokensOnBlur: true
             });
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
                 var value = e.attrs.value;
 
-                return otherSamples.some(function(samp) {
+                return haplotypeSamples.some(function(samp) {
                     return samp.value === value;
                 });
             });
@@ -107,7 +132,11 @@
                     if(i >= 1) {
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
-                    readonlyHaplotypesPanel.append('<a href="' + encURIComp(strain.value) + '.html">' + strain.label + '</a>');
+                    readonlyHaplotypesPanel.append(
+                            '<a href="' + encURIComp(strain.value) + '.html">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[strain.value] + ';"></span>'
+                            + strain.label
+                            + '</a>');
                 });
                 contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
             }
@@ -121,17 +150,28 @@
             }
             updateSampleID(sampleID);
 
+            function updateSampleColor(newColor) {
+                sampleColor = newColor;
+
+                editColorComponent.minicolors('value', newColor);
+                sampleColorIcon.css({'color': newColor});
+                sampleColorText.text(newColor);
+            }
+            updateSampleColor(sampleColor);
+
             editSampleButton.click(function() {
                 // hide some stuff and show some stuff to switch from read-only mode to edit mode
                 editSampleButton.parent().css('display', 'none');
                 readonlySampleIDPanel.css('display', 'none');
                 tagLinksPanel.css('display', 'none');
                 readonlyHaplotypesPanel.css('display', 'none');
+                readonlySampleColorPanel.css('display', 'none');
 
                 saveSampleButton.parent().css('display', '');
                 editSampleIDPanel.css('display', '');
                 editTagsPanel.css('display', '');
                 editHaplotypesPanel.css('display', '');
+                editSampleColorPanel.css('display', '');
             });
 
             function switchToReadonlyView() {
@@ -140,11 +180,13 @@
                 editSampleIDPanel.css('display', 'none');
                 editTagsPanel.css('display', 'none');
                 editHaplotypesPanel.css('display', 'none');
+                editSampleColorPanel.css('display', 'none');
 
                 editSampleButton.parent().css('display', '');
                 readonlySampleIDPanel.css('display', '');
                 tagLinksPanel.css('display', '');
                 readonlyHaplotypesPanel.css('display', '');
+                readonlySampleColorPanel.css('display', '');
             }
 
             cancelSampleButton.click(function() {
@@ -155,6 +197,7 @@
                 updateSampleTags(sampleTags);
                 updateHaplotypeStrains(contribStrainTokens);
                 updateSampleID(sampleID);
+                updateSampleColor(sampleColor);
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -191,6 +234,12 @@
                     postData['sample_id'] = newSampleID;
                 }
 
+                var newColor = editColorComponent.minicolors('value');
+                var colorChanged = newColor !== sampleColor;
+                if(colorChanged) {
+                    postData['color'] = newColor;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
                     url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -205,6 +254,9 @@
                         }
                         if(sampleIDChanged) {
                             updateSampleID(newSampleID);
+                        }
+                        if(colorChanged) {
+                            updateSampleColor(newColor);
                         }
                     }
                 }).fail(function() {
@@ -250,12 +302,12 @@
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
                     console.log('data');
                     console.log(data);
-                    hapKaryoPlot.updateHaplotypes(data);
+                    hapKaryoPlot.updateHaplotypes(data, haplotypeColors);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
                 }).fail(function() {
-                    showErrorMessage('An error occured while updating haplotypes.');
+                    showErrorMessage('An error occurred while updating haplotypes.');
                 }).always(function() {
                     window.setTimeout(updateHaplotypeSVG, intervalDelayMS);
                 });
@@ -395,7 +447,7 @@
                     </tr>
                     <tr id="tags-table-row">
                         <th>
-                            tags
+                            Tags
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -410,6 +462,40 @@
                             <span id="tag-links"></span>
                         </td>
                     </tr>
+                    <tr id="color-table-row">
+                        <th>
+                            Haplotype Color
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span id="edit-sample-color" style="display: none;">
+                                <input type="text" id="edit-color-component" class="form-control" data-control="hue" value="#000000">
+                            </span>
+                            <span id="readonly-sample-color">
+                                <span id="sample-color-icon" class="fa fa-square"></span>
+                                <span id="sample-color-text"></span>
+                            </span>
+                        </td>
+                    </tr>
+                    <!--tr id="samples-w-haplotype-table-row">
+                        <th>
+                            Samples With This Haplotype
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            TODO
+                        </td>
+                    </tr-->
                 </tbody>
             </table>
         </div>
