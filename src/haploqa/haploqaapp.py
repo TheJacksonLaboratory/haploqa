@@ -5,6 +5,7 @@ import json
 import math
 import numpy as np
 import os
+import pymongo
 import tempfile
 import uuid
 
@@ -19,6 +20,17 @@ app.config.update(
     CELERY_RESULT_BACKEND=BROKER_URL,
 )
 app.jinja_env.globals.update(isnan=math.isnan)
+
+
+# TODO this key must be changed to something secret (ie. not committed to the repo).
+# Comment out the print message when this is done
+print('===================================================')
+print('THIS VERSION OF HaploQA IS NOT SECURE. YOU MUST    ')
+print('REGENERATE THE SECRET KEY BEFORE DEPLOYMENT. SEE   ')
+print('"How to generate good secret keys" AT			  ')
+print('http://flask.pocoo.org/docs/quickstart/ FOR DETAILS')
+print('===================================================')
+app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\xa1\xab\x0f'
 
 
 HAPLOTYPE_TAG = 'haplotype-strain'
@@ -169,10 +181,14 @@ def sample_tag_html(tag_id):
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
-    matching_samples = db.samples.find({'tags': tag_id}, {'chromosome_data': 0, 'unannotated_snps': 0})
+    matching_samples = db.samples.find(
+        {'tags': tag_id},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
     matching_samples = list(matching_samples)
     for sample in matching_samples:
         _add_call_percents(sample)
+        _add_color(sample)
 
     return flask.render_template('sample-tag.html', matching_samples=matching_samples, tag_id=tag_id)
 
@@ -183,6 +199,26 @@ def index_html():
     db = mds.get_db()
     tags = db.samples.distinct('tags')
     return flask.render_template('index.html', tags=tags)
+
+
+@app.route('/help.html')
+def help_html():
+    pass
+
+
+@app.route('/about.html')
+def about_html():
+    pass
+
+
+@app.route('/contact.html')
+def contact_html():
+    pass
+
+
+@app.route('/login.html', methods=['GET', 'POST'])
+def login_html():
+    return flask.render_template('login.html')
 
 
 @app.route('/sample/<mongo_id>.html')
@@ -310,7 +346,7 @@ def sample_data_import_task(platform_id, sample_map_filename, final_report_filen
     return sample_group_name
 
 
-CONCORDANCE_BIN_SIZE = 200
+CONCORDANCE_BIN_SIZE = 50
 
 
 def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, snps):
@@ -376,6 +412,58 @@ def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, 
         'discordant_snp_indexes': discordant_snp_indexes,
         'concordance_bins': concordance_bins,
     }
+
+
+def _earliest_run_start(
+        prev1_start, prev1_haplo,
+        prev2_start, prev2_haplo,
+        curr1_haplo,
+        curr2_haplo):
+    earliest_start = None
+    if prev1_haplo == curr1_haplo:
+        earliest_start = prev1_start
+
+    if prev2_haplo == curr2_haplo:
+        if earliest_start is None or prev2_start < prev1_start:
+            earliest_start = prev2_start
+
+    return earliest_start
+
+
+def _extend_haplotype_blocks(blocks):
+    """
+    A greedy algorithm extending haplotype runs as long as possible. While the greedy algorithm does not
+    give the optimal solution in all cases it should normally give the right result and is fast and
+    easy to implement.
+
+    :param blocks: the haplotype blocks to extend
+    :return: None
+    """
+    if blocks:
+        blocks = iter(blocks)
+        prev_block = next(blocks)
+        prev1_start = 0
+        prev2_start = 0
+        for curr_block in blocks:
+            curr1 = curr_block['haplotype_index_1']
+            curr2 = curr_block['haplotype_index_2']
+            prev1 = prev_block['haplotype_index_1']
+            prev2 = prev_block['haplotype_index_2']
+
+            # can we extend the longest haplotype by doing a swap? if so we'll do it
+            earliest_swapped_start = _earliest_run_start(prev1_start, prev1, prev2_start, prev2, curr2, curr1)
+            if earliest_swapped_start is not None:
+                earliest_noswap_start = _earliest_run_start(prev1_start, prev1, prev2_start, prev2, curr1, curr2)
+                if earliest_noswap_start is None or earliest_swapped_start < earliest_noswap_start:
+                    curr_block['haplotype_index_1'] = curr2
+                    curr_block['haplotype_index_2'] = curr1
+
+            # update previous block and haplotype start positions for next iteration
+            if curr_block['haplotype_index_1'] != prev1:
+                prev1_start = curr_block['start_position_bp']
+            if curr_block['haplotype_index_2'] != prev2:
+                prev2_start = curr_block['start_position_bp']
+            prev_block = curr_block
 
 
 @celery.task(name='infer_haplotype_structure_task')
@@ -469,6 +557,7 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
             'haplotype_index_1': curr_state[0],
             'haplotype_index_2': curr_state[1],
         })
+        _extend_haplotype_blocks(haplotype_blocks)
         haplotype_dict['haplotype_blocks'] = haplotype_blocks
 
         print('updating haplotypes for sample {}, chr {}'.format(sample_obj_id_str, chr_id))
