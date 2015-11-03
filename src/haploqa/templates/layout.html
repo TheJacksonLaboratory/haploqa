@@ -2,6 +2,9 @@
 <html>
 <head>
     {% block head %}
+    <meta charset="utf-8">
+    {% if no_robots %}<meta name="robots" content="noindex,nofollow">{% endif %}
+
     <title>{% block title %}{% endblock %}</title>
 
     <!-- JQuery -->
@@ -27,6 +30,109 @@
     <!-- application specific -->
     <script src="{{ url_for('static', filename='js/haploqa.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/haploqa.css') }}">
+
+    <script>
+    var userChangeRequiresRefresh = {% if user_change_requires_refresh %}true{% else %}false{% endif %};
+    var user = {% if g.user %}{{ g.user|tojson }}{% else %}null{% endif %};
+    var flashMessages = {{ get_flashed_messages()|tojson }};
+    function userChanged(requireRefresh) {
+        if(typeof requireRefresh === 'undefined') {
+            requireRefresh = userChangeRequiresRefresh;
+        }
+
+        var currUserLabel = $('#curr-user-label');
+
+        if(requireRefresh) {
+            document.location.reload(true);
+        } else {
+            if(user) {
+                currUserLabel.text(user.email_address);
+                $('[data-display-when="logged-in"]').css('display', '');
+                $('[data-display-when="logged-out"]').css('display', 'none');
+            } else {
+                currUserLabel.text('');
+                $('[data-display-when="logged-in"]').css('display', 'none');
+                $('[data-display-when="logged-out"]').css('display', '');
+            }
+        }
+    }
+
+    $(document).ready(function() {
+        userChanged(false);
+
+        if(flashMessages.length) {
+            showErrorMessage(flashMessages[0]);
+        }
+
+        var loginBannerEmail = $('#login-banner-email');
+        var loginBannerPassword = $('#login-banner-password');
+        var loginBannerButton = $('#login-banner-button');
+        var logoutBanner = $('#logout-banner');
+
+        var loginRequest = null;
+        function doLogin() {
+            if(loginRequest !== null) {
+                loginRequest.abort();
+            }
+
+            var email = loginBannerEmail.val();
+            loginRequest = $.ajax({
+                type: "POST",
+                url: "{{ url_for('login_json') }}",
+                data: {
+                    email: email,
+                    password: loginBannerPassword.val()
+                },
+                dataType: 'json',
+                success: function(new_user) {
+                    user = new_user;
+                    userChanged();
+                }
+            }).fail(function() {
+                showErrorMessage('login attempt failed');
+            }).always(function() {
+                loginRequest = null;
+                loginBannerPassword.val('');
+                //sampleUpdateSpinner.css('display', 'none');
+            });
+        }
+        loginBannerButton.click(doLogin);
+        loginBannerEmail.keydown(function(e) {
+            if(e.keyCode === 13) {
+                doLogin();
+            }
+        });
+        loginBannerPassword.keydown(function(e) {
+            if(e.keyCode === 13) {
+                doLogin();
+            }
+        });
+
+        var logoutRequest = null;
+        logoutBanner.click(function(e) {
+            e.preventDefault();
+
+            if(logoutRequest !== null) {
+                logoutRequest.abort();
+            }
+
+            logoutRequest = $.ajax({
+                type: "POST",
+                url: "{{ url_for('logout_json') }}",
+                dataType: 'json',
+                success: function(data) {
+                    user = null;
+                    userChanged();
+                }
+            }).fail(function() {
+                showErrorMessage('logout attempt failed');
+            }).always(function() {
+                logoutRequest = null;
+                loginBannerPassword.val('');
+            });
+        });
+    });
+    </script>
     {% endblock %}
 </head>
 <body>
@@ -44,12 +150,63 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
-                <li><a href="{{ url_for('about_html') }}">About</a></li>
-                <li><a href="{{ url_for('contact_html') }}">Contact</a></li>
-                <li><a href="{{ url_for('help_html') }}">Help</a></li>
+                <li>
+                    <a href="{{ url_for('sample_data_import_html') }}" data-display-when="logged-in">
+                        <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
+                        Import Sample Data
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('about_html') }}">
+                        <span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>
+                        About
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('contact_html') }}">
+                        <span class="glyphicon glyphicon-envelope" aria-hidden="true"></span>
+                        Contact
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('help_html') }}">
+                        <span class="glyphicon glyphicon-question-sign" aria-hidden="true"></span>
+                        Help
+                    </a>
+                </li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
-                <li><a href="{{ url_for('login_html') }}">Login</a></li>
+                <li data-display-when="logged-in">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                        <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
+                        <span id="curr-user-label">user@example.com</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a id="logout-banner" href="#">logout</a></li>
+                        <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
+                        <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown" data-display-when="logged-out">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                        <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
+                        Login
+                    </a>
+                    <div class="dropdown-menu" style="width: 400px;">
+                        <form class="form dropdown-form">
+                            <div class="form-group">
+                                <input type="email" class="form-control" id="login-banner-email" name="email" placeholder="name@example.com">
+                            </div>
+                            <div class="form-group">
+                                <input type="password" class="form-control" id="login-banner-password" name="password">
+                            </div>
+                            <div class="form-group">
+                                <button id="login-banner-button" class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Login</button>
+                                <a href="{{ url_for('reset_password_html') }}">I forgot my password</a>
+                            </div>
+                        </form>
+                    </div>
+                </li>
             </ul>
         </div>
         <!--/.nav-collapse -->

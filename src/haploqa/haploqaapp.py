@@ -1,4 +1,5 @@
 from bson.objectid import ObjectId
+from bson.son import SON
 from celery import Celery
 import flask
 import json
@@ -12,6 +13,7 @@ import uuid
 import haploqa.haplohmm as hhmm
 import haploqa.mongods as mds
 import haploqa.finalreportimport as finalin
+import haploqa.usermanagement as usrmgmt
 
 app = flask.Flask(__name__)
 BROKER_URL = 'amqp://guest:guest@localhost:5672//'
@@ -57,6 +59,39 @@ def _make_celery(app):
     return celery
 
 celery = _make_celery(app)
+
+
+@app.before_request
+def lookup_user_from_session():
+    if not flask.request.path.startswith(app.static_url_path):
+        # lookup the current user if the user_id is found in the session
+        user_email_address = flask.session.get('user_email_address')
+        if user_email_address:
+            if flask.request.remote_addr == flask.session.get('remote_addr'):
+                user = usrmgmt.lookup_user(user_email_address, mds.get_db())
+                user_id = user.pop('_id', None)
+                if user_id:
+                    user['id'] = str(user_id)
+
+                flask.g.user = user
+            else:
+                # If IP addresses don't match we're going to reset the session for
+                # a bit of extra safety. Unfortunately this also means that we're
+                # forcing valid users to log in again when they change networks
+                _logout()
+        else:
+            flask.g.user = None
+
+
+@app.after_request
+def do_after(response):
+    # tell browser not to cache non-static responses
+    if not flask.request.path.startswith(app.static_url_path):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+    return response
 
 
 @app.route('/sample-import-status/<task_id>.html')
@@ -111,66 +146,11 @@ def sample_data_import_html():
             final_report_filename,
             sample_group_name)
 
-        # render the status page and perform a 303 redirect to the
-        # URL that uniquely identifies this run
-        response = flask.make_response(
-            flask.render_template('import-status.html', task_id=import_task.task_id))
-        response.status_code = 303
+        # perform a 303 redirect to the URL that uniquely identifies this run
         new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
-        response.headers['location'] = new_location
-
-        return response
+        return flask.redirect(new_location, 303)
     else:
         return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
-
-
-def _unescape_forward_slashes(s):
-    """
-    Unescape forward slashes for our custom escape scheme where
-    '/' escapes to '\f' and '\' escapes to '\b'. Note that
-    http://flask.pocoo.org/snippets/76/ recommends against
-    doing this, but the problem is that URL variable
-    boundaries can be ambiguous in some cases if we don't do
-    a simple escaping like this.
-
-    :param s: the escaped string
-    :return: the unescaped string
-    """
-    return s.replace('\\f', '/').replace('\\b', '\\')
-
-
-def _add_call_percents(sample):
-    total_count = sample['heterozygous_count'] + \
-                  sample['homozygous_count'] + \
-                  sample['no_read_count']
-    sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
-    sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
-    sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
-    _add_concordant_percent(sample)
-
-
-def _add_concordant_percent(sample):
-    if 'viterbi_haplotypes' not in sample:
-        sample['viterbi_haplotypes'] = {}
-    viterbi_haplotypes = sample['viterbi_haplotypes']
-
-    if 'chromosome_data' not in viterbi_haplotypes:
-        viterbi_haplotypes['chromosome_data'] = {}
-
-    if 'informative_count' not in viterbi_haplotypes or 'concordant_count' not in viterbi_haplotypes:
-        viterbi_haplotypes['informative_count'] = 0
-        viterbi_haplotypes['concordant_count'] = 0
-        viterbi_haplotypes['concordant_percent'] = None
-    elif viterbi_haplotypes['informative_count'] == 0:
-        viterbi_haplotypes['concordant_percent'] = None
-    else:
-        viterbi_haplotypes['concordant_percent'] = \
-            viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
-
-
-def _add_color(sample):
-    if 'color' not in sample:
-        sample['color'] = '#000000'
 
 
 @app.route('/tag/<tag_id>.html')
@@ -190,35 +170,207 @@ def sample_tag_html(tag_id):
         _add_call_percents(sample)
         _add_color(sample)
 
-    return flask.render_template('sample-tag.html', matching_samples=matching_samples, tag_id=tag_id)
+    return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
+
+
+@app.route('/all-samples.html')
+def all_samples_html():
+    # look up all samples. Only return top level information though (snp-level data is too much)
+    db = mds.get_db()
+    samples = db.samples.find(
+        {},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
+    samples = list(samples)
+    for sample in samples:
+        _add_call_percents(sample)
+        _add_color(sample)
+
+    return flask.render_template('samples.html', samples=samples)
 
 
 @app.route('/index.html')
 @app.route('/')
 def index_html():
     db = mds.get_db()
-    tags = db.samples.distinct('tags')
-    return flask.render_template('index.html', tags=tags)
+
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": SON([("count", -1), ("_id", -1)])},
+    ]
+    tags = db.samples.aggregate(pipeline)
+    tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+
+    sample_count = db.samples.count({})
+
+    return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
 
 
 @app.route('/help.html')
 def help_html():
-    pass
+    return flask.render_template('help.html')
 
 
 @app.route('/about.html')
 def about_html():
-    pass
+    return flask.render_template('about.html')
 
 
 @app.route('/contact.html')
 def contact_html():
-    pass
+    return flask.render_template('contact.html')
 
 
-@app.route('/login.html', methods=['GET', 'POST'])
-def login_html():
-    return flask.render_template('login.html')
+#@app.route('/signup.html')
+#def signup_html():
+#    return flask.render_template('signup.html')
+
+
+@app.route('/invite-user.html', methods=['GET', 'POST'])
+def invite_user_html():
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    elif not user['administrator']:
+        flask.abort(403)
+    else:
+        if flask.request.method == 'GET':
+            return flask.render_template('invite-user.html')
+        elif flask.request.method == 'POST':
+            form = flask.request.form
+            usrmgmt.invite_admin(form['email'])
+
+            return flask.redirect(flask.url_for('index_html'), 303)
+
+
+@app.route('/reset-password.html', methods=['POST', 'GET'])
+def reset_password_html():
+    if flask.request.method == 'GET':
+        return flask.render_template('reset-password.html')
+    elif flask.request.method == 'POST':
+        form = flask.request.form
+        usrmgmt.reset_password(form['email'])
+
+        return flask.redirect(flask.url_for('index_html'), 303)
+
+
+@app.route('/login.json', methods=['POST'])
+def login_json():
+    user = _form_login()
+    if user is None:
+        response = flask.jsonify({'success': False})
+        response.status_code = 400
+
+        return response
+    else:
+        return flask.jsonify(user)
+
+
+def _form_login():
+    _logout()
+
+    form = flask.request.form
+    # TODO deal with login failure
+    user = usrmgmt.authenticate_user(form['email'], form['password'], mds.get_db())
+    if user is not None:
+        user_id = user.pop('_id', None)
+        if user_id:
+            user['id'] = str(user_id)
+
+        flask.session['user_email_address'] = user['email_address']
+        remote_addr = flask.request.remote_addr
+        if remote_addr:
+            flask.session['remote_addr'] = remote_addr
+
+    flask.g.user = user
+    return user
+
+
+@app.route('/logout.json', methods=['POST'])
+def logout_json():
+    _logout()
+    return flask.jsonify({'success': True})
+
+
+def _logout():
+    flask.session.pop('user_email_address', None)
+    flask.g.user = None
+
+
+@app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])
+def validate_reset(password_reset_id):
+    db = mds.get_db()
+    form = flask.request.form
+    user_to_reset = db.users.find_one({'password_reset_hash': usrmgmt.hash_str(password_reset_id)})
+    if user_to_reset is None:
+        # TODO create an message page explaining what went wrong and that the user
+        # should try to reset their password again or contact an administrator if
+        # they don't think it's a problem with an expired ID
+        raise Exception('invalid password reset ID. It may have expired')
+
+    if flask.request.method == 'POST':
+        new_password = form['password']
+        if len(new_password) < usrmgmt.MIN_PASSWORD_LENGTH:
+            # TODO present user with a good error message
+            raise Exception('password is too short')
+
+        new_salt = str(uuid.uuid4())
+        db.users.update_one(
+            {'password_reset_hash': usrmgmt.hash_str(password_reset_id)},
+            {
+                '$set': {
+                    'salt': new_salt,
+                    'password_hash': usrmgmt.hash_str(new_password + new_salt)
+                },
+                '$unset': {
+                    'password_reset_hash': ''
+                },
+            }
+        )
+        user = usrmgmt.authenticate_user(user_to_reset['email_address'], new_password, db)
+        flask.g.user = user
+        flask.session['user_email_address'] = user['email_address']
+
+        return flask.redirect(flask.url_for('index_html'), 303)
+    elif flask.request.method == 'GET':
+        return flask.render_template('validate-reset.html', reset_user=user_to_reset)
+
+
+@app.route('/change-password.html', methods=['GET', 'POST'])
+def change_password_html():
+    user = flask.g.user
+    if user is not None:
+        if flask.request.method == 'POST':
+
+            form = flask.request.form
+            old_password = form['old-password']
+            new_password = form['new-password']
+            new_salt = str(uuid.uuid4())
+
+            db = mds.get_db()
+            user_salt = usrmgmt.lookup_salt(user['email_address'], db)
+            result = db.users.update_one(
+                {
+                    'password_hash': usrmgmt.hash_str(old_password + user_salt)
+                },
+                {
+                    '$set': {
+                        'salt': new_salt,
+                        'password_hash': usrmgmt.hash_str(new_password + new_salt)
+                    },
+                    '$unset': {
+                        'password_reset_hash': ''
+                    },
+                }
+            )
+            if result.modified_count:
+                return flask.redirect(flask.url_for('index_html'), 303)
+            else:
+                flask.flash('bad password. Please try again, or logout and reset via the forgotten password link.')
+                return flask.render_template('change-password.html')
+        elif flask.request.method == 'GET':
+            return flask.render_template('change-password.html')
 
 
 @app.route('/sample/<mongo_id>.html')
@@ -346,6 +498,166 @@ def sample_data_import_task(platform_id, sample_map_filename, final_report_filen
     return sample_group_name
 
 
+@celery.task(name='infer_haplotype_structure_task')
+def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inference_uuid):
+    """
+
+    :param sample_obj_id_str:
+    :param chr_id:
+    :param haplotype_inference_uuid:
+        this tag is just used to make sure that haplotypes are
+        inferred with the latest HMM settings (we need to prevent older inference
+        tasks from overwriting the results from newer inference tasks since we're
+        doing inference asynchronously)
+    :return:
+    """
+
+    # look up all of the sample IDs and get their ab codes
+    sample_obj_id = ObjectId(sample_obj_id_str)
+    db = mds.get_db()
+    sample = db.samples.find_one(
+        {
+            # TODO add an index for this
+            '_id': sample_obj_id,
+            'haplotype_inference_uuid': haplotype_inference_uuid,
+        },
+        {
+            'contributing_strains': 1,
+            'platform_id': 1,
+            'chromosome_data.' + chr_id: 1,
+        })
+
+    if sample is not None and sample['contributing_strains']:
+        snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+        contrib_strains = [
+            db.samples.find_one({'_id': obj_id}, {'chromosome_data.' + chr_id: 1})
+            for obj_id in sample['contributing_strains']
+        ]
+        contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)
+        sample_ab_codes = hhmm.samples_to_ab_codes([sample], chr_id, snps)[:, 0]
+
+        # construct an HMM model
+        hom_obs_probs = np.array([
+            50,     # matching homozygous
+            0.5,    # opposite homozygous
+            1,      # het
+            1,      # no read
+        ], dtype=np.float64)
+        het_obs_probs = np.array([
+            50,     # het obs
+            2,      # hom obs
+            2,      # no read obs
+        ], dtype=np.float64)
+        n_obs_probs = np.ones(3, dtype=np.float64)
+
+        trans_prob = 0.01
+        hmm = hhmm.SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
+
+        # run viterbi to get maximum likelihood path
+        max_likelihood_states, max_final_likelihood = hmm.viterbi(
+            haplotype_ab_codes=contrib_ab_codes,
+            observation_ab_codes=sample_ab_codes)
+        haplotype_dict = _call_concordance(
+            max_likelihood_states,
+            sample_ab_codes,
+            contrib_ab_codes,
+            snps,
+        )
+
+        # convert haplotypes into coordinates representation
+        num_snps = len(snps)
+        haplotype_blocks = []
+        start_state = max_likelihood_states[0]
+        start_pos_bp = snps[0]['position_bp']
+        curr_state = None
+        for curr_index in range(1, num_snps):
+            curr_state = max_likelihood_states[curr_index]
+            if curr_state != start_state:
+                haplotype_blocks.append({
+                    'start_position_bp': start_pos_bp,
+                    'end_position_bp': snps[curr_index]['position_bp'] - 1,
+                    'haplotype_index_1': start_state[0],
+                    'haplotype_index_2': start_state[1],
+                })
+
+                start_state = curr_state
+                start_pos_bp = snps[curr_index]['position_bp']
+
+        haplotype_blocks.append({
+            'start_position_bp': start_pos_bp,
+            'end_position_bp': snps[num_snps - 1]['position_bp'],
+            'haplotype_index_1': curr_state[0],
+            'haplotype_index_2': curr_state[1],
+        })
+        _extend_haplotype_blocks(haplotype_blocks)
+        haplotype_dict['haplotype_blocks'] = haplotype_blocks
+
+        print('updating haplotypes for sample {}, chr {}'.format(sample_obj_id_str, chr_id))
+        db.samples.update_one(
+            {
+                # TODO add an index for this
+                '_id': sample_obj_id,
+                'haplotype_inference_uuid': haplotype_inference_uuid,
+            },
+            {
+                '$set': {'viterbi_haplotypes.chromosome_data.' + chr_id: haplotype_dict},
+                '$inc': {
+                    'viterbi_haplotypes.informative_count': haplotype_dict['informative_count'],
+                    'viterbi_haplotypes.concordant_count': haplotype_dict['concordant_count'],
+                }
+            },
+        )
+
+
+def _unescape_forward_slashes(s):
+    """
+    Unescape forward slashes for our custom escape scheme where
+    '/' escapes to '\f' and '\' escapes to '\b'. Note that
+    http://flask.pocoo.org/snippets/76/ recommends against
+    doing this, but the problem is that URL variable
+    boundaries can be ambiguous in some cases if we don't do
+    a simple escaping like this.
+
+    :param s: the escaped string
+    :return: the unescaped string
+    """
+    return s.replace('\\f', '/').replace('\\b', '\\')
+
+
+def _add_call_percents(sample):
+    total_count = sample['heterozygous_count'] + \
+                  sample['homozygous_count'] + \
+                  sample['no_read_count']
+    sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
+    sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
+    sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
+    _add_concordant_percent(sample)
+
+
+def _add_concordant_percent(sample):
+    if 'viterbi_haplotypes' not in sample:
+        sample['viterbi_haplotypes'] = {}
+    viterbi_haplotypes = sample['viterbi_haplotypes']
+
+    if 'chromosome_data' not in viterbi_haplotypes:
+        viterbi_haplotypes['chromosome_data'] = {}
+
+    if 'informative_count' not in viterbi_haplotypes or 'concordant_count' not in viterbi_haplotypes:
+        viterbi_haplotypes['informative_count'] = 0
+        viterbi_haplotypes['concordant_count'] = 0
+        viterbi_haplotypes['concordant_percent'] = None
+    elif viterbi_haplotypes['informative_count'] == 0:
+        viterbi_haplotypes['concordant_percent'] = None
+    else:
+        viterbi_haplotypes['concordant_percent'] = \
+            viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
+
+
+def _add_color(sample):
+    if 'color' not in sample:
+        sample['color'] = '#000000'
+
+
 CONCORDANCE_BIN_SIZE = 50
 
 
@@ -464,117 +776,6 @@ def _extend_haplotype_blocks(blocks):
             if curr_block['haplotype_index_2'] != prev2:
                 prev2_start = curr_block['start_position_bp']
             prev_block = curr_block
-
-
-@celery.task(name='infer_haplotype_structure_task')
-def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inference_uuid):
-    """
-
-    :param sample_obj_id_str:
-    :param chr_id:
-    :param haplotype_inference_uuid:
-        this tag is just used to make sure that haplotypes are
-        inferred with the latest HMM settings (we need to prevent older inference
-        tasks from overwriting the results from newer inference tasks since we're
-        doing inference asynchronously)
-    :return:
-    """
-
-    # look up all of the sample IDs and get their ab codes
-    sample_obj_id = ObjectId(sample_obj_id_str)
-    db = mds.get_db()
-    sample = db.samples.find_one(
-        {
-            # TODO add an index for this
-            '_id': sample_obj_id,
-            'haplotype_inference_uuid': haplotype_inference_uuid,
-        },
-        {
-            'contributing_strains': 1,
-            'platform_id': 1,
-            'chromosome_data.' + chr_id: 1,
-        })
-
-    if sample is not None and sample['contributing_strains']:
-        snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
-        contrib_strains = [
-            db.samples.find_one({'_id': obj_id}, {'chromosome_data.' + chr_id: 1})
-            for obj_id in sample['contributing_strains']
-        ]
-        contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)
-        sample_ab_codes = hhmm.samples_to_ab_codes([sample], chr_id, snps)[:, 0]
-
-        # construct an HMM model
-        hom_obs_probs = np.array([
-            50,     # matching homozygous
-            0.5,    # opposite homozygous
-            1,      # het
-            1,      # no read
-        ], dtype=np.float64)
-        het_obs_probs = np.array([
-            50,     # het obs
-            2,      # hom obs
-            2,      # no read obs
-        ], dtype=np.float64)
-        n_obs_probs = np.ones(3, dtype=np.float64)
-
-        trans_prob = 0.01
-        hmm = hhmm.SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
-
-        # run viterbi to get maximum likelihood path
-        max_likelihood_states, max_final_likelihood = hmm.viterbi(
-            haplotype_ab_codes=contrib_ab_codes,
-            observation_ab_codes=sample_ab_codes)
-        haplotype_dict = _call_concordance(
-            max_likelihood_states,
-            sample_ab_codes,
-            contrib_ab_codes,
-            snps,
-        )
-
-        # convert haplotypes into coordinates representation
-        num_snps = len(snps)
-        haplotype_blocks = []
-        start_state = max_likelihood_states[0]
-        start_pos_bp = snps[0]['position_bp']
-        curr_state = None
-        for curr_index in range(1, num_snps):
-            curr_state = max_likelihood_states[curr_index]
-            if curr_state != start_state:
-                haplotype_blocks.append({
-                    'start_position_bp': start_pos_bp,
-                    'end_position_bp': snps[curr_index]['position_bp'] - 1,
-                    'haplotype_index_1': start_state[0],
-                    'haplotype_index_2': start_state[1],
-                })
-
-                start_state = curr_state
-                start_pos_bp = snps[curr_index]['position_bp']
-
-        haplotype_blocks.append({
-            'start_position_bp': start_pos_bp,
-            'end_position_bp': snps[num_snps - 1]['position_bp'],
-            'haplotype_index_1': curr_state[0],
-            'haplotype_index_2': curr_state[1],
-        })
-        _extend_haplotype_blocks(haplotype_blocks)
-        haplotype_dict['haplotype_blocks'] = haplotype_blocks
-
-        print('updating haplotypes for sample {}, chr {}'.format(sample_obj_id_str, chr_id))
-        db.samples.update_one(
-            {
-                # TODO add an index for this
-                '_id': sample_obj_id,
-                'haplotype_inference_uuid': haplotype_inference_uuid,
-            },
-            {
-                '$set': {'viterbi_haplotypes.chromosome_data.' + chr_id: haplotype_dict},
-                '$inc': {
-                    'viterbi_haplotypes.informative_count': haplotype_dict['informative_count'],
-                    'viterbi_haplotypes.concordant_count': haplotype_dict['concordant_count'],
-                }
-            },
-        )
 
 
 if __name__ == '__main__':

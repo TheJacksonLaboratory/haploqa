@@ -7,17 +7,30 @@
         <h1>HaploQA</h1>
     </div>
 
-    <div>
-        You can <a href="{{ url_for('sample_data_import_html') }}">import new samples here</a> .
-    </div>
+    <div class="row">
+        <div class="col-md-12">
+            Select any of the following tags to view or edit samples:
 
-    <div>
-        Select any of the following tags to view or edit samples:
-
-        <ul>
-            {% for tag in tags %}
-            <li><a href="{{ url_for('sample_tag_html', tag_id=tag) }}">{{ tag }}</a></li>
-            {% endfor %}
-        </ul>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Sample Tag</th>
+                        <th>Sample Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><a href="{{ url_for('all_samples_html') }}">all samples (includes untagged samples)</a></td>
+                        <td>{{ total_sample_count }}</td>
+                    </tr>
+                    {% for tag in tags %}
+                    <tr>
+                        <td><a href="{{ url_for('sample_tag_html', tag_id=tag.name) }}">{{ tag.name }}</a></td>
+                        <td>{{ tag.sample_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 {% endblock %}

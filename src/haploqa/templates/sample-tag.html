@@ -1,56 +1,7 @@
-{% extends "layout.html" %}
+{% extends "samples.html" %}
 
 {% block title %}Samples for tag: {{ tag_id }}{% endblock %}
 
-{% block content %}
-    <div class="page-header">
-        <h1>{{ tag_id }}</h1>
-    </div>
+{% block header %}{{ tag_id }}{% endblock %}
 
-    <p>Select any of the samples below to view or edit details.</p>
-
-    <!-- a bootstrap progress bar for the import -->
-    <div class="row">
-        <div class="col-md-12">
-            <table class="table table-striped">
-                <thead>
-                <tr>
-                    <th>Sample ID</th>
-                    <th>Platform</th>
-                    <th>% Het. Calls</th>
-                    <th>% Hom. Calls</th>
-                    <th>% No Call</th>
-                    <th>% Haplotype & SNP Concordance</th>
-                </tr>
-                </thead>
-                <tbody>
-                    {% for sample in matching_samples %}
-                    <tr>
-                        <td>
-                            <a href="../sample/{{ sample._id }}.html">
-                                {% if 'haplotype-strain' in sample.tags %}
-                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span>
-                                {% endif %}
-                                {{ sample.sample_id }}
-                            </a>
-                        </td>
-                        <td>{{ sample.platform_id }}</td>
-                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
-                        <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
-                        <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
-                        <td>
-                            {% if sample.viterbi_haplotypes.concordant_percent == None %}
-                                N/A
-                            {% else %}
-                                {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="5">No samples found for tag: {{ tag_id }}</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-{% endblock %}
+{% block nosamples %}No samples found for tag: {{ tag_id }}{% endblock %}

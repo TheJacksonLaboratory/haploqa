@@ -1,0 +1,36 @@
+{% set no_robots = True %}
+
+{% extends "layout.html" %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<form class="form-horizontal">
+    <div class="form-group">
+        <label for="full-name" class="col-md-3 control-label">Name:</label>
+
+        <div class="col-md-6">
+            <input type="text" class="form-control" id="full-name" name="full-name" placeholder="Jane Doe">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="email" class="col-md-3 control-label">Email:</label>
+
+        <div class="col-md-6">
+            <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="password" class="col-md-3 control-label">Password:</label>
+
+        <div class="col-md-6">
+            <input type="password" class="form-control" id="password" name="password">
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-3">
+            <button class="btn btn-primary" type="submit">Create Account</button>
+        </div>
+    </div>
+</form>
+{% endblock %}

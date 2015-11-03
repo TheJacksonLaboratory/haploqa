@@ -1,0 +1,34 @@
+{% set no_robots = True %}
+
+{% extends "layout.html" %}
+
+{% block title %}Invite User{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Invite User</h1>
+</div>
+
+<p>
+    After entering the invitee's email and submiting this form they will receive a link allowing them to
+    validate their account and choose a password. Some SPAM filters may mistakenly mark this email as spam
+    so the invitee should check their SPAM filter if they have not received an invitation.
+</p>
+
+<form class="form-horizontal" method="post">
+    <div class="form-group">
+        <label for="email" class="col-md-3 control-label">Email:</label>
+
+        <div class="col-md-6">
+            <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com">
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-3">
+            <button class="btn btn-primary" type="submit">
+                <span class="glyphicon glyphicon-envelope" aria-hidden="true"></span> E-mail Invitation
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}

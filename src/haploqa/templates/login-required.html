@@ -1,0 +1,18 @@
+{% set no_robots = True %}
+{% set user_change_requires_refresh = True %}
+
+{% extends "layout.html" %}
+
+{% block title %}Login Required{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Login Required</h1>
+</div>
+
+<p>
+    Viewing this page requires a user account. If you have an account you can login using the toolbar above. If you do
+    not yet have an account you can <a href="{{ url_for('contact_html') }}">request an account invitation</a>.
+</p>
+
+{% endblock %}

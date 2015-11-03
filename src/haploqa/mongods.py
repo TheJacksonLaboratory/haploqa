@@ -23,6 +23,8 @@ def init_db(db=None):
         ('position_bp', pymongo.ASCENDING),
         ('snp_id',      pymongo.ASCENDING),
     ])
+    db.users.create_index('email_address', unique=True)
+    db.users.create_index('password_reset_hash')
 
     return db
 

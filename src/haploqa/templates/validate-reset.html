@@ -1,0 +1,33 @@
+{% set no_robots = True %}
+
+{% extends "layout.html" %}
+
+{% block title %}Reset Password{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Reset Password</h1>
+</div>
+
+<form class="form-horizontal" method="post">
+    <div class="form-group">
+        <label for="email" class="col-md-3 control-label">Email:</label>
+
+        <div class="col-md-6">
+            <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com" readonly value="{{ reset_user.email_address }}">
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="password" class="col-md-3 control-label">Password:</label>
+
+        <div class="col-md-6">
+            <input type="password" class="form-control" id="password" name="password">
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-3">
+            <button class="btn btn-primary" type="submit">Update Password</button>
+        </div>
+    </div>
+</form>
+{% endblock %}
