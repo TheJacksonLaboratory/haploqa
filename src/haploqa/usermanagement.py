@@ -85,7 +85,10 @@ def invite_admin(email_address, db=None):
         '''You have been invited by to be an administrator of the HaploQA application. ''' \
         '''To validate your account and create a password, visit this link: {} ''' \
         '''Please ignore this message if it was sent in error.'''
-    msg = MIMEText(msg_template.format(flask.url_for('validate_reset', password_reset_id=password_reset_id)))
+    msg = MIMEText(msg_template.format(flask.url_for(
+        'validate_reset',
+        password_reset_id=password_reset_id,
+        _external=True)))
 
     from_addr = noreply_address()
     msg['Subject'] = 'Confirm HaploQA Account'
@@ -113,7 +116,10 @@ def reset_password(email_address, db=None):
         '''Someone has attempted to reset your password for the HaploQA application. ''' \
         '''To validate this request follow this link: {} ''' \
         '''Please ignore this message if it was sent in error.'''
-    msg = MIMEText(msg_template.format(flask.url_for('validate_reset', password_reset_id=password_reset_id)))
+    msg = MIMEText(msg_template.format(flask.url_for(
+        'validate_reset',
+        password_reset_id=password_reset_id,
+        _external=True)))
 
     from_addr = noreply_address()
     msg['Subject'] = 'Reset password request for HaploQA'

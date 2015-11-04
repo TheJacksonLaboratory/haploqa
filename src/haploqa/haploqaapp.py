@@ -78,7 +78,7 @@ def lookup_user_from_session():
                 # If IP addresses don't match we're going to reset the session for
                 # a bit of extra safety. Unfortunately this also means that we're
                 # forcing valid users to log in again when they change networks
-                _logout()
+                _set_session_user(None)
         else:
             flask.g.user = None
 
@@ -123,34 +123,38 @@ def sample_import_status_json(task_id):
 
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
-    form = flask.request.form
-    files = flask.request.files
-
-    db = mds.get_db()
-    platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
-
-    if flask.request.method == 'POST':
-        platform_id = form['platform-select']
-
-        sample_map_filename = _unique_temp_filename()
-        files['sample-map-file'].save(sample_map_filename)
-
-        final_report_filename = _unique_temp_filename()
-        final_report_file = files['final-report-file']
-        final_report_file.save(final_report_filename)
-
-        sample_group_name = os.path.splitext(final_report_file.filename)[0]
-        import_task = sample_data_import_task.delay(
-            platform_id,
-            sample_map_filename,
-            final_report_filename,
-            sample_group_name)
-
-        # perform a 303 redirect to the URL that uniquely identifies this run
-        new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
-        return flask.redirect(new_location, 303)
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
     else:
-        return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
+        form = flask.request.form
+        files = flask.request.files
+
+        db = mds.get_db()
+        platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
+
+        if flask.request.method == 'POST':
+            platform_id = form['platform-select']
+
+            sample_map_filename = _unique_temp_filename()
+            files['sample-map-file'].save(sample_map_filename)
+
+            final_report_filename = _unique_temp_filename()
+            final_report_file = files['final-report-file']
+            final_report_file.save(final_report_filename)
+
+            sample_group_name = os.path.splitext(final_report_file.filename)[0]
+            import_task = sample_data_import_task.delay(
+                platform_id,
+                sample_map_filename,
+                final_report_filename,
+                sample_group_name)
+
+            # perform a 303 redirect to the URL that uniquely identifies this run
+            new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
+            return flask.redirect(new_location, 303)
+        else:
+            return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
 
 
 @app.route('/tag/<tag_id>.html')
@@ -257,7 +261,8 @@ def reset_password_html():
 
 @app.route('/login.json', methods=['POST'])
 def login_json():
-    user = _form_login()
+    _form_login()
+    user = flask.g.user
     if user is None:
         response = flask.jsonify({'success': False})
         response.status_code = 400
@@ -267,35 +272,33 @@ def login_json():
         return flask.jsonify(user)
 
 
-def _form_login():
-    _logout()
-
-    form = flask.request.form
-    # TODO deal with login failure
-    user = usrmgmt.authenticate_user(form['email'], form['password'], mds.get_db())
-    if user is not None:
-        user_id = user.pop('_id', None)
-        if user_id:
-            user['id'] = str(user_id)
-
+def _set_session_user(user):
+    flask.session.pop('user_email_address', None)
+    flask.session.pop('remote_addr', None)
+    if user is None:
+        flask.g.user = None
+    else:
         flask.session['user_email_address'] = user['email_address']
         remote_addr = flask.request.remote_addr
         if remote_addr:
             flask.session['remote_addr'] = remote_addr
 
-    flask.g.user = user
-    return user
+        lookup_user_from_session()
+
+
+def _form_login():
+    _set_session_user(None)
+
+    form = flask.request.form
+    user = usrmgmt.authenticate_user(form['email'], form['password'], mds.get_db())
+    if user is not None:
+        _set_session_user(user)
 
 
 @app.route('/logout.json', methods=['POST'])
 def logout_json():
-    _logout()
+    _set_session_user(None)
     return flask.jsonify({'success': True})
-
-
-def _logout():
-    flask.session.pop('user_email_address', None)
-    flask.g.user = None
 
 
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])
@@ -312,27 +315,28 @@ def validate_reset(password_reset_id):
     if flask.request.method == 'POST':
         new_password = form['password']
         if len(new_password) < usrmgmt.MIN_PASSWORD_LENGTH:
-            # TODO present user with a good error message
-            raise Exception('password is too short')
+            flask.flash('The given password is too short. It must contain at least {} characters.'.format(
+                usrmgmt.MIN_PASSWORD_LENGTH
+            ))
+            return flask.render_template('validate-reset.html', reset_user=user_to_reset)
+        else:
+            new_salt = str(uuid.uuid4())
+            db.users.update_one(
+                {'password_reset_hash': usrmgmt.hash_str(password_reset_id)},
+                {
+                    '$set': {
+                        'salt': new_salt,
+                        'password_hash': usrmgmt.hash_str(new_password + new_salt)
+                    },
+                    '$unset': {
+                        'password_reset_hash': ''
+                    },
+                }
+            )
+            user = usrmgmt.authenticate_user(user_to_reset['email_address'], new_password, db)
+            _set_session_user(user)
 
-        new_salt = str(uuid.uuid4())
-        db.users.update_one(
-            {'password_reset_hash': usrmgmt.hash_str(password_reset_id)},
-            {
-                '$set': {
-                    'salt': new_salt,
-                    'password_hash': usrmgmt.hash_str(new_password + new_salt)
-                },
-                '$unset': {
-                    'password_reset_hash': ''
-                },
-            }
-        )
-        user = usrmgmt.authenticate_user(user_to_reset['email_address'], new_password, db)
-        flask.g.user = user
-        flask.session['user_email_address'] = user['email_address']
-
-        return flask.redirect(flask.url_for('index_html'), 303)
+            return flask.redirect(flask.url_for('index_html'), 303)
     elif flask.request.method == 'GET':
         return flask.render_template('validate-reset.html', reset_user=user_to_reset)
 
@@ -346,29 +350,35 @@ def change_password_html():
             form = flask.request.form
             old_password = form['old-password']
             new_password = form['new-password']
-            new_salt = str(uuid.uuid4())
-
-            db = mds.get_db()
-            user_salt = usrmgmt.lookup_salt(user['email_address'], db)
-            result = db.users.update_one(
-                {
-                    'password_hash': usrmgmt.hash_str(old_password + user_salt)
-                },
-                {
-                    '$set': {
-                        'salt': new_salt,
-                        'password_hash': usrmgmt.hash_str(new_password + new_salt)
-                    },
-                    '$unset': {
-                        'password_reset_hash': ''
-                    },
-                }
-            )
-            if result.modified_count:
-                return flask.redirect(flask.url_for('index_html'), 303)
-            else:
-                flask.flash('bad password. Please try again, or logout and reset via the forgotten password link.')
+            if len(new_password) < usrmgmt.MIN_PASSWORD_LENGTH:
+                flask.flash('The given password is too short. It must contain at least {} characters.'.format(
+                    usrmgmt.MIN_PASSWORD_LENGTH
+                ))
                 return flask.render_template('change-password.html')
+            else:
+                new_salt = str(uuid.uuid4())
+
+                db = mds.get_db()
+                user_salt = usrmgmt.lookup_salt(user['email_address'], db)
+                result = db.users.update_one(
+                    {
+                        'password_hash': usrmgmt.hash_str(old_password + user_salt)
+                    },
+                    {
+                        '$set': {
+                            'salt': new_salt,
+                            'password_hash': usrmgmt.hash_str(new_password + new_salt)
+                        },
+                        '$unset': {
+                            'password_reset_hash': ''
+                        },
+                    }
+                )
+                if result.modified_count:
+                    return flask.redirect(flask.url_for('index_html'), 303)
+                else:
+                    flask.flash('bad password. Please try again, or logout and reset via the forgotten password link.')
+                    return flask.render_template('change-password.html')
         elif flask.request.method == 'GET':
             return flask.render_template('change-password.html')
 
