@@ -329,7 +329,10 @@ class SnpHaploHMM:
         state_count = state_hap1_indices.size
 
         # initialize transition probabilities
-        log_transition_to_new_state_prob = np.log(self.trans_prob / (state_count - 1))
+        log_transition_to_new_state_prob = 0
+        if state_count > 1:
+            log_transition_to_new_state_prob = np.log(self.trans_prob / (state_count - 1))
+
         log_transition_to_same_state_prob = np.log(1.0 - self.trans_prob)
         log_trans_probs = np.empty((state_count, state_count), dtype=np.float64)
         log_trans_probs[:] = log_transition_to_new_state_prob
