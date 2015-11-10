@@ -25,7 +25,7 @@
                     </tr>
                     {% for tag in tags %}
                     <tr>
-                        <td><a href="{{ url_for('sample_tag_html', tag_id=tag.name) }}">{{ tag.name }}</a></td>
+                        <td><a href="{{ url_for('sample_tag_html', tag_id=escape_forward_slashes(tag.name)) }}">{{ tag.name }}</a></td>
                         <td>{{ tag.sample_count }}</td>
                     </tr>
                     {% endfor %}

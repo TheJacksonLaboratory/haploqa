@@ -61,6 +61,38 @@ def _make_celery(app):
 celery = _make_celery(app)
 
 
+@app.template_global()
+def escape_forward_slashes(s):
+    """
+    Escape forward slashes for our custom escape scheme where
+    '/' escapes to '\f' and '\' escapes to '\b'. Note that
+    http://flask.pocoo.org/snippets/76/ recommends against
+    doing this, but the problem is that URL variable
+    boundaries can be ambiguous in some cases if we don't do
+    a simple escaping like this.
+
+    :param s: the string
+    :return: the escaped string
+    """
+    return s.replace('\\', '\\b').replace('/', '\\f')
+
+
+@app.template_global()
+def unescape_forward_slashes(s):
+    """
+    Unescape forward slashes for our custom escape scheme where
+    '/' escapes to '\f' and '\' escapes to '\b'. Note that
+    http://flask.pocoo.org/snippets/76/ recommends against
+    doing this, but the problem is that URL variable
+    boundaries can be ambiguous in some cases if we don't do
+    a simple escaping like this.
+
+    :param s: the escaped string
+    :return: the unescaped string
+    """
+    return s.replace('\\f', '/').replace('\\b', '\\')
+
+
 @app.before_request
 def lookup_user_from_session():
     if not flask.request.path.startswith(app.static_url_path):
@@ -160,7 +192,7 @@ def sample_data_import_html():
 @app.route('/tag/<tag_id>.html')
 def sample_tag_html(tag_id):
     # this tag_id uses a home-grown forward slash escape.
-    tag_id = _unescape_forward_slashes(tag_id)
+    tag_id = unescape_forward_slashes(tag_id)
 
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
@@ -171,8 +203,7 @@ def sample_tag_html(tag_id):
     ).sort('sample_id', pymongo.ASCENDING)
     matching_samples = list(matching_samples)
     for sample in matching_samples:
-        _add_call_percents(sample)
-        _add_color(sample)
+        _add_default_attributes(sample)
 
     return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
 
@@ -187,10 +218,31 @@ def all_samples_html():
     ).sort('sample_id', pymongo.ASCENDING)
     samples = list(samples)
     for sample in samples:
-        _add_call_percents(sample)
-        _add_color(sample)
+        _add_default_attributes(sample)
 
     return flask.render_template('samples.html', samples=samples)
+
+
+@app.route('/standard-designation/<standard_designation>.html')
+def standard_designation_html(standard_designation):
+    # this standard_designation uses a home-grown forward slash escape.
+    standard_designation = unescape_forward_slashes(standard_designation)
+
+    # look up all samples with this standard_designation. Only return top level information though
+    # (snp-level data is too much)
+    db = mds.get_db()
+    matching_samples = db.samples.find(
+        {'standard_designation': standard_designation},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
+    matching_samples = list(matching_samples)
+    for sample in matching_samples:
+        _add_default_attributes(sample)
+
+    return flask.render_template(
+        'standard-designation.html',
+        samples=matching_samples,
+        standard_designation=standard_designation)
 
 
 @app.route('/index.html')
@@ -224,11 +276,6 @@ def about_html():
 @app.route('/contact.html')
 def contact_html():
     return flask.render_template('contact.html')
-
-
-#@app.route('/signup.html')
-#def signup_html():
-#    return flask.render_template('signup.html')
 
 
 @app.route('/invite-user.html', methods=['GET', 'POST'])
@@ -388,17 +435,23 @@ def sample_html(mongo_id):
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = db.samples.find_one({'_id': obj_id})
-    _add_call_percents(sample)
-    _add_color(sample)
+    _add_default_attributes(sample)
+
     haplotype_samples = db.samples.find(
         {'tags': HAPLOTYPE_TAG},
         {'chromosome_data': 0, 'unannotated_snps': 0},
     )
     haplotype_samples = list(haplotype_samples)
-    for x in haplotype_samples:
-        _add_color(x)
+    for curr_hap_sample in haplotype_samples:
+        _add_default_attributes(curr_hap_sample)
+
+    def contrib_strain_lbl(contrib_strain):
+        if contrib_strain['standard_designation']:
+            return contrib_strain['standard_designation']
+        else:
+            return contrib_strain['sample_id']
     contrib_strain_tokens = [
-        {'value': str(x['_id']), 'label': x['sample_id']}
+        {'value': str(x['_id']), 'label': contrib_strain_lbl(x)}
         for x in haplotype_samples
         if x['_id'] in sample['contributing_strains']
     ]
@@ -431,6 +484,16 @@ def update_sample(mongo_id):
 
     if 'color' in form:
         update_dict['color'] = form['color']
+
+    if 'standard_designation' in form:
+        sd = form['standard_designation']
+        if sd:
+            sd = sd.strip()
+
+        if sd:
+            update_dict['standard_designation'] = form['standard_designation']
+        else:
+            update_dict['standard_designation'] = None
 
     if 'contributing_strain_ids' in form:
         new_strain_ids = json.loads(form['contributing_strain_ids'])
@@ -474,13 +537,13 @@ def viterbi_haplotypes_json(mongo_id):
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = db.samples.find_one({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1})
-    _add_concordant_percent(sample)
+    _add_default_attributes(sample)
     haplotype_samples = [
         db.samples.find_one({'_id': x}, {'sample_id': 1, 'color': 1})
         for x in sample['contributing_strains']
     ]
-    for x in haplotype_samples:
-        _add_color(x)
+    for curr_hap_sample in haplotype_samples:
+        _add_default_attributes(curr_hap_sample)
     haplotype_samples = [
         {'obj_id': str(x['_id']), 'sample_id': x['sample_id']}
         for x in haplotype_samples
@@ -619,32 +682,20 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         )
 
 
-def _unescape_forward_slashes(s):
-    """
-    Unescape forward slashes for our custom escape scheme where
-    '/' escapes to '\f' and '\' escapes to '\b'. Note that
-    http://flask.pocoo.org/snippets/76/ recommends against
-    doing this, but the problem is that URL variable
-    boundaries can be ambiguous in some cases if we don't do
-    a simple escaping like this.
+def _add_default_attributes(sample):
+    # add call percents
+    try:
+        total_count = sample['heterozygous_count'] + \
+                      sample['homozygous_count'] + \
+                      sample['no_read_count']
+        if total_count > 0:
+            sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
+            sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
+            sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
+    except KeyError:
+        pass
 
-    :param s: the escaped string
-    :return: the unescaped string
-    """
-    return s.replace('\\f', '/').replace('\\b', '\\')
-
-
-def _add_call_percents(sample):
-    total_count = sample['heterozygous_count'] + \
-                  sample['homozygous_count'] + \
-                  sample['no_read_count']
-    sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
-    sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
-    sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
-    _add_concordant_percent(sample)
-
-
-def _add_concordant_percent(sample):
+    # add haplotype/concordance defaults
     if 'viterbi_haplotypes' not in sample:
         sample['viterbi_haplotypes'] = {}
     viterbi_haplotypes = sample['viterbi_haplotypes']
@@ -662,10 +713,15 @@ def _add_concordant_percent(sample):
         viterbi_haplotypes['concordant_percent'] = \
             viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
 
-
-def _add_color(sample):
+    # add default color
     if 'color' not in sample:
         sample['color'] = '#000000'
+
+    if 'standard_designation' not in sample:
+        sample['standard_designation'] = None
+
+    if 'gender' not in sample:
+        sample['gender'] = None
 
 
 CONCORDANCE_BIN_SIZE = 50

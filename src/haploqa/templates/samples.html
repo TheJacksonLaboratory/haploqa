@@ -18,6 +18,8 @@
                 <thead>
                 <tr>
                     <th>Sample ID</th>
+                    <th>Standard Designation</th>
+                    <th>Gender</th>
                     <th>Platform</th>
                     <th>% Het. Calls</th>
                     <th>% Hom. Calls</th>
@@ -36,6 +38,12 @@
                                 {{ sample.sample_id }}
                             </a>
                         </td>
+                        <td>
+                            {% if sample.standard_designation %}
+                                <a href="{{ url_for('standard_designation_html', standard_designation=escape_forward_slashes(sample.standard_designation)) }}">{{ sample.standard_designation }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{% if sample.gender %}{{ sample.gender }}{% endif %}</td>
                         <td>{{ sample.platform_id }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
@@ -49,7 +57,7 @@
                         </td>
                     </tr>
                     {% else %}
-                        <tr><td colspan="5">
+                        <tr><td colspan="8">
                             {% block nosamples %}No samples found{% endblock %}
                         </td></tr>
                     {% endfor %}

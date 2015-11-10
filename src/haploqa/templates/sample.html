@@ -21,25 +21,25 @@
         var haplotypeSamples = [
             {% for haplotype_sample in haplotype_samples %}
             {
-                label: '{{ haplotype_sample.sample_id }}',
-                value: '{{ haplotype_sample._id }}'
+                label: {% if haplotype_sample.standard_designation %}{{ haplotype_sample.standard_designation|tojson }}{% else %}{{ haplotype_sample.sample_id|tojson }}{% endif %},
+                value: {{ haplotype_sample._id|string|tojson }}
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         ];
         var haplotypeColors = {
             {% for haplotype_sample in haplotype_samples %}
-                '{{ haplotype_sample._id }}': '{{ haplotype_sample.color }}'{% if not loop.last %},{% endif %}
+                {{ haplotype_sample._id|string|tojson }}: {{ haplotype_sample.color|tojson }}{% if not loop.last %},{% endif %}
             {% endfor %}
         };
-        var sampleID = "{{ sample.sample_id }}";
-        var sampleColor = "{{ sample.color }}";
+        var sampleID = {{ sample.sample_id|tojson }};
+        var standardDesignation = {{ sample.standard_designation|tojson }};
+        var sampleColor = {{ sample.color|tojson }};
         var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
         var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
         var intervalDelayMS = 2500;
 
         $(function() {
-            var editTagsPanel = $('#edit-tags-panel');
             var editTagsInput = $('#edit-tags-input');
             var tagLinksPanel = $('#tag-links');
 
@@ -49,15 +49,13 @@
             var cancelSampleButton = $('#cancel-sample-button');
 
             var readonlyHaplotypesPanel = $('#readonly-haplotypes-panel');
-            var editHaplotypesPanel = $('#edit-haplotypes-panel');
 
-            var readonlySampleIDPanel = $('#readonly-sampleid');
-            var editSampleIDPanel = $('#edit-sampleid-panel');
             var editSampleIDInput = $('#edit-sampleid-input');
 
-            var editSampleColorPanel = $('#edit-sample-color');
+            var editStandardDesignationInput = $('#edit-standarddesignation-input');
+            var readonlyStandardDesignationPanel = $('#readonly-standarddesignation');
+
             var editColorComponent = $('#edit-color-component');
-            var readonlySampleColorPanel = $('#readonly-sample-color');
             var sampleColorIcon = $('#sample-color-icon');
             var sampleColorText = $('#sample-color-text');
             var colorTableRow = $('#color-table-row');
@@ -107,6 +105,20 @@
                 }));
             }
             updateSampleTags(sampleTags);
+
+            function updateStandardDesignation(newStandardDesignation) {
+                standardDesignation = newStandardDesignation;
+
+                readonlyStandardDesignationPanel.empty();
+                if(newStandardDesignation) {
+                    readonlyStandardDesignationPanel.append(
+                            '<a href="../standard-designation/' + encURIComp(newStandardDesignation) + '.html">' +
+                            newStandardDesignation + '</a>');
+                }
+
+                editStandardDesignationInput.val(newStandardDesignation);
+            }
+            updateStandardDesignation(standardDesignation);
 
             var contribStrainTokensInput = $('#contrib-strains-tokens');
             contribStrainTokensInput.tokenfield({
@@ -159,42 +171,20 @@
             }
             updateSampleColor(sampleColor);
 
-            editSampleButton.click(function() {
-                // hide some stuff and show some stuff to switch from read-only mode to edit mode
-                editSampleButton.parent().css('display', 'none');
-                readonlySampleIDPanel.css('display', 'none');
-                tagLinksPanel.css('display', 'none');
-                readonlyHaplotypesPanel.css('display', 'none');
-                readonlySampleColorPanel.css('display', 'none');
-
-                saveSampleButton.parent().css('display', '');
-                editSampleIDPanel.css('display', '');
-                editTagsPanel.css('display', '');
-                editHaplotypesPanel.css('display', '');
-                editSampleColorPanel.css('display', '');
-            });
-
-            function switchToReadonlyView() {
-                // hide some stuff and show some stuff to switch from edit mode to read-only mode
-                saveSampleButton.parent().css('display', 'none');
-                editSampleIDPanel.css('display', 'none');
-                editTagsPanel.css('display', 'none');
-                editHaplotypesPanel.css('display', 'none');
-                editSampleColorPanel.css('display', 'none');
-
-                editSampleButton.parent().css('display', '');
-                readonlySampleIDPanel.css('display', '');
-                tagLinksPanel.css('display', '');
-                readonlyHaplotypesPanel.css('display', '');
-                readonlySampleColorPanel.css('display', '');
+            function switchEditSampleView(isEdit) {
+                $('[data-display-when="sample-edit"]').css('display', isEdit ? '' : 'none');
+                $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
             }
+            switchEditSampleView(false);
+            editSampleButton.click(function() {switchEditSampleView(true);});
 
             cancelSampleButton.click(function() {
-                switchToReadonlyView();
+                switchEditSampleView(false);
 
                 // restore old values to inputs so that if the user clicks edit again they
                 // won't be presented with the values that they just cancelled.
                 updateSampleTags(sampleTags);
+                updateStandardDesignation(standardDesignation);
                 updateHaplotypeStrains(contribStrainTokens);
                 updateSampleID(sampleID);
                 updateSampleColor(sampleColor);
@@ -240,6 +230,12 @@
                     postData['color'] = newColor;
                 }
 
+                var newStandardDesignation = editStandardDesignationInput.val();
+                var standardDesignationChanged = newStandardDesignation != standardDesignation;
+                if(standardDesignationChanged) {
+                    postData['standard_designation'] = newStandardDesignation;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
                     url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -258,15 +254,18 @@
                         if(colorChanged) {
                             updateSampleColor(newColor);
                         }
+                        if(standardDesignationChanged) {
+                            updateStandardDesignation(newStandardDesignation);
+                        }
                     }
                 }).fail(function() {
-                    showErrorMessage('An error occured while saving sample.');
+                    showErrorMessage('An error occurred while saving sample.');
                 }).always(function() {
                     saveTagRequest = null;
                     sampleUpdateSpinner.css('display', 'none');
                 });
 
-                switchToReadonlyView();
+                switchEditSampleView(false);
             });
 
             var svg = d3.select('#hapkaryoplot-svg');
@@ -341,16 +340,16 @@
         <h1>Samples Details for <span data-sampleid>{{ sample.sample_id }}</span></h1>
     </div>
 
-    <div data-display-when="logged-in">
-        <span>
-            <button id="edit-sample-button" type="button" class="btn btn-default">
+    <div data-display-when="logged-in" style="margin-bottom: 10px;">
+        <span data-display-when="sample-readonly">
+            <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
             </button>
             <span id="sample-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
         </span>
 
-        <span style="display: none;">
-            <button id="save-sample-button" type="button" class="btn btn-default">
+        <span data-display-when="sample-edit" style="display: none;">
+            <button id="save-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Edits
             </button>
             <button id="cancel-sample-button" type="button" class="btn btn-default">
@@ -365,7 +364,7 @@
                 <tbody>
                     <tr>
                         <th>
-                            Sample ID:
+                            Sample ID
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -374,10 +373,43 @@
                                     title="TODO: add help text"></span>
                         </th>
                         <td>
-                            <span id="edit-sampleid-panel" class="form-group" style="display: none;">
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
                                 <input id="edit-sampleid-input" type="text" class="form-control"/>
                             </span>
-                            <span id="readonly-sampleid" data-sampleid>{{ sample.sample_id }}</span>
+                            <span data-sampleid data-display-when="sample-readonly">{{ sample.sample_id }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Standard Designation
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="This can be an official strain name, an F1 designation or other. Consult MGI's nomenclature page for detailed information."></span>
+                        </th>
+                        <td>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-standarddesignation-input" type="text" class="form-control"/>
+                            </span>
+                            <span id="readonly-standarddesignation" data-display-when="sample-readonly">{{ sample.standard_designation }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Gender
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span>
+                                {% if sample.gender %}{{ sample.gender }}{% else %}Unknown{% endif %}
+                            </span>
                         </td>
                     </tr>
                     <tr>
@@ -445,7 +477,7 @@
                             {% endif %}
                         </td>
                     </tr>
-                    <tr id="tags-table-row">
+                    <tr>
                         <th>
                             Tags
                             <span
@@ -456,10 +488,10 @@
                                     title="TODO: add help text"></span>
                         </th>
                         <td>
-                            <span id="edit-tags-panel" class="form-group" style="display: none;">
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
                                 <input id="edit-tags-input" type="text" class="form-control"/>
                             </span>
-                            <span id="tag-links"></span>
+                            <span id="tag-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
                     <tr id="color-table-row">
@@ -473,10 +505,10 @@
                                     title="TODO: add help text"></span>
                         </th>
                         <td>
-                            <span id="edit-sample-color" style="display: none;">
+                            <span data-display-when="sample-edit" style="display: none;">
                                 <input type="text" id="edit-color-component" class="form-control" data-control="hue" value="#000000">
                             </span>
-                            <span id="readonly-sample-color">
+                            <span data-display-when="sample-readonly">
                                 <span id="sample-color-icon" class="fa fa-square"></span>
                                 <span id="sample-color-text"></span>
                             </span>
@@ -513,9 +545,9 @@
 
     <div><strong>Contributing Haplotype Strains:</strong></div>
 
-    <div id="readonly-haplotypes-panel"></div>
+    <div id="readonly-haplotypes-panel" data-display-when="sample-readonly"></div>
 
-    <form id="edit-haplotypes-panel" style="display: none;">
+    <form id="edit-haplotypes-panel" data-display-when="sample-edit" style="display: none;">
         <div class="form-group">
             <input type="text" class="form-control" id="contrib-strains-tokens"/>
         </div>

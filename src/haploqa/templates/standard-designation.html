@@ -1,0 +1,9 @@
+{% set user_change_requires_refresh = True %}
+
+{% extends "samples.html" %}
+
+{% block title %}Samples with Standard Designation: {{ standard_designation }}{% endblock %}
+
+{% block header %}{{ standard_designation }}{% endblock %}
+
+{% block nosamples %}No samples found for standard designation: {{ standard_designation }}{% endblock %}
