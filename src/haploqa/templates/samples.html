@@ -49,9 +49,7 @@
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
                         <td>
-                            {% if sample.viterbi_haplotypes.concordant_percent == None %}
-                                N/A
-                            {% else %}
+                            {% if sample.viterbi_haplotypes.concordant_percent != None %}
                                 {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
                             {% endif %}
                         </td>

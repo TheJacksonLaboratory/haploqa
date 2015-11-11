@@ -16,6 +16,20 @@ function showErrorMessage(msg) {
     errorModalMessage.text(msg);
 }
 
+function anyResultsPending(haploData) {
+    var anyPending = false;
+    $.each(haploData.viterbi_haplotypes.chromosome_data, function(chr, haplos) {
+        if(haplos.results_pending) {
+            anyPending = true;
+
+            // break loop
+            return false;
+        }
+    });
+
+    return anyPending;
+}
+
 /**
  * @typedef {Object} GenoInterval
  * @property {string} chr
@@ -109,81 +123,83 @@ function HaploKaryoPlot(params) {
                 .attr("height", chrOrdinalScale.rangeBand()) //function(d) { return height - y(d.value); })
                 .attr("width", function(d) {return genomeScale(d.size)}); //x.rangeBand());
         $.each(haploData.viterbi_haplotypes.chromosome_data, function(chr, haplos) {
-            haplos.haplotype_blocks.forEach(function(currHaplo) {
-                var currRect;
-                var currHapID;
-                if(currHaplo.haplotype_index_1 === currHaplo.haplotype_index_2) {
-                    currRect = plotContentsGroup.append("rect")
-                        .attr("class", "bar")
-                        .attr("x", genomeScale(currHaplo.start_position_bp))
-                        //.attr("y", chrOrdinalScale(chr))
-                        //.attr("height", chrOrdinalScale.rangeBand())
-                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
-                        .attr("height", chrOrdinalScale.rangeBand() / 2.0)
-                        .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
-                        .attr("class", "hap" + (currHaplo.haplotype_index_1 + 1))
-                        .on("mousemove", function() {
-                            if(self.mouseOverHaplotype !== null) {
-                                self.mouseOverHaplotype(currHaplo, haploData);
-                            }
-                        }).on("mouseout", function() {
-                            if(self.mouseOutHaplotype !== null) {
-                                self.mouseOutHaplotype(currHaplo, haploData);
-                            }
-                        });
-                    currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
-                    if(haplotypeColors.hasOwnProperty(currHapID)) {
-                        currRect.style('fill', haplotypeColors[currHapID]);
-                    }
-                } else {
-                    // TODO these bars may be flipped!
-                    currRect = plotContentsGroup.append("rect")
-                        .attr("class", "bar")
-                        .attr("x", genomeScale(currHaplo.start_position_bp))
-                        //.attr("y", chrOrdinalScale(chr))
-                        //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
-                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
-                        .attr("height", chrOrdinalScale.rangeBand() / 4.0)
-                        .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
-                        .attr("class", "hap" + (currHaplo.haplotype_index_1 + 1))
-                        .on("mousemove", function() {
-                            if(self.mouseOverHaplotype !== null) {
-                                self.mouseOverHaplotype(currHaplo, haploData);
-                            }
-                        }).on("mouseout", function() {
-                            if(self.mouseOutHaplotype !== null) {
-                                self.mouseOutHaplotype(currHaplo, haploData);
-                            }
-                        });
-                    currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
-                    if(haplotypeColors.hasOwnProperty(currHapID)) {
-                        currRect.style('fill', haplotypeColors[currHapID]);
-                    }
+            if(haplos.haplotype_blocks) {
+                haplos.haplotype_blocks.forEach(function(currHaplo) {
+                    var currRect;
+                    var currHapID;
+                    if(currHaplo.haplotype_index_1 === currHaplo.haplotype_index_2) {
+                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
+                        currRect = plotContentsGroup.append("rect")
+                            .attr("class", "bar")
+                            .attr("x", genomeScale(currHaplo.start_position_bp))
+                            //.attr("y", chrOrdinalScale(chr))
+                            //.attr("height", chrOrdinalScale.rangeBand())
+                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                            .attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                            .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
+                            .attr("class", "hap hap" + currHapID)
+                            .on("mousemove", function() {
+                                if(self.mouseOverHaplotype !== null) {
+                                    self.mouseOverHaplotype(currHaplo.haplotype_index_1, haploData);
+                                }
+                            }).on("mouseout", function() {
+                                if(self.mouseOutHaplotype !== null) {
+                                    self.mouseOutHaplotype(currHaplo.haplotype_index_1, haploData);
+                                }
+                            });
+                        if(haplotypeColors.hasOwnProperty(currHapID)) {
+                            currRect.style('fill', haplotypeColors[currHapID]);
+                        }
+                    } else {
+                        // TODO these bars may be flipped!
+                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
+                        currRect = plotContentsGroup.append("rect")
+                            .attr("class", "bar")
+                            .attr("x", genomeScale(currHaplo.start_position_bp))
+                            //.attr("y", chrOrdinalScale(chr))
+                            //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                            .attr("height", chrOrdinalScale.rangeBand() / 4.0)
+                            .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
+                            .attr("class", "hap hap" + currHapID)
+                            .on("mousemove", function() {
+                                if(self.mouseOverHaplotype !== null) {
+                                    self.mouseOverHaplotype(currHaplo.haplotype_index_1, haploData);
+                                }
+                            }).on("mouseout", function() {
+                                if(self.mouseOutHaplotype !== null) {
+                                    self.mouseOutHaplotype(currHaplo.haplotype_index_1, haploData);
+                                }
+                            });
+                        if(haplotypeColors.hasOwnProperty(currHapID)) {
+                            currRect.style('fill', haplotypeColors[currHapID]);
+                        }
 
-                    currRect = plotContentsGroup.append("rect")
-                        .attr("class", "bar")
-                        .attr("x", genomeScale(currHaplo.start_position_bp))
-                        //.attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
-                        //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
-                        .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0))
-                        .attr("height", chrOrdinalScale.rangeBand() / 4.0)
-                        .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
-                        .attr("class", "hap" + (currHaplo.haplotype_index_2 + 1))
-                        .on("mousemove", function() {
-                            if(self.mouseOverHaplotype !== null) {
-                                self.mouseOverHaplotype(currHaplo, haploData);
-                            }
-                        }).on("mouseout", function() {
-                            if(self.mouseOutHaplotype !== null) {
-                                self.mouseOutHaplotype(currHaplo, haploData);
-                            }
-                        });
-                    currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_2].obj_id;
-                    if(haplotypeColors.hasOwnProperty(currHapID)) {
-                        currRect.style('fill', haplotypeColors[currHapID]);
+                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_2].obj_id;
+                        currRect = plotContentsGroup.append("rect")
+                            .attr("class", "bar")
+                            .attr("x", genomeScale(currHaplo.start_position_bp))
+                            //.attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                            //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
+                            .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0))
+                            .attr("height", chrOrdinalScale.rangeBand() / 4.0)
+                            .attr("width", genomeScale(currHaplo.end_position_bp) - genomeScale(currHaplo.start_position_bp))
+                            .attr("class", "hap hap" + currHapID)
+                            .on("mousemove", function() {
+                                if(self.mouseOverHaplotype !== null) {
+                                    self.mouseOverHaplotype(currHaplo.haplotype_index_2, haploData);
+                                }
+                            }).on("mouseout", function() {
+                                if(self.mouseOutHaplotype !== null) {
+                                    self.mouseOutHaplotype(currHaplo.haplotype_index_2, haploData);
+                                }
+                            });
+                        if(haplotypeColors.hasOwnProperty(currHapID)) {
+                            currRect.style('fill', haplotypeColors[currHapID]);
+                        }
                     }
-                }
-            });
+                });
+            }
 
             if(haplos.concordance_bins) {
                 haplos.concordance_bins.forEach(function(currBin) {

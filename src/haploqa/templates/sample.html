@@ -128,7 +128,8 @@
                     autoFocus: true
                 },
                 showAutocompleteOnFocus: true,
-                createTokensOnBlur: true
+                createTokensOnBlur: true,
+                limit: {{ maximum_contributing_strain_count() }}
             });
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
                 var value = e.attrs.value;
@@ -144,11 +145,18 @@
                     if(i >= 1) {
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
-                    readonlyHaplotypesPanel.append(
-                            '<a href="' + encURIComp(strain.value) + '.html">'
+                    var haploLink = $(
+                            '<a href="' + encURIComp(strain.value) + '.html" class="hap hap' + (strain.value) + '">'
                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[strain.value] + ';"></span>'
                             + strain.label
                             + '</a>');
+                    readonlyHaplotypesPanel.append(haploLink);
+                    haploLink.hover(function() {
+                        highlightHaplotype(strain.value);
+                    },
+                    function() {
+                        clearHaplotypeHightlight(strain.value);
+                    });
                 });
                 contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
             }
@@ -247,6 +255,7 @@
                         }
                         if(contribStrainsChanged) {
                             updateHaplotypeStrains(newContribStrainTokens);
+                            updateHaplotypeSVG();
                         }
                         if(sampleIDChanged) {
                             updateSampleID(newSampleID);
@@ -276,39 +285,57 @@
                 chrSizes: mm10ChrSizes
             });
 
-            var cursorStatusPopup = d3.select("#cursor-status");
-            var hideCursorPopup = function() {
-                cursorStatusPopup.style("display", null);
-            };
-            hapKaryoPlot.mouseOverHaplotype = function(currHaplo, haploData) {
-                var popupOffset = 20;
-                var xPos = d3.event.pageX + popupOffset;
-                var yPos = d3.event.pageY + popupOffset;
-                cursorStatusPopup.style({
-                    display: "block",
-                    top: yPos + "px",
-                    left: xPos + "px"
+            function highlightHaplotype(haploID) {
+                clearHaplotypeHightlight();
+
+                svg.selectAll('rect.hap').style('fill-opacity', 0.25);
+                svg.selectAll('rect.hap' + haploID).style({
+                    'fill-opacity': null,
+                    'stroke': '#000000'
                 });
-                $('#cursor-haplotype1').text(
-                        haploData.haplotype_samples[currHaplo.haplotype_index_1].sample_id);
-                $('#cursor-haplotype2').text(
-                        haploData.haplotype_samples[currHaplo.haplotype_index_2].sample_id);
+                $('a.hap' + haploID).css({
+                    'box-shadow': '0px 0px 15px 2px ' + haplotypeColors[haploID]
+                });
+            }
+            function clearHaplotypeHightlight(haploID) {
+                svg.selectAll('rect.hap').style({
+                    'fill-opacity': null,
+                    'stroke': null
+                });
+                $('a.hap').css({
+                    'box-shadow': ''
+                });
+            }
+
+            hapKaryoPlot.mouseOverHaplotype = function(haploIndex, haploData) {
+                var currHapID = haploData.haplotype_samples[haploIndex].obj_id;
+                highlightHaplotype(currHapID);
             };
-            hapKaryoPlot.mouseOutHaplotype = hideCursorPopup;
+            hapKaryoPlot.mouseOutHaplotype = function(haploIndex, haploData) {
+                var currHapID = haploData.haplotype_samples[haploIndex].obj_id;
+                clearHaplotypeHightlight(currHapID);
+            };
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
+            var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
-                    console.log('data');
-                    console.log(data);
+                    //console.log('data');
+                    //console.log(data);
                     hapKaryoPlot.updateHaplotypes(data, haplotypeColors);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
+
+                    if(anyResultsPending(data)) {
+                        if(updateHaplotypeSVGTimeoutID !== null) {
+                            // to prevent a pileup of timeout events clear any existing timeout
+                            window.clearTimeout(updateHaplotypeSVGTimeoutID);
+                        }
+                        updateHaplotypeSVGTimeoutID = window.setTimeout(updateHaplotypeSVG, intervalDelayMS);
+                    }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
-                }).always(function() {
-                    window.setTimeout(updateHaplotypeSVG, intervalDelayMS);
                 });
             }
             updateHaplotypeSVG();

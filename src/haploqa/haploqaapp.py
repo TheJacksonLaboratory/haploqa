@@ -36,6 +36,7 @@ app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\
 
 
 HAPLOTYPE_TAG = 'haplotype-strain'
+MAX_CONTRIB_STRAIN_COUNT = 10
 
 
 def _unique_temp_filename():
@@ -59,6 +60,11 @@ def _make_celery(app):
     return celery
 
 celery = _make_celery(app)
+
+
+@app.template_global()
+def maximum_contributing_strain_count():
+    return MAX_CONTRIB_STRAIN_COUNT
 
 
 @app.template_global()
@@ -496,27 +502,26 @@ def update_sample(mongo_id):
             update_dict['standard_designation'] = None
 
     if 'contributing_strain_ids' in form:
+        sample = db.samples.find_one({'_id': obj_id}, {'platform_id': 1})
+        platform = db.platforms.find_one({'platform_id': sample['platform_id']})
+
         new_strain_ids = json.loads(form['contributing_strain_ids'])
-        new_strain_ids = [ObjectId(x) for x in new_strain_ids]
+        new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
         haplotype_inference_uuid = str(uuid.uuid4())
 
         # we need to update the document and invalidate existing haplotypes
         update_dict['contributing_strains'] = new_strain_ids
         update_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
-        db.samples.update_one(
-            {'_id': obj_id},
-            {
-                '$set': update_dict,
-                '$unset': {
-                    'viterbi_haplotypes': '',
-                },
-            },
-        )
+        for chr_id in platform['chromosomes']:
+            update_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {
+                'results_pending': bool(new_strain_ids)
+            }
+        update_dict['viterbi_haplotypes.informative_count'] = 0
+        update_dict['viterbi_haplotypes.concordant_count'] = 0
+        db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
         if new_strain_ids:
-            sample = db.samples.find_one({'_id': obj_id}, {'platform_id': 1})
-            platform = db.platforms.find_one({'platform_id': sample['platform_id']})
             sample_obj_id = str(sample['_id'])
             for chr_id in platform['chromosomes']:
                 t = infer_haplotype_structure_task.delay(
@@ -664,6 +669,7 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         })
         _extend_haplotype_blocks(haplotype_blocks)
         haplotype_dict['haplotype_blocks'] = haplotype_blocks
+        haplotype_dict['results_pending'] = False
 
         print('updating haplotypes for sample {}, chr {}'.format(sample_obj_id_str, chr_id))
         db.samples.update_one(
