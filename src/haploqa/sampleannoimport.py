@@ -1,6 +1,7 @@
 import argparse
 import csv
 import re
+import sys
 
 import haploqa.mongods as mds
 
@@ -32,6 +33,14 @@ sample_id_aliases = {
     sample_id_canonical,
 }
 
+notes_canonical = 'notes'
+notes_aliases = {
+    'note',
+    'comment',
+    'comments',
+    notes_canonical
+}
+
 
 def normalize_header(header):
     """
@@ -58,6 +67,8 @@ def normalize_header(header):
             return standard_designation_canonical
         elif simplified_header in sample_id_aliases:
             return sample_id_canonical
+        elif simplified_header in notes_aliases:
+            return notes_canonical
         else:
             return header
 
@@ -83,20 +94,27 @@ def import_sample_anno(sample_anno_file, db):
 
         header = next(sample_anno_table)
         header = list(map(normalize_header, header))
+        missing_id_count = 0
+        total_row_count = 0
         for row in sample_anno_table:
+            total_row_count += 1
+
             norm_vals = [normalize_value(h, v) for h, v in zip(header, row)]
             sample_properties = {h: nv for h, nv in zip(header, norm_vals) if nv and nv != '#N/A'}
 
             sample_id = sample_properties.pop(sample_id_canonical, None)
             if not sample_id:
+                missing_id_count += 1
                 continue
 
             set_dict = dict()
             standard_designation = sample_properties.pop(standard_designation_canonical, None)
-            set_dict[standard_designation_canonical] = standard_designation
+            if standard_designation:
+                set_dict[standard_designation_canonical] = standard_designation
 
             gender = sample_properties.pop(gender_canonical, None)
-            set_dict[gender_canonical] = gender
+            if gender:
+                set_dict[gender_canonical] = gender
 
             set_dict['properties'] = sample_properties
 
@@ -105,6 +123,12 @@ def import_sample_anno(sample_anno_file, db):
                 {sample_id_canonical: sample_id},
                 {'$set': set_dict},
             )
+
+        if missing_id_count:
+            err_fmt = 'failed to import {} out of {} rows because of missing sample IDs'
+            print(
+                err_fmt.format(missing_id_count, total_row_count),
+                file=sys.stderr)
 
 
 def main():

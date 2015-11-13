@@ -483,27 +483,33 @@ def update_sample(mongo_id):
     form = flask.request.form
     update_dict = dict()
     if 'sample_id' in form:
-        update_dict['sample_id'] = form['sample_id']
+        update_dict['sample_id'] = form['sample_id'].strip()
 
     if 'tags' in form:
         update_dict['tags'] = json.loads(form['tags'])
 
     if 'color' in form:
-        update_dict['color'] = form['color']
+        update_dict['color'] = form['color'].strip()
 
     if 'standard_designation' in form:
-        sd = form['standard_designation']
-        if sd:
-            sd = sd.strip()
+        update_dict['standard_designation'] = form['standard_designation'].strip()
 
-        if sd:
-            update_dict['standard_designation'] = form['standard_designation']
-        else:
-            update_dict['standard_designation'] = None
+    if 'notes' in form:
+        update_dict['notes'] = form['notes'].strip()
 
     if 'contributing_strain_ids' in form:
-        sample = db.samples.find_one({'_id': obj_id}, {'platform_id': 1})
+        sample = db.samples.find_one({'_id': obj_id}, {'platform_id': 1, 'gender': 1})
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
+
+        # remove Y chromosome from haplotype scan if sample is female
+        unset_dict = dict()
+        chr_ids = platform['chromosomes']
+        if sample.get('gender', None) == 'female':
+            unset_dict['viterbi_haplotypes.chromosome_data.Y'] = ''
+            try:
+                chr_ids.remove('Y')
+            except ValueError:
+                pass
 
         new_strain_ids = json.loads(form['contributing_strain_ids'])
         new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
@@ -512,18 +518,21 @@ def update_sample(mongo_id):
         # we need to update the document and invalidate existing haplotypes
         update_dict['contributing_strains'] = new_strain_ids
         update_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
-        for chr_id in platform['chromosomes']:
+        for chr_id in chr_ids:
             update_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {
                 'results_pending': bool(new_strain_ids)
             }
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
-        db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
+        if unset_dict:
+            db.samples.update_one({'_id': obj_id}, {'$set': update_dict, '$unset': unset_dict})
+        else:
+            db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
         if new_strain_ids:
             sample_obj_id = str(sample['_id'])
-            for chr_id in platform['chromosomes']:
+            for chr_id in chr_ids:
                 t = infer_haplotype_structure_task.delay(
                     sample_obj_id,
                     chr_id,
@@ -531,7 +540,7 @@ def update_sample(mongo_id):
                 )
                 task_ids.append(t.task_id)
 
-    elif len(update_dict):
+    elif update_dict:
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
     return flask.jsonify(task_ids=task_ids)
@@ -728,6 +737,9 @@ def _add_default_attributes(sample):
 
     if 'gender' not in sample:
         sample['gender'] = None
+
+    if 'notes' not in sample:
+        sample['notes'] = None
 
 
 CONCORDANCE_BIN_SIZE = 50

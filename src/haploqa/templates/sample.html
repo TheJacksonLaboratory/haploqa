@@ -33,6 +33,7 @@
         };
         var sampleID = {{ sample.sample_id|tojson }};
         var standardDesignation = {{ sample.standard_designation|tojson }};
+        var notes = {{ sample.notes|tojson }};
         var sampleColor = {{ sample.color|tojson }};
         var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
@@ -55,16 +56,14 @@
             var editStandardDesignationInput = $('#edit-standarddesignation-input');
             var readonlyStandardDesignationPanel = $('#readonly-standarddesignation');
 
+            var editNotesInput = $('#edit-notes-input');
+            var readonlyNotesPanel = $('#readonly-notes');
+
             var editColorComponent = $('#edit-color-component');
             var sampleColorIcon = $('#sample-color-icon');
             var sampleColorText = $('#sample-color-text');
             var colorTableRow = $('#color-table-row');
-            editColorComponent.minicolors({
-                theme: 'bootstrap',
-                change: function(value, opacity) {
-                    console.log(value);
-                }
-            });
+            editColorComponent.minicolors({theme: 'bootstrap'});
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -119,6 +118,22 @@
                 editStandardDesignationInput.val(newStandardDesignation);
             }
             updateStandardDesignation(standardDesignation);
+
+            function updateNotes(newNotes) {
+                if(!newNotes) {
+                    newNotes = '';
+                }
+                readonlyNotesPanel.empty();
+                notes = newNotes;
+                notes.split(/\n/).forEach(function(line) {
+                    var p = $(document.createElement('p'));
+                    p.text(line);
+                    readonlyNotesPanel.append(p);
+                });
+
+                editNotesInput.val(newNotes);
+            }
+            updateNotes(notes);
 
             var contribStrainTokensInput = $('#contrib-strains-tokens');
             contribStrainTokensInput.tokenfield({
@@ -244,6 +259,12 @@
                     postData['standard_designation'] = newStandardDesignation;
                 }
 
+                var newNotes = editNotesInput.val();
+                var notesChanged = newNotes != notes;
+                if(notesChanged) {
+                    postData['notes'] = newNotes;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
                     url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -265,6 +286,9 @@
                         }
                         if(standardDesignationChanged) {
                             updateStandardDesignation(newStandardDesignation);
+                        }
+                        if(notesChanged) {
+                            updateNotes(newNotes);
                         }
                     }
                 }).fail(function() {
@@ -434,9 +458,7 @@
                                     title="TODO: add help text"></span>
                         </th>
                         <td>
-                            <span>
-                                {% if sample.gender %}{{ sample.gender }}{% else %}Unknown{% endif %}
-                            </span>
+                            <span>{{ sample.gender  or 'Unknown'}}</span>
                         </td>
                     </tr>
                     <tr>
@@ -488,7 +510,7 @@
                     </tr>
                     <tr>
                         <th>
-                            % Haplotype & SNP Concordance
+                            % Concordance
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -541,20 +563,23 @@
                             </span>
                         </td>
                     </tr>
-                    <!--tr id="samples-w-haplotype-table-row">
+                    <tr>
                         <th>
-                            Samples With This Haplotype
+                            Notes:
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="Free-form text notes associated with this sample."></span>
                         </th>
                         <td>
-                            TODO
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <textarea id="edit-notes-input" class="form-control" rows="4">{{ sample.notes  or ''}}</textarea>
+                            </span>
+                            <span id="readonly-notes" data-display-when="sample-readonly">{{ sample.notes or ''}}</span>
                         </td>
-                    </tr-->
+                    </tr>
                 </tbody>
             </table>
         </div>
