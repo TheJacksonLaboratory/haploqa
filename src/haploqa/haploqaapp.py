@@ -444,7 +444,7 @@ def sample_html(mongo_id):
     _add_default_attributes(sample)
 
     haplotype_samples = db.samples.find(
-        {'tags': HAPLOTYPE_TAG},
+        {'tags': HAPLOTYPE_TAG, 'platform_id': sample['platform_id']},
         {'chromosome_data': 0, 'unannotated_snps': 0},
     )
     haplotype_samples = list(haplotype_samples)
@@ -513,6 +513,15 @@ def update_sample(mongo_id):
 
         new_strain_ids = json.loads(form['contributing_strain_ids'])
         new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
+
+        # we need to abort if not all contributing stains have the same platform
+        for new_strain_id in new_strain_ids:
+            new_strain = db.samples.find_one({'_id': new_strain_id}, {'platform_id': 1})
+            if new_strain is None or 'platform_id' not in new_strain or new_strain['platform_id'] != sample['platform_id']:
+                raise Exception('failed to find strain having id = {} and platform = {}'.format(
+                    new_strain_id,
+                    sample['platform_id']))
+
         haplotype_inference_uuid = str(uuid.uuid4())
 
         # we need to update the document and invalidate existing haplotypes
