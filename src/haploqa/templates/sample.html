@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Samples Details for {{ sample.sample_id }}{% endblock %}
+{% block title %}Sample: {{ sample.sample_id }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -41,6 +41,43 @@
         var intervalDelayMS = 2500;
 
         $(function() {
+            var updateIntervalButton = $('#update-interval-button');
+            var clearIntervalButton = $('#clear-interval-button');
+            var intervalText = $('#interval-edit');
+
+            function updateInterval(interval) {
+                if(interval === null) {
+                    intervalText.val('');
+                } else {
+                    interval.endPos = interval.startPos + interval.size - 1;
+                    if(Math.round(interval.startPos / 1000000) == interval.startPos / 1000000 &&
+                       Math.round(interval.endPos / 1000000) == interval.endPos / 1000000) {
+                        intervalText.val(
+                                'Chr' + interval.chr + ':' +
+                                (interval.startPos / 1000000) + 'Mb-' +
+                                (interval.endPos / 1000000) + 'Mb');
+                    } else {
+                        intervalText.val(
+                                'Chr' + interval.chr + ':' +
+                                Math.round(interval.startPos) + '-' +
+                                Math.round(interval.endPos));
+                    }
+                }
+
+                hapKaryoPlot.zoomInterval(interval);
+                hapIntervalPlot.zoomInterval(interval);
+                console.log('set interval to:');
+                console.log(interval);
+            }
+
+            clearIntervalButton.click(function() {
+                updateInterval(null);
+            });
+
+            updateIntervalButton.click(function() {
+                updateInterval(parseInterval(intervalText.val()));
+            });
+
             var editTagsInput = $('#edit-tags-input');
             var tagLinksPanel = $('#tag-links');
 
@@ -49,7 +86,7 @@
             var saveSampleButton = $('#save-sample-button');
             var cancelSampleButton = $('#cancel-sample-button');
 
-            var readonlyHaplotypesPanel = $('#readonly-haplotypes-panel');
+            var readonlyHaplotypesPanel = $('.readonly-haplotypes-panel');
 
             var editSampleIDInput = $('#edit-sampleid-input');
 
@@ -161,17 +198,19 @@
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
                     var haploLink = $(
-                            '<a href="' + encURIComp(strain.value) + '.html" class="hap hap' + (strain.value) + '">'
+                            '<a href="' + encURIComp(strain.value) + '.html" class="hap hap' + strain.value + '">'
                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[strain.value] + ';"></span>'
                             + strain.label
                             + '</a>');
                     readonlyHaplotypesPanel.append(haploLink);
-                    haploLink.hover(function() {
-                        highlightHaplotype(strain.value);
-                    },
-                    function() {
-                        clearHaplotypeHightlight(strain.value);
-                    });
+                    $('.hap' + strain.value).hover(
+                        function() {
+                            highlightHaplotype(strain.value);
+                        },
+                        function() {
+                            clearHaplotypeHightlight(strain.value);
+                        }
+                    );
                 });
                 contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
             }
@@ -308,6 +347,17 @@
                 height: 900,
                 chrSizes: mm10ChrSizes
             });
+            hapKaryoPlot.zoomIntervalChange = updateInterval;
+
+            var intervalSVG = d3.select("#hapintervalplot-svg");
+            var hapIntervalPlot = new HaploKaryoPlot({
+                svg: intervalSVG,
+                width: 900,
+                height: 150,
+                chrSizes: mm10ChrSizes,
+                intervalMode: true
+            });
+            hapIntervalPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(haploID) {
                 clearHaplotypeHightlight();
@@ -317,12 +367,21 @@
                     'fill-opacity': null,
                     'stroke': '#000000'
                 });
+                intervalSVG.selectAll('rect.hap').style('fill-opacity', 0.25);
+                intervalSVG.selectAll('rect.hap' + haploID).style({
+                    'fill-opacity': null,
+                    'stroke': '#000000'
+                });
                 $('a.hap' + haploID).css({
                     'box-shadow': '0px 0px 15px 2px ' + haplotypeColors[haploID]
                 });
             }
             function clearHaplotypeHightlight(haploID) {
                 svg.selectAll('rect.hap').style({
+                    'fill-opacity': null,
+                    'stroke': null
+                });
+                intervalSVG.selectAll('rect.hap').style({
                     'fill-opacity': null,
                     'stroke': null
                 });
@@ -347,6 +406,7 @@
                     //console.log('data');
                     //console.log(data);
                     hapKaryoPlot.updateHaplotypes(data, haplotypeColors);
+                    hapIntervalPlot.updateHaplotypes(data, haplotypeColors);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
@@ -388,7 +448,7 @@
 
 {% block content %}
     <div class="page-header">
-        <h1>Samples Details for <span data-sampleid>{{ sample.sample_id }}</span></h1>
+        <h1>Sample: <span data-sampleid>{{ sample.sample_id }}</span></h1>
     </div>
 
     <div data-display-when="logged-in" style="margin-bottom: 10px;">
@@ -411,7 +471,7 @@
 
     <div class="row">
         <div class="col-md-12">
-            <table class="table table-striped">
+            <table class="table">
                 <tbody>
                     <tr>
                         <th>
@@ -586,10 +646,14 @@
     </div>
 
     <div class="page-header">
-        <h1>Sample Haplotypes</h1>
+        <h2>Genome Karyotype Plot</h2>
     </div>
 
     <p>
+        Click any area of the karyotype plot to get a zoomed in view.
+    </p>
+
+    <p data-display-when="sample-edit" style="display: none;">
         You can modify the "Contributing Haplotype Strains" below and click "Save Contributing Strains". This will
         cause the haplotype structure of this strain to be inferred based on these settings (using a hidden markov
         model) and rendered in a plot below.
@@ -597,7 +661,7 @@
 
     <div><strong>Contributing Haplotype Strains:</strong></div>
 
-    <div id="readonly-haplotypes-panel" data-display-when="sample-readonly"></div>
+    <div class="readonly-haplotypes-panel" data-display-when="sample-readonly"></div>
 
     <form id="edit-haplotypes-panel" data-display-when="sample-edit" style="display: none;">
         <div class="form-group">
@@ -610,14 +674,70 @@
             <svg
                     id="hapkaryoplot-svg"
                     width="900" height="900"
-                    style="display: block; margin-left: auto; margin-right: auto;"></svg>
+                    class="haplotype-plot"></svg>
         </div>
     </div>
 
-    <div id="cursor-status">
-        <table id="cursor-status-table">
-            <tr><td>Haplotype 1:</td><td id="cursor-haplotype1"></td></tr>
-            <tr><td>Haplotype 2:</td><td id="cursor-haplotype2"></td></tr>
-        </table>
+    <div class="row">
+        <div class="col-md-12">
+            <button class="btn btn-default" type="button">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Genome-Wide Haplotype Report
+            </button>
+        </div>
     </div>
+
+    <div class="page-header">
+        <h2>Genome Interval Plot</h2>
+    </div>
+
+    <div class="form-inline">
+        <label for="interval-edit">Interval:</label>
+        <div class="input-group">
+            <input type="text" class="form-control" id="interval-edit" size="50" placeholder="Chr2:45Mb-55Mb">
+            <span class="input-group-btn">
+                <button id="clear-interval-button" type="button" class="btn btn-default">
+                    <span class="glyphicon glyphicon-remove" aria-hidden="true" aria-label="clear interval"></span>
+                </button>
+                <button id="update-interval-button" class="btn btn-default" type="button">
+                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Update Interval
+                </button>
+            </span>
+        </div>
+
+    </div>
+
+    <div class="readonly-haplotypes-panel"></div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <svg
+                    id="hapintervalplot-svg"
+                    width="900" height="150"
+                    class="haplotype-plot"></svg>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <button class="btn btn-default" type="button">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Interval Haplotype Report
+            </button>
+        </div>
+    </div>
+
+    <!--div class="row">
+        <div class="col-md-12">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div-->
+
 {% endblock %}

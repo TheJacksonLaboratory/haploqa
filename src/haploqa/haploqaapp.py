@@ -36,7 +36,7 @@ app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\
 
 
 HAPLOTYPE_TAG = 'haplotype-strain'
-MAX_CONTRIB_STRAIN_COUNT = 10
+MAX_CONTRIB_STRAIN_COUNT = 15
 
 
 def _unique_temp_filename():
