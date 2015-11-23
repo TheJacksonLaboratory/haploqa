@@ -1,3 +1,4 @@
+from bisect import bisect_left, bisect_right
 from bson.objectid import ObjectId
 from bson.son import SON
 from celery import Celery
@@ -555,6 +556,105 @@ def update_sample(mongo_id):
     return flask.jsonify(task_ids=task_ids)
 
 
+DEFAULT_CANDIDATE_HAPLOTYPE_LIMIT = 20
+
+
+@app.route('/best-haplotype-candidates/<sample_mongo_id_str>/chr<chr_id>-<int:start_pos_bp>-<int:end_pos_bp>.json')
+def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos_bp):
+    limit = flask.request.args.get('limit', None)
+    if limit is not None:
+        try:
+            limit = int(limit)
+        except ValueError:
+            limit = None
+
+    if limit is None:
+        limit = DEFAULT_CANDIDATE_HAPLOTYPE_LIMIT
+
+    db = mds.get_db()
+    obj_id = ObjectId(sample_mongo_id_str)
+    sample = db.samples.find_one(
+        {'_id': obj_id},
+        {
+            'platform_id': 1,
+            'chromosome_data.' + chr_id + '.allele1_fwds': 1,
+            'chromosome_data.' + chr_id + '.allele2_fwds': 1,
+        }
+    )
+
+    # calculate which SNPs fall within the interval of interest
+    snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+    snp_positions = [x['position_bp'] for x in snps]
+    left_index = bisect_left(snp_positions, start_pos_bp)
+    right_index = bisect_right(snp_positions, end_pos_bp, left_index)
+    snp_limit = right_index - left_index
+    snps = snps[left_index:right_index]
+
+    best_candidates = []
+    if snps:
+        # get sliced versions of our main sample and the haplotype samples
+        sample = db.samples.find_one(
+            {'_id': obj_id},
+            {
+                'platform_id': 1,
+                'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
+            }
+        )
+        sample_ab = hhmm.samples_to_ab_codes([sample], chr_id, snps)
+
+        haplotype_samples = list(db.samples.find(
+            {
+                '_id': {'$ne': obj_id},
+                'tags': HAPLOTYPE_TAG,
+                'platform_id': sample['platform_id']
+            },
+            {
+                'sample_id': 1,
+                'standard_designation': 1,
+                'color': 1,
+                'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
+            }
+        ))
+        for hap_sample in haplotype_samples:
+            _add_default_attributes(hap_sample)
+        hap_sample_count = len(haplotype_samples)
+        haplotype_samples_ab = hhmm.samples_to_ab_codes(haplotype_samples, chr_id, snps)
+
+        # get the haplotype indexes and sort them by likelihood
+        haplo_likelihoods = []
+        hmm = _make_hmm()
+        for i in range(hap_sample_count):
+            for j in range(i, hap_sample_count):
+                curr_loglikelihood = hmm.log_likelihood(
+                    haplotype_samples_ab[:, i],
+                    haplotype_samples_ab[:, j],
+                    sample_ab[:, 0])
+                haplo_likelihoods.append((i, j, curr_loglikelihood))
+        haplo_likelihoods.sort(key=lambda tup: -tup[2])
+        haplo_likelihoods = haplo_likelihoods[:limit]
+
+        for i, j, curr_loglikelihood in haplo_likelihoods:
+            hap1 = haplotype_samples[i]
+            hap2 = haplotype_samples[j]
+            best_candidates.append({
+                'haplotype_1': {
+                    '_id': str(hap1['_id']),
+                    'sample_id': hap1['sample_id'],
+                    'standard_designation': hap1['standard_designation'],
+                },
+                'haplotype_2': {
+                    '_id': str(hap2['_id']),
+                    'sample_id': hap2['sample_id'],
+                    'standard_designation': hap2['standard_designation'],
+                },
+                'neg_log_likelihood': -curr_loglikelihood,
+            })
+
+    return flask.jsonify(best_candidates=best_candidates);
+
+
 @app.route('/sample/<mongo_id>/viterbi-haplotypes.json')
 def viterbi_haplotypes_json(mongo_id):
     db = mds.get_db()
@@ -578,20 +678,27 @@ def viterbi_haplotypes_json(mongo_id):
     )
 
 
-@celery.task(name='sample_data_import_task')
-def sample_data_import_task(platform_id, sample_map_filename, final_report_filename, sample_group_name):
-    try:
-        db = mds.get_db()
-        tags = [sample_group_name, platform_id]
-        finalin.import_final_report(final_report_filename, platform_id, tags, db)
-    finally:
-        # we don't need the files after the import is complete
-        if os.path.isfile(sample_map_filename):
-            os.remove(sample_map_filename)
-        if os.path.isfile(final_report_filename):
-            os.remove(final_report_filename)
+def _make_hmm():
+    # TODO params should be adjustable
 
-    return sample_group_name
+    # construct an HMM model
+    hom_obs_probs = np.array([
+        50,     # matching homozygous
+        0.5,    # opposite homozygous
+        1,      # het
+        1,      # no read
+    ], dtype=np.float64)
+    het_obs_probs = np.array([
+        50,     # het obs
+        2,      # hom obs
+        2,      # no read obs
+    ], dtype=np.float64)
+    n_obs_probs = np.ones(3, dtype=np.float64)
+
+    trans_prob = 0.01
+    hmm = hhmm.SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
+
+    return hmm
 
 
 @celery.task(name='infer_haplotype_structure_task')
@@ -632,22 +739,7 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)
         sample_ab_codes = hhmm.samples_to_ab_codes([sample], chr_id, snps)[:, 0]
 
-        # construct an HMM model
-        hom_obs_probs = np.array([
-            50,     # matching homozygous
-            0.5,    # opposite homozygous
-            1,      # het
-            1,      # no read
-        ], dtype=np.float64)
-        het_obs_probs = np.array([
-            50,     # het obs
-            2,      # hom obs
-            2,      # no read obs
-        ], dtype=np.float64)
-        n_obs_probs = np.ones(3, dtype=np.float64)
-
-        trans_prob = 0.01
-        hmm = hhmm.SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
+        hmm = _make_hmm()
 
         # run viterbi to get maximum likelihood path
         max_likelihood_states, max_final_likelihood = hmm.viterbi(
@@ -869,6 +961,22 @@ def _extend_haplotype_blocks(blocks):
             if curr_block['haplotype_index_2'] != prev2:
                 prev2_start = curr_block['start_position_bp']
             prev_block = curr_block
+
+
+@celery.task(name='sample_data_import_task')
+def sample_data_import_task(platform_id, sample_map_filename, final_report_filename, sample_group_name):
+    try:
+        db = mds.get_db()
+        tags = [sample_group_name, platform_id]
+        finalin.import_final_report(final_report_filename, platform_id, tags, db)
+    finally:
+        # we don't need the files after the import is complete
+        if os.path.isfile(sample_map_filename):
+            os.remove(sample_map_filename)
+        if os.path.isfile(final_report_filename):
+            os.remove(final_report_filename)
+
+    return sample_group_name
 
 
 if __name__ == '__main__':

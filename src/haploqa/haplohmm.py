@@ -383,14 +383,17 @@ class SnpHaploHMM:
         ]
         return max_likelihood_states, max_final_likelihood
 
-    def log_likelihood(self, haplotype_ab_codes, observation_ab_codes):
+    def log_likelihood(self, haplotype1_ab_codes, haplotype2_ab_codes, observation_ab_codes):
         """
-
-        :param haplotype_ab_codes:
-        :param observation_ab_codes:
-        :return:
+        Compute the log likelihood of the observation_ab_codes sequece of SNPs given that the parental
+        strains' genotypes are represented by haplotype1_ab_codes and haplotype2_ab_codes
+        :param haplotype1_ab_codes: sequence of SNPs from the first parental haplotype converted to AB codes
+        :param haplotype2_ab_codes: sequence of SNPs from the second parental haplotype converted to AB codes
+        :param observation_ab_codes: sequence of SNPs from the sample we're haplotyping
+        :return: the log probability
         """
-        raise Exception('implement me')
+        log_obs_prob_matrix = np.log(self.obs_prob_matrix)
+        return np.sum(log_obs_prob_matrix[haplotype1_ab_codes, haplotype2_ab_codes, observation_ab_codes])
 
     def forward_scan(self, haplotype_ab_codes, observation_ab_codes):
         """
@@ -430,8 +433,6 @@ def main():
     test_hmm = SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
 
     # Each sample is a different set of parental strains but only 129S, B6J, FVB for the most part
-    # Thanks
-    # MO
     print('getting AB Codes')
     for chr in (str(i) for i in range(1, 20)):
         print('chromosome', chr)
