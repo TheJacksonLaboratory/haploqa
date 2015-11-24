@@ -107,6 +107,13 @@ def _scale_matrix_rows_to_one(m):
 
 
 def samples_to_ab_codes(samples, chromosome, snps):
+    """
+    Converts the "GACT-" calls into "ABHN" which is a more natural representation for the HMM to work with
+    :param samples: the samples from mongo DB whose SNP calls we're going to extract and convert
+    :param chromosome: the chromosome to convert
+    :param snps: the SNP annotation dicts from mongo DB
+    :return: the AB codes organized in as an NP array
+    """
     snp_count = 0
     x_calls = []
     y_calls = []

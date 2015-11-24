@@ -36,13 +36,13 @@ print('===================================================')
 app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\xa1\xab\x0f'
 
 
+# special sample tag used to mark a strain as a potential haplotype
 HAPLOTYPE_TAG = 'haplotype-strain'
-MAX_CONTRIB_STRAIN_COUNT = 15
 
 
-def _unique_temp_filename():
-    return os.path.join(tempfile.tempdir, str(uuid.uuid4()))
-
+#####################################################################
+# FLASK/CELERY INITIALIZATION
+#####################################################################
 
 # make celery function based on http://flask.pocoo.org/docs/0.10/patterns/celery/
 def _make_celery(app):
@@ -61,6 +61,9 @@ def _make_celery(app):
     return celery
 
 celery = _make_celery(app)
+
+
+MAX_CONTRIB_STRAIN_COUNT = 15
 
 
 @app.template_global()
@@ -100,6 +103,22 @@ def unescape_forward_slashes(s):
     return s.replace('\\f', '/').replace('\\b', '\\')
 
 
+@app.after_request
+def do_after(response):
+    # tell browser not to cache non-static responses
+    if not flask.request.path.startswith(app.static_url_path):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+    return response
+
+
+#####################################################################
+# USER ACCOUNT/LOGIN FUNCTIONS
+#####################################################################
+
+
 @app.before_request
 def lookup_user_from_session():
     if not flask.request.path.startswith(app.static_url_path):
@@ -122,171 +141,14 @@ def lookup_user_from_session():
             flask.g.user = None
 
 
-@app.after_request
-def do_after(response):
-    # tell browser not to cache non-static responses
-    if not flask.request.path.startswith(app.static_url_path):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-
-    return response
-
-
-@app.route('/sample-import-status/<task_id>.html')
-def sample_import_status_html(task_id):
-    return flask.render_template('import-status.html', task_id=task_id)
-
-
-@app.route('/sample-import-status/<task_id>.json')
-def sample_import_status_json(task_id):
-    async_result = sample_data_import_task.AsyncResult(task_id)
-
-    msg_dict = {
-        'ready': async_result.ready(),
-        'failed': async_result.failed(),
-    }
-    if async_result.failed():
-        msg_dict['error_message'] = str(async_result.result)
-        response = flask.jsonify(**msg_dict)
-
-        # server error code
-        response.status_code = 500
-
-        return response
-    else:
-        msg_dict['result_tag'] = async_result.result
-
-        return flask.jsonify(**msg_dict)
-
-
-@app.route('/sample-data-import.html', methods=['GET', 'POST'])
-def sample_data_import_html():
-    user = flask.g.user
-    if user is None:
-        return flask.render_template('login-required.html')
-    else:
-        form = flask.request.form
-        files = flask.request.files
-
-        db = mds.get_db()
-        platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
-
-        if flask.request.method == 'POST':
-            platform_id = form['platform-select']
-
-            sample_map_filename = _unique_temp_filename()
-            files['sample-map-file'].save(sample_map_filename)
-
-            final_report_filename = _unique_temp_filename()
-            final_report_file = files['final-report-file']
-            final_report_file.save(final_report_filename)
-
-            sample_group_name = os.path.splitext(final_report_file.filename)[0]
-            import_task = sample_data_import_task.delay(
-                platform_id,
-                sample_map_filename,
-                final_report_filename,
-                sample_group_name)
-
-            # perform a 303 redirect to the URL that uniquely identifies this run
-            new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
-            return flask.redirect(new_location, 303)
-        else:
-            return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
-
-
-@app.route('/tag/<tag_id>.html')
-def sample_tag_html(tag_id):
-    # this tag_id uses a home-grown forward slash escape.
-    tag_id = unescape_forward_slashes(tag_id)
-
-    # look up all samples with this tag ID. Only return top level information though
-    # (snp-level data is too much)
-    db = mds.get_db()
-    matching_samples = db.samples.find(
-        {'tags': tag_id},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
-    matching_samples = list(matching_samples)
-    for sample in matching_samples:
-        _add_default_attributes(sample)
-
-    return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
-
-
-@app.route('/all-samples.html')
-def all_samples_html():
-    # look up all samples. Only return top level information though (snp-level data is too much)
-    db = mds.get_db()
-    samples = db.samples.find(
-        {},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
-    samples = list(samples)
-    for sample in samples:
-        _add_default_attributes(sample)
-
-    return flask.render_template('samples.html', samples=samples)
-
-
-@app.route('/standard-designation/<standard_designation>.html')
-def standard_designation_html(standard_designation):
-    # this standard_designation uses a home-grown forward slash escape.
-    standard_designation = unescape_forward_slashes(standard_designation)
-
-    # look up all samples with this standard_designation. Only return top level information though
-    # (snp-level data is too much)
-    db = mds.get_db()
-    matching_samples = db.samples.find(
-        {'standard_designation': standard_designation},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
-    matching_samples = list(matching_samples)
-    for sample in matching_samples:
-        _add_default_attributes(sample)
-
-    return flask.render_template(
-        'standard-designation.html',
-        samples=matching_samples,
-        standard_designation=standard_designation)
-
-
-@app.route('/index.html')
-@app.route('/')
-def index_html():
-    db = mds.get_db()
-
-    pipeline = [
-        {"$unwind": "$tags"},
-        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
-        {"$sort": SON([("count", -1), ("_id", -1)])},
-    ]
-    tags = db.samples.aggregate(pipeline)
-    tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
-
-    sample_count = db.samples.count({})
-
-    return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
-
-
-@app.route('/help.html')
-def help_html():
-    return flask.render_template('help.html')
-
-
-@app.route('/about.html')
-def about_html():
-    return flask.render_template('about.html')
-
-
-@app.route('/contact.html')
-def contact_html():
-    return flask.render_template('contact.html')
-
-
 @app.route('/invite-user.html', methods=['GET', 'POST'])
 def invite_user_html():
+    """
+    Invite a new user to the application using their email address. Upon get
+    the invite-user template is rendered. Upon successful POST the
+    invite email is sent out and the browser is redirected to index.html
+    """
+
     user = flask.g.user
     if user is None:
         return flask.render_template('login-required.html')
@@ -298,6 +160,8 @@ def invite_user_html():
         elif flask.request.method == 'POST':
             form = flask.request.form
             usrmgmt.invite_admin(form['email'])
+
+            # TODO flash a success message
 
             return flask.redirect(flask.url_for('index_html'), 303)
 
@@ -357,6 +221,13 @@ def logout_json():
 
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])
 def validate_reset(password_reset_id):
+    """
+    A user should only arrive at this page if they have received a password reset email. Upon GET
+    the reset password template is rendered. Upon POST we attempt to actually update the password
+    :param password_reset_id: this ID is the secret that authorizes a password reset. It should
+                              be contained in the reset email that was sent to the user
+    """
+
     db = mds.get_db()
     form = flask.request.form
     user_to_reset = db.users.find_one({'password_reset_hash': usrmgmt.hash_str(password_reset_id)})
@@ -397,6 +268,11 @@ def validate_reset(password_reset_id):
 
 @app.route('/change-password.html', methods=['GET', 'POST'])
 def change_password_html():
+    """
+    Render the HTML change-password template for gets and try to actually change
+    the password for posts (followed by a redirect to index.html on success)
+    """
+
     user = flask.g.user
     if user is not None:
         if flask.request.method == 'POST':
@@ -437,8 +313,278 @@ def change_password_html():
             return flask.render_template('change-password.html')
 
 
+#####################################################################
+# DATA IMPORT FUNCTIONS
+#####################################################################
+
+
+def _unique_temp_filename():
+    return os.path.join(tempfile.tempdir, str(uuid.uuid4()))
+
+
+@app.route('/sample-import-status/<task_id>.html')
+def sample_import_status_html(task_id):
+    """
+    Render template for checking the status of a (potentially long-running) sample import task
+    :param task_id: the celery task ID for the import
+    :return: the Flask response object for the template
+    """
+    return flask.render_template('import-status.html', task_id=task_id)
+
+
+@app.route('/sample-import-status/<task_id>.json')
+def sample_import_status_json(task_id):
+    """
+    Render a JSON response describing the status of a (potentially long-running) sample import task.
+    :param task_id: the celery task ID for the import
+    :return: the flask response object for the status
+    """
+
+    async_result = sample_data_import_task.AsyncResult(task_id)
+
+    # TODO check that user is logged in
+
+    msg_dict = {
+        'ready': async_result.ready(),
+        'failed': async_result.failed(),
+    }
+    if async_result.failed():
+        msg_dict['error_message'] = str(async_result.result)
+        response = flask.jsonify(**msg_dict)
+
+        # server error code
+        response.status_code = 500
+
+        return response
+    else:
+        msg_dict['result_tag'] = async_result.result
+
+        return flask.jsonify(**msg_dict)
+
+
+@app.route('/sample-data-import.html', methods=['GET', 'POST'])
+def sample_data_import_html():
+    """
+    render the template for importing datasets
+    """
+
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        form = flask.request.form
+        files = flask.request.files
+
+        db = mds.get_db()
+        platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
+
+        if flask.request.method == 'POST':
+            platform_id = form['platform-select']
+
+            sample_map_filename = _unique_temp_filename()
+            files['sample-map-file'].save(sample_map_filename)
+
+            final_report_filename = _unique_temp_filename()
+            final_report_file = files['final-report-file']
+            final_report_file.save(final_report_filename)
+
+            sample_group_name = os.path.splitext(final_report_file.filename)[0]
+            import_task = sample_data_import_task.delay(
+                platform_id,
+                sample_map_filename,
+                final_report_filename,
+                sample_group_name)
+
+            # perform a 303 redirect to the URL that uniquely identifies this run
+            new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
+            return flask.redirect(new_location, 303)
+        else:
+            return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
+
+
+@celery.task(name='sample_data_import_task')
+def sample_data_import_task(platform_id, sample_map_filename, final_report_filename, sample_group_name):
+    """
+    Our long-running import task, triggered from the import page of the app
+    """
+    try:
+        db = mds.get_db()
+        tags = [sample_group_name, platform_id]
+        finalin.import_final_report(final_report_filename, platform_id, tags, db)
+    finally:
+        # we don't need the files after the import is complete
+        if os.path.isfile(sample_map_filename):
+            os.remove(sample_map_filename)
+        if os.path.isfile(final_report_filename):
+            os.remove(final_report_filename)
+
+    return sample_group_name
+
+
+#####################################################################
+# SAMPLE LISTING PAGES
+#####################################################################
+
+
+@app.route('/all-samples.html')
+def all_samples_html():
+    # look up all samples. Only return top level information though (snp-level data is too much)
+    db = mds.get_db()
+    samples = db.samples.find(
+        {},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
+    samples = list(samples)
+    for sample in samples:
+        _add_default_attributes(sample)
+
+    return flask.render_template('samples.html', samples=samples)
+
+
+@app.route('/tag/<tag_id>.html')
+def sample_tag_html(tag_id):
+    # this tag_id uses a home-grown forward slash escape.
+    tag_id = unescape_forward_slashes(tag_id)
+
+    # look up all samples with this tag ID. Only return top level information though
+    # (snp-level data is too much)
+    db = mds.get_db()
+    matching_samples = db.samples.find(
+        {'tags': tag_id},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
+    matching_samples = list(matching_samples)
+    for sample in matching_samples:
+        _add_default_attributes(sample)
+
+    return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
+
+
+@app.route('/standard-designation/<standard_designation>.html')
+def standard_designation_html(standard_designation):
+    # this standard_designation uses a home-grown forward slash escape.
+    standard_designation = unescape_forward_slashes(standard_designation)
+
+    # look up all samples with this standard_designation. Only return top level information though
+    # (snp-level data is too much)
+    db = mds.get_db()
+    matching_samples = db.samples.find(
+        {'standard_designation': standard_designation},
+        {'chromosome_data': 0, 'unannotated_snps': 0}
+    ).sort('sample_id', pymongo.ASCENDING)
+    matching_samples = list(matching_samples)
+    for sample in matching_samples:
+        _add_default_attributes(sample)
+
+    return flask.render_template(
+        'standard-designation.html',
+        samples=matching_samples,
+        standard_designation=standard_designation)
+
+
+#####################################################################
+# index.html AND SEVERAL OTHER GENERAL INFORMATIVE TEMPLATES
+#####################################################################
+
+
+@app.route('/index.html')
+@app.route('/')
+def index_html():
+    db = mds.get_db()
+
+    # this pipeline should get us all tags along with their sample counts
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": SON([("count", -1), ("_id", -1)])},
+    ]
+    tags = db.samples.aggregate(pipeline)
+    tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+
+    sample_count = db.samples.count({})
+
+    return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
+
+
+@app.route('/help.html')
+def help_html():
+    return flask.render_template('help.html')
+
+
+@app.route('/about.html')
+def about_html():
+    return flask.render_template('about.html')
+
+
+@app.route('/contact.html')
+def contact_html():
+    return flask.render_template('contact.html')
+
+
+#####################################################################
+# SAMPLE VIEWING/EDITING FUNCTIONS
+#####################################################################
+
+
+def _add_default_attributes(sample):
+    """
+    Jinja2 templates are not as tolerant of missing attributes as I would like. This function
+    serves to fill in default attribute values missing values in order to keep the templates
+    happy
+    :param sample: a sample dict as read from our mongo DB
+    """
+    # add call percents
+    try:
+        total_count = sample['heterozygous_count'] + \
+                      sample['homozygous_count'] + \
+                      sample['no_read_count']
+        if total_count > 0:
+            sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
+            sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
+            sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
+    except KeyError:
+        pass
+
+    # add haplotype/concordance defaults
+    if 'viterbi_haplotypes' not in sample:
+        sample['viterbi_haplotypes'] = {}
+    viterbi_haplotypes = sample['viterbi_haplotypes']
+
+    if 'chromosome_data' not in viterbi_haplotypes:
+        viterbi_haplotypes['chromosome_data'] = {}
+
+    if 'informative_count' not in viterbi_haplotypes or 'concordant_count' not in viterbi_haplotypes:
+        viterbi_haplotypes['informative_count'] = 0
+        viterbi_haplotypes['concordant_count'] = 0
+        viterbi_haplotypes['concordant_percent'] = None
+    elif viterbi_haplotypes['informative_count'] == 0:
+        viterbi_haplotypes['concordant_percent'] = None
+    else:
+        viterbi_haplotypes['concordant_percent'] = \
+            viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
+
+    # add default color
+    if 'color' not in sample:
+        sample['color'] = '#000000'
+
+    if 'standard_designation' not in sample:
+        sample['standard_designation'] = None
+
+    if 'gender' not in sample:
+        sample['gender'] = None
+
+    if 'notes' not in sample:
+        sample['notes'] = None
+
+
 @app.route('/sample/<mongo_id>.html')
 def sample_html(mongo_id):
+    """
+    Render the HTML template for the sample
+    :param mongo_id: the mongo ID string for the sample we're interested in
+    :return: the Flask response for the template
+    """
+
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = db.samples.find_one({'_id': obj_id})
@@ -476,6 +622,10 @@ def sample_html(mongo_id):
 
 @app.route('/sample/<mongo_id>.json', methods=['POST'])
 def update_sample(mongo_id):
+    """
+    Accepts a POST to update the sample identified by the given mongo_id string
+    """
+
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
 
@@ -556,11 +706,29 @@ def update_sample(mongo_id):
     return flask.jsonify(task_ids=task_ids)
 
 
+#####################################################################
+# SAMPLE HAPLOTYPE/HMM FUNCTIONS
+#####################################################################
+
+
 DEFAULT_CANDIDATE_HAPLOTYPE_LIMIT = 20
 
 
 @app.route('/best-haplotype-candidates/<sample_mongo_id_str>/chr<chr_id>-<int:start_pos_bp>-<int:end_pos_bp>.json')
 def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos_bp):
+    """
+    This function will search all possible combinations of haplotypes for the given sample
+    and interval, finding the most likely haplotype combinations and returning them
+    in sorted order (from most likely to least likely)
+    :param sample_mongo_id_str:
+    :param chr_id: the chromosome ID string. like: "X", "2", ...
+    :param start_pos_bp: the start position to search
+    :param end_pos_bp: the end position to search
+    :return: the JSON response containing the most likely haplotype combinations
+    """
+
+    # TODO: this is a bit too heavyweight for a web request and should be delegated to the celery task queue
+
     limit = flask.request.args.get('limit', None)
     if limit is not None:
         try:
@@ -657,6 +825,15 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
 
 @app.route('/sample/<mongo_id>/viterbi-haplotypes.json')
 def viterbi_haplotypes_json(mongo_id):
+    """
+    Fetches and returns the previously calculated haplotypes for the sample indicated by mongo_id.
+    Note that if haplotype calculation is underway, any incomplete chromosomes will have an
+    results_pending value set to true like:
+    sample.viterbi_haplotypes.chromosome_data.<chr_id>.results_pending = True
+    :param mongo_id: the mongo ID string
+    :return: the haplotype JSON response
+    """
+
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = db.samples.find_one({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1})
@@ -678,8 +855,66 @@ def viterbi_haplotypes_json(mongo_id):
     )
 
 
+def _earliest_run_start(
+        prev1_start, prev1_haplo, curr1_haplo,
+        prev2_start, prev2_haplo, curr2_haplo):
+    """
+    find the earliest "prev start" such that the "prev" and "curr" haplos match
+    """
+
+    earliest_start = None
+    if prev1_haplo == curr1_haplo:
+        earliest_start = prev1_start
+
+    if prev2_haplo == curr2_haplo:
+        if earliest_start is None or prev2_start < prev1_start:
+            earliest_start = prev2_start
+
+    return earliest_start
+
+
+def _extend_haplotype_blocks(blocks):
+    """
+    A greedy algorithm extending haplotype runs as long as possible. While the greedy algorithm does not
+    give the optimal solution in all cases it should normally give the right result and is fast and
+    easy to implement.
+
+    :param blocks: the haplotype blocks to extend
+    :return: None
+    """
+    if blocks:
+        blocks = iter(blocks)
+        prev_block = next(blocks)
+        prev1_start = 0
+        prev2_start = 0
+        for curr_block in blocks:
+            curr1 = curr_block['haplotype_index_1']
+            curr2 = curr_block['haplotype_index_2']
+            prev1 = prev_block['haplotype_index_1']
+            prev2 = prev_block['haplotype_index_2']
+
+            # can we extend the longest haplotype by doing a swap? if so we'll do it
+            earliest_swapped_start = _earliest_run_start(prev1_start, prev1, curr2, prev2_start, prev2, curr1)
+            if earliest_swapped_start is not None:
+                earliest_noswap_start = _earliest_run_start(prev1_start, prev1, curr1, prev2_start, prev2, curr2)
+                if earliest_noswap_start is None or earliest_swapped_start < earliest_noswap_start:
+                    curr_block['haplotype_index_1'] = curr2
+                    curr_block['haplotype_index_2'] = curr1
+
+            # update previous block and haplotype start positions for next iteration
+            if curr_block['haplotype_index_1'] != prev1:
+                prev1_start = curr_block['start_position_bp']
+            if curr_block['haplotype_index_2'] != prev2:
+                prev2_start = curr_block['start_position_bp']
+            prev_block = curr_block
+
+
 def _make_hmm():
-    # TODO params should be adjustable
+    """
+    Make an HMM with our hardcoded parameters.
+    """
+
+    # TODO params should be adjustable (the user should be able to modify these and save them to the DB)
 
     # construct an HMM model
     hom_obs_probs = np.array([
@@ -704,17 +939,17 @@ def _make_hmm():
 @celery.task(name='infer_haplotype_structure_task')
 def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inference_uuid):
     """
-
-    :param sample_obj_id_str:
-    :param chr_id:
+    This celery task does the heavy lifting of actually calculating the haplotypes for a given
+    strain. This involves extracting SNP sequences from this sample as well as from all of
+    the contributing_strains samples and delegating the HMM calculation to our HMM model.
+    :param sample_obj_id_str: the mongo string ID for the sample we're haplotyping
+    :param chr_id: the chromosome to haplotype
     :param haplotype_inference_uuid:
         this tag is just used to make sure that haplotypes are
         inferred with the latest HMM settings (we need to prevent older inference
         tasks from overwriting the results from newer inference tasks since we're
         doing inference asynchronously)
-    :return:
     """
-
     # look up all of the sample IDs and get their ab codes
     sample_obj_id = ObjectId(sample_obj_id_str)
     db = mds.get_db()
@@ -798,55 +1033,15 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         )
 
 
-def _add_default_attributes(sample):
-    # add call percents
-    try:
-        total_count = sample['heterozygous_count'] + \
-                      sample['homozygous_count'] + \
-                      sample['no_read_count']
-        if total_count > 0:
-            sample['heterozygous_percent'] = sample['heterozygous_count'] * 100.0 / total_count
-            sample['homozygous_percent'] = sample['homozygous_count'] * 100.0 / total_count
-            sample['no_read_percent'] = sample['no_read_count'] * 100.0 / total_count
-    except KeyError:
-        pass
-
-    # add haplotype/concordance defaults
-    if 'viterbi_haplotypes' not in sample:
-        sample['viterbi_haplotypes'] = {}
-    viterbi_haplotypes = sample['viterbi_haplotypes']
-
-    if 'chromosome_data' not in viterbi_haplotypes:
-        viterbi_haplotypes['chromosome_data'] = {}
-
-    if 'informative_count' not in viterbi_haplotypes or 'concordant_count' not in viterbi_haplotypes:
-        viterbi_haplotypes['informative_count'] = 0
-        viterbi_haplotypes['concordant_count'] = 0
-        viterbi_haplotypes['concordant_percent'] = None
-    elif viterbi_haplotypes['informative_count'] == 0:
-        viterbi_haplotypes['concordant_percent'] = None
-    else:
-        viterbi_haplotypes['concordant_percent'] = \
-            viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
-
-    # add default color
-    if 'color' not in sample:
-        sample['color'] = '#000000'
-
-    if 'standard_designation' not in sample:
-        sample['standard_designation'] = None
-
-    if 'gender' not in sample:
-        sample['gender'] = None
-
-    if 'notes' not in sample:
-        sample['notes'] = None
-
-
 CONCORDANCE_BIN_SIZE = 50
 
 
 def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, snps):
+    """
+    Calculates call concordance as a series of bins (the resulting concordance values are what
+    we use to render the histograms on the karyotype plots)
+    """
+
     informative_count = 0
     concordant_count = 0
     # TODO storing indexes in this way is very fragile (if SNP count or ordering changes at all
@@ -911,74 +1106,7 @@ def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, 
     }
 
 
-def _earliest_run_start(
-        prev1_start, prev1_haplo,
-        prev2_start, prev2_haplo,
-        curr1_haplo,
-        curr2_haplo):
-    earliest_start = None
-    if prev1_haplo == curr1_haplo:
-        earliest_start = prev1_start
-
-    if prev2_haplo == curr2_haplo:
-        if earliest_start is None or prev2_start < prev1_start:
-            earliest_start = prev2_start
-
-    return earliest_start
-
-
-def _extend_haplotype_blocks(blocks):
-    """
-    A greedy algorithm extending haplotype runs as long as possible. While the greedy algorithm does not
-    give the optimal solution in all cases it should normally give the right result and is fast and
-    easy to implement.
-
-    :param blocks: the haplotype blocks to extend
-    :return: None
-    """
-    if blocks:
-        blocks = iter(blocks)
-        prev_block = next(blocks)
-        prev1_start = 0
-        prev2_start = 0
-        for curr_block in blocks:
-            curr1 = curr_block['haplotype_index_1']
-            curr2 = curr_block['haplotype_index_2']
-            prev1 = prev_block['haplotype_index_1']
-            prev2 = prev_block['haplotype_index_2']
-
-            # can we extend the longest haplotype by doing a swap? if so we'll do it
-            earliest_swapped_start = _earliest_run_start(prev1_start, prev1, prev2_start, prev2, curr2, curr1)
-            if earliest_swapped_start is not None:
-                earliest_noswap_start = _earliest_run_start(prev1_start, prev1, prev2_start, prev2, curr1, curr2)
-                if earliest_noswap_start is None or earliest_swapped_start < earliest_noswap_start:
-                    curr_block['haplotype_index_1'] = curr2
-                    curr_block['haplotype_index_2'] = curr1
-
-            # update previous block and haplotype start positions for next iteration
-            if curr_block['haplotype_index_1'] != prev1:
-                prev1_start = curr_block['start_position_bp']
-            if curr_block['haplotype_index_2'] != prev2:
-                prev2_start = curr_block['start_position_bp']
-            prev_block = curr_block
-
-
-@celery.task(name='sample_data_import_task')
-def sample_data_import_task(platform_id, sample_map_filename, final_report_filename, sample_group_name):
-    try:
-        db = mds.get_db()
-        tags = [sample_group_name, platform_id]
-        finalin.import_final_report(final_report_filename, platform_id, tags, db)
-    finally:
-        # we don't need the files after the import is complete
-        if os.path.isfile(sample_map_filename):
-            os.remove(sample_map_filename)
-        if os.path.isfile(final_report_filename):
-            os.remove(final_report_filename)
-
-    return sample_group_name
-
-
 if __name__ == '__main__':
+    # start server (for development use only)
     app.debug = True
     app.run(host='0.0.0.0')

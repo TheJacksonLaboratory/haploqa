@@ -2,11 +2,20 @@ import pymongo
 
 
 def get_db():
+    """
+    Gets a reference to the HaploQA database
+    :return: the DB
+    """
     client = pymongo.MongoClient('localhost', 27017)
     return client.haploqa
 
 
 def init_db(db=None):
+    """
+    Initialize the DB indexes
+    :param db: will be looked up via get_db() by default
+    :return: the database
+    """
     if db is None:
         db = get_db()
 
@@ -32,6 +41,14 @@ def init_db(db=None):
 
 
 def get_snps(platform_id, chromosome, db=None):
+    """
+    Grab the SNP annotations from the DB. These will be returned in order (sorted by position then by ID). This
+    is the same ordering used by the SNP arrays in samples
+    :param platform_id: the platform to get SNPs for. Eg. "GigaMUGA"
+    :param chromosome: the chromosome to grab SNPs for
+    :param db: the DB (by default we look up the DB using get_db()
+    :return: the SNP annotations from the mongodb
+    """
     if db is None:
         db = get_db()
 
@@ -42,6 +59,11 @@ def get_snps(platform_id, chromosome, db=None):
 
 
 def post_proc_sample(sample):
+    """
+    Post-process a sample dict after it's loaded from a data source but before it's inserted into the DB. This adds some
+    default values and performs some simple calculations. This function will modify the sample by adding new attributes.
+    :param sample: the sample dict to modify
+    """
     print('post-processing sample: ' + sample['sample_id'])
 
     sample['homozygous_count'] = 0

@@ -15,19 +15,6 @@ def hash_str(s):
     return sha512(s.encode('utf-8')).hexdigest()
 
 
-# def app_server_name():
-#     # try to look up the server name using flask's configuration
-#     server_name = None
-#     if app is not None:
-#         server_name = app.config['SERVER_NAME']
-#
-#     # if that fails we can look up the fully qualified domain name
-#     if not server_name:
-#         server_name = socket.getfqdn()
-#
-#     return server_name
-
-
 def noreply_address():
     return 'no-reply@' + socket.getfqdn()
 
@@ -36,7 +23,7 @@ def lookup_user(email_address, db):
     return db.users.find_one({
         'email_address': email_address
     }, {
-        # exclude authentication data for added security
+        # exclude authentication data for added security (avoid the data leaking out)
         'password_hash': 0,
         'password_reset_hash': 0,
         'salt': 0,
@@ -44,6 +31,9 @@ def lookup_user(email_address, db):
 
 
 def lookup_salt(email_address, db):
+    """
+    lookup and return a user's password salt
+    """
     salt_dict = db.users.find_one({'email_address': email_address, 'salt': {'$exists': 1}}, {'salt': 1})
     if salt_dict is not None:
         return salt_dict['salt']
@@ -52,8 +42,15 @@ def lookup_salt(email_address, db):
 
 
 def authenticate_user(email_address, password, db):
+    """
+    Perform password authentication for a user
+    :param email_address: the email address to authenticate
+    :param password: the password to check
+    :param db: the database
+    :return: the user dict from mongo upon success and None upon failure
+    """
     user = db.users.find_one({
-        'email_address': email_address
+        'email_address': email_address,
     }, {
         'password_reset_hash': 0,
     })
@@ -71,6 +68,13 @@ def authenticate_user(email_address, password, db):
 
 
 def invite_admin(email_address, db=None):
+    """
+    invite a new user with the given email address (sends out an invite email via an SMTP
+    server on localhost)
+    :param email_address: the address of the user to invite
+    :param db: the mongo database
+    """
+
     if db is None:
         db = mds.get_db()
 
@@ -103,6 +107,14 @@ def invite_admin(email_address, db=None):
 
 
 def reset_password(email_address, db=None):
+    """
+    Reset password for user with the given email address (sends out a reset email via an SMTP
+    server on localhost). If the user does not follow the link from the email that's sent out
+    this should have no effect.
+    :param email_address: the address of the user to invite
+    :param db: the mongo database
+    """
+
     if db is None:
         db = mds.get_db()
 
@@ -155,6 +167,10 @@ def _create_admin(email_address, password, db=None):
 
 
 def main():
+    """
+    Use this main function for creating the 1st admin user. After the 1st user is
+    created you can use the web interface to invite new users.
+    """
     print('Creating a new admin user...')
     email = input('E-mail Address: ')
     password = input('password: ')
