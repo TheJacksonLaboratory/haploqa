@@ -53,6 +53,37 @@ function parseInterval(intervalStr) {
     }
 }
 
+function ElemOverlay(targetElement, centerSpan) {
+    var overlay = null;
+    this.overlayActive = function(setActive) {
+        if(typeof setActive === 'undefined') {
+            return overlay !== null;
+        } else if(setActive) {
+            if(overlay == null) {
+                var offset = targetElement.offset();
+                overlay = $(document.createElement('div'));
+
+                overlay.css(offset);
+                overlay.width(targetElement.outerWidth());
+                overlay.height(targetElement.outerHeight());
+                overlay.addClass('elem-overlay');
+
+                //var textSpan = $(document.createElement('span'));
+                //textSpan.text(centerSpan);
+                //waitOverlay.append(textSpan);
+                overlay.append(centerSpan);
+
+                $('body').append(overlay);
+            }
+        } else {
+            if(overlay !== null) {
+                overlay.remove();
+                overlay = null;
+            }
+        }
+    };
+}
+
 /**
  * @typedef {Object} GenoInterval
  * @property {string} chr
@@ -193,7 +224,6 @@ function HaploKaryoPlot(params) {
         });
     } else {
         svg.on('click', function() {
-            console.log('svg clicked');
             var mouseXY = d3.mouse(svg.node());
             var x = mouseXY[0];
             var y = mouseXY[1];
@@ -202,7 +232,6 @@ function HaploKaryoPlot(params) {
 
             if(genomeScale !== null && chrOrdinalScale !== null) {
                 bpPos = genomeScale.invert(x);
-                console.log(bpPos);
 
                 // we have no built in revert for ordinal scale so we'll do that ourselves
                 var ordinalHeight = chrOrdinalScale.rangeBand();
@@ -215,7 +244,6 @@ function HaploKaryoPlot(params) {
                         return true;
                     }
                 });
-                console.log(chr);
             }
 
             if(bpPos !== null && chr !== null) {

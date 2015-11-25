@@ -131,3 +131,21 @@ th {
 .hap22 {
     fill: rgba(229, 223, 143, 0.75);
 }
+
+.elem-overlay {
+    display: table;
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.75);
+    pointer-events: none;
+    /*border: 2px dashed gray;*/
+    border: none;
+    font-family: sans-serif;
+    font-size: 3em;
+    color: gray;
+}
+.elem-overlay > span {
+    display: table-cell;
+    /*vertical-align: middle;*/
+    vertical-align: top;
+    text-align: center;
+}

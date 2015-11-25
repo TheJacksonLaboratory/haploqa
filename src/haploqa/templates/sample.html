@@ -41,10 +41,15 @@
 
         $(function() {
             var findCandidateHapButton = $('#find-candidate-hap-button');
+            var candidateHaplotypeTable = $('#candidate-haplotype-table');
+            var candidateHaplotypeTableOverlay = new ElemOverlay(
+                    candidateHaplotypeTable,
+                    $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Finding Candidate Haplotypes</span>'));
             var candidateHaplotypeTableBody = $('#candidate-haplotype-table-body');
             findCandidateHapButton.click(function() {
                 if(interval !== null) {
                     $('#find-candidate-hap-icon').addClass('fa-spin');
+                    candidateHaplotypeTableOverlay.overlayActive(true);
                     var candHapURL =
                             '../best-haplotype-candidates/{{ sample._id }}/chr' +
                             interval.chr + '-' + interval.startPos + '-' +
@@ -77,9 +82,11 @@
 
                             candidateHaplotypeTableBody.append(tr);
                         });
+                        updateHaplotypeLinkHoverListeners();
                     }).fail(function() {
                         showErrorMessage('An error occurred while calculating candidate haplotypes.');
                     }).always(function() {
+                        candidateHaplotypeTableOverlay.overlayActive(false);
                         $('#find-candidate-hap-icon').removeClass('fa-spin');
                     });
                 }
@@ -113,8 +120,6 @@
 
                 hapKaryoPlot.zoomInterval(newInterval);
                 hapIntervalPlot.zoomInterval(newInterval);
-                console.log('set interval to:');
-                console.log(newInterval);
             }
 
             clearIntervalButton.click(function() {
@@ -187,7 +192,6 @@
                     }
                 }));
             }
-            updateSampleTags(sampleTags);
 
             function updateStandardDesignation(newStandardDesignation) {
                 standardDesignation = newStandardDesignation;
@@ -250,18 +254,10 @@
                             + strain.label
                             + '</a>');
                     readonlyHaplotypesPanel.append(haploLink);
-                    $('.hap' + strain.value).hover(
-                        function() {
-                            highlightHaplotype(strain.value);
-                        },
-                        function() {
-                            clearHaplotypeHightlight(strain.value);
-                        }
-                    );
                 });
+                updateHaplotypeLinkHoverListeners();
                 contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
             }
-            updateHaplotypeStrains(contribStrainTokens);
 
             function updateSampleID(newSampleID) {
                 sampleID = newSampleID;
@@ -269,7 +265,6 @@
                 $('[data-sampleid]').text(newSampleID);
                 editSampleIDInput.val(newSampleID);
             }
-            updateSampleID(sampleID);
 
             function updateSampleColor(newColor) {
                 sampleColor = newColor;
@@ -278,13 +273,11 @@
                 sampleColorIcon.css({'color': newColor});
                 sampleColorText.text(newColor);
             }
-            updateSampleColor(sampleColor);
 
             function switchEditSampleView(isEdit) {
                 $('[data-display-when="sample-edit"]').css('display', isEdit ? '' : 'none');
                 $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
             }
-            switchEditSampleView(false);
             editSampleButton.click(function() {switchEditSampleView(true);});
 
             cancelSampleButton.click(function() {
@@ -436,6 +429,18 @@
                     'box-shadow': ''
                 });
             }
+            function updateHaplotypeLinkHoverListeners() {
+                haplotypeSamples.forEach(function(hapSamp) {
+                    $('a.hap' + hapSamp.value).hover(
+                        function() {
+                            highlightHaplotype(hapSamp.value);
+                        },
+                        function() {
+                            clearHaplotypeHightlight(hapSamp.value);
+                        }
+                    );
+                });
+            }
 
             hapKaryoPlot.mouseOverHaplotype = function(haploIndex, haploData) {
                 var currHapID = haploData.haplotype_samples[haploIndex].obj_id;
@@ -450,8 +455,6 @@
             var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
-                    //console.log('data');
-                    //console.log(data);
                     hapKaryoPlot.updateHaplotypes(data, haplotypeColors);
                     hapIntervalPlot.updateHaplotypes(data, haplotypeColors);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
@@ -469,20 +472,21 @@
                     showErrorMessage('An error occurred while updating haplotypes.');
                 });
             }
+
+            switchEditSampleView(false);
+
+            // initialize the UI by calling a bunch of the "update" functions
+            updateSampleTags(sampleTags);
+            updateStandardDesignation(standardDesignation);
+            updateHaplotypeStrains(contribStrainTokens);
+            updateSampleID(sampleID);
+            updateSampleColor(sampleColor);
             updateHaplotypeSVG();
 
             $('[data-toggle="tooltip"]').tooltip()
         });
     </script>
     <style>
-        #cursor-status {
-            display: none;
-            position: absolute;
-            background-color: rgba(255, 255, 255, 0.75);
-            pointer-events: none;
-            white-space: nowrap;
-        }
-
         .help-icon {
             visibility: hidden;
         }
@@ -750,7 +754,6 @@
                 </button>
             </span>
         </div>
-
     </div>
 
     <div class="readonly-haplotypes-panel"></div>
@@ -770,16 +773,20 @@
                 <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Interval Haplotype Report
             </button>
             <button id="find-candidate-hap-button" class="btn btn-default" type="button">
-                <span id="find-candidate-hap-icon" class="fa fa-refresh" aria-hidden="true"></span> Find Candidate Haplotypes For Interval
+                <span id="find-candidate-hap-icon" class="fa fa-refresh" aria-hidden="true"></span> Refresh Candidate Haplotypes For Interval
             </button>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-12">
-            <table class="table table-striped">
+            <table id="candidate-haplotype-table" class="table table-striped" style="margin-top: 10px;">
                 <thead><tr><th>Candidate Haplotype</th><th>Negative Log Likelihood</th></tr></thead>
-                <tbody id="candidate-haplotype-table-body"><tr><td colspan="2">No candidate haplotypes for current interval</td></tr></tbody>
+                <tbody id="candidate-haplotype-table-body" style="height: 100px;">
+                <tr>
+                    <td colspan="2" style="text-align: center; vertical-align: middle;">Use the Controls Above to Find Candidate Intervals</td>
+                </tr>
+                </tbody>
             </table>
         </div>
     </div>
