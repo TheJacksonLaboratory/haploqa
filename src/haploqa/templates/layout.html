@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-3.3.5-dist/css/bootstrap.min.css') }}">
     <script src="{{ url_for('static', filename='bootstrap-3.3.5-dist/js/bootstrap.min.js') }}"></script>
 
+    <script src="{{ url_for('static', filename='js/validator.js') }}"></script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/css/bootstrap-tokenfield.css') }}">
     <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/bootstrap-tokenfield.js') }}"></script>
 
@@ -185,6 +187,7 @@
                         <li><a id="logout-banner" href="#">logout</a></li>
                         <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
                         <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
+                        <li><a href="{{ url_for('my_groups_html') }}">my groups</a></li>
                     </ul>
                 </li>
                 <li class="dropdown" data-display-when="logged-out">

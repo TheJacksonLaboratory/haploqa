@@ -53,6 +53,43 @@ function parseInterval(intervalStr) {
     }
 }
 
+function discardDupElems(arr, elemToIdStr) {
+    var seenIdStrs = {};
+    return arr.filter(function(elem) {
+        var str = elem;
+        if(elemToIdStr) {
+            str = elemToIdStr(elem);
+        }
+
+        if(seenIdStrs.hasOwnProperty(str)) {
+            return false;
+        } else {
+            seenIdStrs[str] = null;
+            return true;
+        }
+    });
+}
+
+/**
+ * A small wrapper around setTimeout that allows for preemption.
+ * @constructor
+ */
+function DelayedPreemptable() {
+    var timeoutID = null;
+    this.delay = function(func, delayMillisecs) {
+        if(timeoutID !== null) {
+            window.clearTimeout(timeoutID);
+            timeoutID = null;
+        }
+
+        if(typeof delayMillisecs === 'undefined' || delayMillisecs === 0) {
+            func();
+        } else {
+            timeoutID = window.setTimeout(func, delayMillisecs);
+        }
+    };
+}
+
 function ElemOverlay(targetElement, centerSpan) {
     var overlay = null;
     this.overlayActive = function(setActive) {

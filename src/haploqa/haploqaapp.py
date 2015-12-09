@@ -10,6 +10,7 @@ import os
 import pymongo
 import tempfile
 import uuid
+from werkzeug.routing import BaseConverter
 
 import haploqa.haplohmm as hhmm
 import haploqa.mongods as mds
@@ -23,6 +24,45 @@ app.config.update(
     CELERY_RESULT_BACKEND=BROKER_URL,
 )
 app.jinja_env.globals.update(isnan=math.isnan)
+
+
+def escape_forward_slashes(s):
+    """
+    Escape forward slashes for our custom escape scheme where
+    '/' escapes to '\f' and '\' escapes to '\b'. Note that
+    http://flask.pocoo.org/snippets/76/ recommends against
+    doing this, but the problem is that URL variable
+    boundaries can be ambiguous in some cases if we don't do
+    a simple escaping like this.
+
+    :param s: the string
+    :return: the escaped string
+    """
+    return s.replace('\\', '\\b').replace('/', '\\f')
+
+
+def unescape_forward_slashes(s):
+    """
+    Unescape forward slashes for our custom escape scheme where
+    '/' escapes to '\f' and '\' escapes to '\b'.
+
+    :param s: the escaped string
+    :return: the unescaped string
+    """
+    return s.replace('\\f', '/').replace('\\b', '\\')
+
+
+class EscForwardSlashConverter(BaseConverter):
+    def to_python(self, value):
+        return unescape_forward_slashes(BaseConverter.to_python(self, value))
+
+    def to_url(self, value):
+        return BaseConverter.to_url(self, escape_forward_slashes(value))
+
+
+# Attaches the EscForwardSlashConverter to the given app
+# with the typename "escfwd"
+app.url_map.converters['escfwd'] = EscForwardSlashConverter
 
 
 # TODO this key must be changed to something secret (ie. not committed to the repo).
@@ -71,38 +111,6 @@ def maximum_contributing_strain_count():
     return MAX_CONTRIB_STRAIN_COUNT
 
 
-@app.template_global()
-def escape_forward_slashes(s):
-    """
-    Escape forward slashes for our custom escape scheme where
-    '/' escapes to '\f' and '\' escapes to '\b'. Note that
-    http://flask.pocoo.org/snippets/76/ recommends against
-    doing this, but the problem is that URL variable
-    boundaries can be ambiguous in some cases if we don't do
-    a simple escaping like this.
-
-    :param s: the string
-    :return: the escaped string
-    """
-    return s.replace('\\', '\\b').replace('/', '\\f')
-
-
-@app.template_global()
-def unescape_forward_slashes(s):
-    """
-    Unescape forward slashes for our custom escape scheme where
-    '/' escapes to '\f' and '\' escapes to '\b'. Note that
-    http://flask.pocoo.org/snippets/76/ recommends against
-    doing this, but the problem is that URL variable
-    boundaries can be ambiguous in some cases if we don't do
-    a simple escaping like this.
-
-    :param s: the escaped string
-    :return: the unescaped string
-    """
-    return s.replace('\\f', '/').replace('\\b', '\\')
-
-
 @app.after_request
 def do_after(response):
     # tell browser not to cache non-static responses
@@ -139,6 +147,198 @@ def lookup_user_from_session():
                 _set_session_user(None)
         else:
             flask.g.user = None
+
+
+@app.route('/create-group.html', methods=['GET', 'POST'])
+def create_group_html():
+    """
+    Create a new user group. Upon GET the create-group template
+    is rendered. Upon successful POST the group is created and
+    the browser is redirected to index.html
+    """
+
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        if flask.request.method == 'GET':
+            all_group_names = [g['group_name'] for g in db.groups.find({}, {'group_name': 1})]
+            return flask.render_template('create-group.html', all_group_names=all_group_names)
+        elif flask.request.method == 'POST':
+            form = flask.request.form
+            group_name = form['group-name']
+
+            db = mds.get_db()
+            db.groups.insert_one({
+                'group_name': group_name,
+                'admin_users': [ObjectId(user['id'])],
+                'users': [ObjectId(user['id'])]
+            })
+
+            return flask.redirect(flask.url_for('group_html', group_name=group_name), 303)
+
+
+def _fetch_users_for_group_template(group, db):
+    grp_users = list(db.users.find({'_id': {'$in': group['users']}}, {'email_address': 1}))
+
+    # convert the IDs to strings for easier manipulation in the template and
+    # set a flag indicating who is and is not an admin for this group
+    admin_user_ids = set(map(str, group['admin_users']))
+    for grp_user in grp_users:
+        grp_user['id'] = str(grp_user.pop('_id'))
+        grp_user['is_group_admin'] = grp_user['id'] in admin_user_ids
+
+    return sorted(grp_users, key=lambda grp_user: grp_user['email_address'])
+
+
+@app.route('/group/<escfwd:group_name>.html')
+def group_html(group_name):
+
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        db = mds.get_db()
+        group = db.groups.find_one({'group_name': group_name}, {'_id': 0})
+        admin_user_ids = set(map(str, group['admin_users']))
+        user_is_group_admin = user['id'] in admin_user_ids
+        group_users = _fetch_users_for_group_template(group, db)
+        return flask.render_template(
+            'group.html',
+            group=group,
+            group_users=group_users,
+            user_is_group_admin=user_is_group_admin)
+
+@app.route('/edit-group/<escfwd:group_name>.html')
+def edit_group_html(group_name):
+
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        db = mds.get_db()
+        group = db.groups.find_one({'group_name': group_name})
+        admin_user_ids = set(map(str, group['admin_users']))
+        user_is_group_admin = user['id'] in admin_user_ids
+        if not user_is_group_admin:
+            # return forbidden http code if the user isn't an administrator
+            flask.abort(403)
+
+        if flask.request.method == 'GET':
+            all_users = list(db.users.find({}, {'email_address': 1}))
+            for curr_user in all_users:
+                curr_user['id'] = str(curr_user.pop('_id'))
+            group_users = _fetch_users_for_group_template(group, db)
+            return flask.render_template(
+                'edit-group.html',
+                all_users=all_users,
+                group=group,
+                group_users=group_users,
+                user_is_group_admin=user_is_group_admin)
+        elif flask.request.method == 'DELETE':
+            db.groups.delete_one({
+                '_id': group['_id'],
+                'admin_users': ObjectId(user['id']),
+            })
+        elif flask.request.method == 'POST':
+            form = flask.request.form
+            new_group_users = json.loads(form['group_users'])
+            new_user_ids = [ObjectId(usr['id']) for usr in new_group_users]
+            new_admin_ids = [ObjectId(usr['id']) for usr in new_group_users if usr['is_group_admin']]
+
+            db.groups.update_one(
+                {
+                    '_id': group['_id'],
+                    'admin_users': ObjectId(user['id']),
+                },
+                {
+                    '$set': {
+                        'users': new_user_ids,
+                        'admin_users': new_admin_ids,
+                    },
+                },
+            )
+
+
+# @app.route('/group/<escfwd:group_name>.json', methods=['POST', 'DELETE'])
+# def group_json(group_name):
+#
+#     user = flask.g.user
+#     if user is None:
+#         return flask.render_template('login-required.html')
+#     else:
+#         db = mds.get_db()
+#         group = db.groups.find_one({'group_name': group_name})
+#         admin_user_ids = set(map(str, group['admin_users']))
+#         user_is_group_admin = user['id'] in admin_user_ids
+#         if not user_is_group_admin:
+#             # return forbidden http code if the user isn't an administrator
+#             flask.abort(403)
+#
+#         if flask.request.method == 'DELETE':
+#             db.groups.delete_one({
+#                 '_id': group['_id'],
+#                 'admin_users': ObjectId(user['id']),
+#             })
+#         elif flask.request.method == 'POST':
+#             form = flask.request.form
+#             new_group_users = json.loads(form['group_users'])
+#             new_user_ids = [ObjectId(usr['id']) for usr in new_group_users]
+#             new_admin_ids = [ObjectId(usr['id']) for usr in new_group_users if usr['is_group_admin']]
+#
+#             db.groups.update_one(
+#                 {
+#                     '_id': group['_id'],
+#                     'admin_users': ObjectId(user['id']),
+#                 },
+#                 {
+#                     '$set': {
+#                         'users': new_user_ids,
+#                         'admin_users': new_admin_ids,
+#                     },
+#                 },
+#             )
+#
+#         return flask.jsonify(success=True)
+
+
+@app.route('/my-groups.html')
+def my_groups_html():
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        db = mds.get_db()
+
+        # load groups and format for template
+        admin_groups = db.groups.find(
+            {
+                'admin_users': ObjectId(user['id']),
+            },
+            {
+                '_id': 0,
+                'group_name': 1,
+            }
+        )
+        admin_groups = {x['group_name'] for x in admin_groups}
+
+        groups = db.groups.find(
+            {
+                'users': ObjectId(user['id']),
+            },
+            {
+                '_id': 0,
+                'group_name': 1,
+            }
+        )
+        groups = list(groups)
+        for group in groups:
+            group['user_is_group_admin'] = group['group_name'] in admin_groups
+        groups.sort(key=lambda grp: grp['group_name'])
+
+        return flask.render_template(
+            'my-groups.html',
+            my_groups=groups)
 
 
 @app.route('/invite-user.html', methods=['GET', 'POST'])
@@ -441,10 +641,8 @@ def all_samples_html():
     return flask.render_template('samples.html', samples=samples)
 
 
-@app.route('/tag/<tag_id>.html')
+@app.route('/tag/<escfwd:tag_id>.html')
 def sample_tag_html(tag_id):
-    # this tag_id uses a home-grown forward slash escape.
-    tag_id = unescape_forward_slashes(tag_id)
 
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
@@ -460,10 +658,8 @@ def sample_tag_html(tag_id):
     return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
 
 
-@app.route('/standard-designation/<standard_designation>.html')
+@app.route('/standard-designation/<escfwd:standard_designation>.html')
 def standard_designation_html(standard_designation):
-    # this standard_designation uses a home-grown forward slash escape.
-    standard_designation = unescape_forward_slashes(standard_designation)
 
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)

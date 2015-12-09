@@ -11,7 +11,6 @@
 
     <p>Select any of the samples below to view or edit details.</p>
 
-    <!-- a bootstrap progress bar for the import -->
     <div class="row">
         <div class="col-md-12">
             <table class="table table-striped">
@@ -40,7 +39,7 @@
                         </td>
                         <td>
                             {% if sample.standard_designation %}
-                                <a href="{{ url_for('standard_designation_html', standard_designation=escape_forward_slashes(sample.standard_designation)) }}">{{ sample.standard_designation }}</a>
+                                <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
                             {% endif %}
                         </td>
                         <td>{% if sample.gender %}{{ sample.gender }}{% endif %}</td>

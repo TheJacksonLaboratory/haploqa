@@ -12,7 +12,8 @@ def get_db():
 
 def init_db(db=None):
     """
-    Initialize the DB indexes
+    Initialize the DB indexes. This function is safe to rerun on existing databases
+    to make sure that all indexes are generated.
     :param db: will be looked up via get_db() by default
     :return: the database
     """
@@ -36,6 +37,7 @@ def init_db(db=None):
     ])
     db.users.create_index('email_address', unique=True)
     db.users.create_index('password_reset_hash')
+    db.groups.create_index('group_name', unique=True)
 
     return db
 
@@ -88,3 +90,9 @@ def post_proc_sample(sample):
         sample['homozygous_count'] += chr_dict['homozygous_count']
         sample['heterozygous_count'] += chr_dict['heterozygous_count']
         sample['no_read_count'] += chr_dict['no_read_count']
+
+
+# as a convenience we can run this file as a script to
+# rebuild DB indexes
+if __name__ == '__main__':
+    init_db()

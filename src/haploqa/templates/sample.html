@@ -37,66 +37,85 @@
         var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
         var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
-        var intervalDelayMS = 2500;
+        var haplotypePollingIntervalMillisecs = 2500;
 
         $(function() {
-            var findCandidateHapButton = $('#find-candidate-hap-button');
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
                     candidateHaplotypeTable,
-                    $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Finding Candidate Haplotypes</span>'));
+                    $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Recalculating Candidate Haplotypes</span>'));
             var candidateHaplotypeTableBody = $('#candidate-haplotype-table-body');
-            findCandidateHapButton.click(function() {
-                if(interval !== null) {
-                    $('#find-candidate-hap-icon').addClass('fa-spin');
-                    candidateHaplotypeTableOverlay.overlayActive(true);
-                    var candHapURL =
-                            '../best-haplotype-candidates/{{ sample._id }}/chr' +
-                            interval.chr + '-' + interval.startPos + '-' +
-                            (interval.startPos + interval.size - 1) + '.json';
-                    $.getJSON(candHapURL, function(data) {
-                        candidateHaplotypeTableBody.empty();
-                        data.best_candidates.forEach(function(currCandidate) {
-                            function makeHapLink(hap) {
-                                var haploLink = $(
-                                        '<a href="' + encURIComp(hap._id) + '.html" class="hap hap' + hap._id + '">'
-                                        + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[hap._id] + ';"></span>'
-                                        + (hap.standard_designation ? hap.standard_designation : hap.sample_id)
-                                        + '</a>');
-                                return haploLink;
+            var findCandidateHapsReq = null;
+            var findCandidateHapsWaiting = false;
+            function findCandidateHaps() {
+                if(interval === null) {
+                    if(findCandidateHapsReq !== null) {
+                        findCandidateHapsReq.abort();
+                        findCandidateHapsReq = null;
+                        findCandidateHapsWaiting = false;
+                    }
+                } else {
+                    if(findCandidateHapsReq !== null) {
+                        // we have to wait until this request finishes before we
+                        // launch another to avoid overloading the server
+                        findCandidateHapsWaiting = true;
+                    } else {
+                        candidateHaplotypeTableOverlay.overlayActive(true);
+                        var candHapURL =
+                                '../best-haplotype-candidates/{{ sample._id }}/chr' +
+                                interval.chr + '-' + interval.startPos + '-' +
+                                (interval.startPos + interval.size - 1) + '.json';
+                        $.getJSON(candHapURL, function(data) {
+                            candidateHaplotypeTableBody.empty();
+                            data.best_candidates.forEach(function(currCandidate) {
+                                function makeHapLink(hap) {
+                                    var haploLink = $(
+                                            '<a href="' + encURIComp(hap._id) + '.html" class="hap hap' + hap._id + '">'
+                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[hap._id] + ';"></span>'
+                                            + (hap.standard_designation ? hap.standard_designation : hap.sample_id)
+                                            + '</a>');
+                                    return haploLink;
+                                }
+
+                                var tr = $(document.createElement('tr'));
+
+                                var labelsTD = $(document.createElement('td'));
+                                labelsTD.append(makeHapLink(currCandidate.haplotype_1));
+                                if(currCandidate.haplotype_1._id !== currCandidate.haplotype_2._id) {
+                                    labelsTD.append($(document.createTextNode(' | ')));
+                                    labelsTD.append(makeHapLink(currCandidate.haplotype_2));
+                                }
+                                tr.append(labelsTD);
+
+                                var likelihoodTD = $(document.createElement('td'));
+                                likelihoodTD.text(currCandidate.neg_log_likelihood.toFixed(2));
+                                tr.append(likelihoodTD);
+
+                                candidateHaplotypeTableBody.append(tr);
+                            });
+                            updateHaplotypeLinkHoverListeners();
+
+                            // see if we have a pending find
+                            findCandidateHapsReq = null;
+                            if(findCandidateHapsWaiting) {
+                                findCandidateHapsWaiting = false;
+                                findCandidateHaps();
                             }
-
-                            var tr = $(document.createElement('tr'));
-
-                            var labelsTD = $(document.createElement('td'));
-                            labelsTD.append(makeHapLink(currCandidate.haplotype_1));
-                            if(currCandidate.haplotype_1._id !== currCandidate.haplotype_2._id) {
-                                labelsTD.append($(document.createTextNode(' | ')));
-                                labelsTD.append(makeHapLink(currCandidate.haplotype_2));
-                            }
-                            tr.append(labelsTD);
-
-                            var likelihoodTD = $(document.createElement('td'));
-                            likelihoodTD.text(currCandidate.neg_log_likelihood.toFixed(2));
-                            tr.append(likelihoodTD);
-
-                            candidateHaplotypeTableBody.append(tr);
+                        }).fail(function() {
+                            showErrorMessage('An error occurred while calculating candidate haplotypes.');
+                        }).always(function() {
+                            candidateHaplotypeTableOverlay.overlayActive(false);
                         });
-                        updateHaplotypeLinkHoverListeners();
-                    }).fail(function() {
-                        showErrorMessage('An error occurred while calculating candidate haplotypes.');
-                    }).always(function() {
-                        candidateHaplotypeTableOverlay.overlayActive(false);
-                        $('#find-candidate-hap-icon').removeClass('fa-spin');
-                    });
+                    }
                 }
-            });
+            }
 
             var interval = null;
             var updateIntervalButton = $('#update-interval-button');
             var clearIntervalButton = $('#clear-interval-button');
             var intervalText = $('#interval-edit');
 
+            var updateIntervalDP = new DelayedPreemptable();
             function updateInterval(newInterval) {
                 interval = newInterval;
 
@@ -120,6 +139,9 @@
 
                 hapKaryoPlot.zoomInterval(newInterval);
                 hapIntervalPlot.zoomInterval(newInterval);
+
+                // don't update haplotypes unless we have at least 1 sec of quiet time.
+                updateIntervalDP.delay(findCandidateHaps, 1000);
             }
 
             clearIntervalButton.click(function() {
@@ -300,15 +322,21 @@
                 }
 
                 var postData = {};
-                var newTags = editTagsInput.tokenfield('getTokens').map(function(x) {
+                var newTags = discardDupElems(editTagsInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
-                });
+                }));
                 var tagsChanged = !arraysEq(newTags, sampleTags);
                 if(tagsChanged) {
                     postData['tags'] = JSON.stringify(newTags);
                 }
 
                 var newContribStrainTokens = contribStrainTokensInput.tokenfield('getTokens');
+                newContribStrainTokens = discardDupElems(
+                    newContribStrainTokens,
+                    function(tok) {
+                        return tok.value;
+                    }
+                );
                 var newContribStrainIds = newContribStrainTokens.map(function(x) {
                     return x.value;
                 });
@@ -466,7 +494,7 @@
                             // to prevent a pileup of timeout events clear any existing timeout
                             window.clearTimeout(updateHaplotypeSVGTimeoutID);
                         }
-                        updateHaplotypeSVGTimeoutID = window.setTimeout(updateHaplotypeSVG, intervalDelayMS);
+                        updateHaplotypeSVGTimeoutID = window.setTimeout(updateHaplotypeSVG, haplotypePollingIntervalMillisecs);
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
@@ -772,9 +800,6 @@
             <button class="btn btn-default" type="button">
                 <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Interval Haplotype Report
             </button>
-            <button id="find-candidate-hap-button" class="btn btn-default" type="button">
-                <span id="find-candidate-hap-icon" class="fa fa-refresh" aria-hidden="true"></span> Refresh Candidate Haplotypes For Interval
-            </button>
         </div>
     </div>
 
@@ -784,7 +809,7 @@
                 <thead><tr><th>Candidate Haplotype</th><th>Negative Log Likelihood</th></tr></thead>
                 <tbody id="candidate-haplotype-table-body" style="height: 100px;">
                 <tr>
-                    <td colspan="2" style="text-align: center; vertical-align: middle;">Use the Controls Above to Find Candidate Intervals</td>
+                    <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>Select an interval to view Candidate Haplotypes</strong></td>
                 </tr>
                 </tbody>
             </table>
