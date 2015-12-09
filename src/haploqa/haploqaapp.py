@@ -161,6 +161,7 @@ def create_group_html():
     if user is None:
         return flask.render_template('login-required.html')
     else:
+        db = mds.get_db()
         if flask.request.method == 'GET':
             all_group_names = [g['group_name'] for g in db.groups.find({}, {'group_name': 1})]
             return flask.render_template('create-group.html', all_group_names=all_group_names)
@@ -168,7 +169,6 @@ def create_group_html():
             form = flask.request.form
             group_name = form['group-name']
 
-            db = mds.get_db()
             db.groups.insert_one({
                 'group_name': group_name,
                 'admin_users': [ObjectId(user['id'])],
