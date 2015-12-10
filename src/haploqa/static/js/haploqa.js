@@ -9,6 +9,30 @@ function decURIComp(str) {
     return decodeURIComponent(str).replace(/\\f/g, '/').replace(/\\b/g, '\\');
 }
 
+var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+};
+
+/**
+ * escapeHtml copied from mustache.js which uses the MIT License
+ */
+function escapeHtml(string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function fromEntityMap(s) {
+        return entityMap[s];
+    });
+}
+
+function deepCopyObj(obj) {
+    return $.extend(true, {}, obj);
+}
+
 function showErrorMessage(msg) {
     var modalDialog = $('#error-modal');
     var errorModalMessage = $('#error-modal-message');

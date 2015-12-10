@@ -209,6 +209,7 @@ def group_html(group_name):
             group_users=group_users,
             user_is_group_admin=user_is_group_admin)
 
+
 @app.route('/edit-group/<escfwd:group_name>.html')
 def edit_group_html(group_name):
 
@@ -224,28 +225,52 @@ def edit_group_html(group_name):
             # return forbidden http code if the user isn't an administrator
             flask.abort(403)
 
-        if flask.request.method == 'GET':
-            all_users = list(db.users.find({}, {'email_address': 1}))
-            for curr_user in all_users:
-                curr_user['id'] = str(curr_user.pop('_id'))
-            group_users = _fetch_users_for_group_template(group, db)
-            return flask.render_template(
-                'edit-group.html',
-                all_users=all_users,
-                group=group,
-                group_users=group_users,
-                user_is_group_admin=user_is_group_admin)
-        elif flask.request.method == 'DELETE':
+        all_users = list(db.users.find({}, {'email_address': 1}))
+        for curr_user in all_users:
+            curr_user['id'] = str(curr_user.pop('_id'))
+        group_users = _fetch_users_for_group_template(group, db)
+        return flask.render_template(
+            'edit-group.html',
+            all_users=all_users,
+            group=group,
+            group_users=group_users,
+            user_is_group_admin=user_is_group_admin)
+
+
+@app.route('/group/<escfwd:group_name>.json', methods=['PUT', 'DELETE'])
+def group_json(group_name):
+
+    print('HERE WE ARE')
+
+    user = flask.g.user
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        db = mds.get_db()
+        group = db.groups.find_one({'group_name': group_name})
+        admin_user_ids = set(map(str, group['admin_users']))
+        user_is_group_admin = user['id'] in admin_user_ids
+        if not user_is_group_admin:
+            # return forbidden http code if the user isn't an administrator
+            flask.abort(403)
+
+        if flask.request.method == 'DELETE':
             db.groups.delete_one({
                 '_id': group['_id'],
                 'admin_users': ObjectId(user['id']),
             })
-        elif flask.request.method == 'POST':
+
+        elif flask.request.method == 'PUT':
             form = flask.request.form
+            print(form)
             new_group_users = json.loads(form['group_users'])
             new_user_ids = [ObjectId(usr['id']) for usr in new_group_users]
-            new_admin_ids = [ObjectId(usr['id']) for usr in new_group_users if usr['is_group_admin']]
+            new_admin_ids = [ObjectId(usr['id']) for usr in new_group_users if usr.get('is_group_admin', False)]
+            if not new_admin_ids:
+                # bad request error. We must have at least one admin per group
+                flask.abort(400)
 
+            print('hey its a print UP')
             db.groups.update_one(
                 {
                     '_id': group['_id'],
@@ -259,47 +284,7 @@ def edit_group_html(group_name):
                 },
             )
 
-
-# @app.route('/group/<escfwd:group_name>.json', methods=['POST', 'DELETE'])
-# def group_json(group_name):
-#
-#     user = flask.g.user
-#     if user is None:
-#         return flask.render_template('login-required.html')
-#     else:
-#         db = mds.get_db()
-#         group = db.groups.find_one({'group_name': group_name})
-#         admin_user_ids = set(map(str, group['admin_users']))
-#         user_is_group_admin = user['id'] in admin_user_ids
-#         if not user_is_group_admin:
-#             # return forbidden http code if the user isn't an administrator
-#             flask.abort(403)
-#
-#         if flask.request.method == 'DELETE':
-#             db.groups.delete_one({
-#                 '_id': group['_id'],
-#                 'admin_users': ObjectId(user['id']),
-#             })
-#         elif flask.request.method == 'POST':
-#             form = flask.request.form
-#             new_group_users = json.loads(form['group_users'])
-#             new_user_ids = [ObjectId(usr['id']) for usr in new_group_users]
-#             new_admin_ids = [ObjectId(usr['id']) for usr in new_group_users if usr['is_group_admin']]
-#
-#             db.groups.update_one(
-#                 {
-#                     '_id': group['_id'],
-#                     'admin_users': ObjectId(user['id']),
-#                 },
-#                 {
-#                     '$set': {
-#                         'users': new_user_ids,
-#                         'admin_users': new_admin_ids,
-#                     },
-#                 },
-#             )
-#
-#         return flask.jsonify(success=True)
+    return ('', 204)
 
 
 @app.route('/my-groups.html')

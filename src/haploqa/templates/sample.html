@@ -72,7 +72,7 @@
                                     var haploLink = $(
                                             '<a href="' + encURIComp(hap._id) + '.html" class="hap hap' + hap._id + '">'
                                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[hap._id] + ';"></span>'
-                                            + (hap.standard_designation ? hap.standard_designation : hap.sample_id)
+                                            + escapeHtml(hap.standard_designation ? hap.standard_designation : hap.sample_id)
                                             + '</a>');
                                     return haploLink;
                                 }

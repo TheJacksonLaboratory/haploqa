@@ -11,7 +11,7 @@
         var allUsers = {{ all_users|tojson }};
         var allUsersMap = {};
         allUsers.forEach(function(currUser) {
-            allUsersMap[currUser.email_address] = currUser;
+            allUsersMap[currUser.id] = currUser;
         });
         var groupUsers = {{ group_users|tojson }};
 
@@ -29,7 +29,7 @@
                 // we should only push users that have a unique email address which is
                 // present in the allUsersMap
                 var doPush =
-                        user.email_address in allUsersMap &&
+                        user.id in allUsersMap &&
                         (prevUser === null || user.email_address !== prevUser.email_address)
                 if(doPush) {
                     uniqueUsers.push(user)
@@ -44,6 +44,32 @@
         $(function() {
             groupUsers = normalizeUsers(groupUsers);
 
+            $('#save-group-button').click(function() {
+                $.ajax({
+                    type: "PUT",
+                    url: "{{ url_for('group_json', group_name=group.group_name) }}",
+                    data: {group_users: JSON.stringify(groupUsers)},
+                    success: function() {
+                        window.location = "{{ url_for('group_html', group_name=group.group_name) }}";
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while saving group.');
+                });
+            });
+
+            $('#delete-group-button').click(function() {
+                $.ajax({
+                    type: "DELETE",
+                    url: "{{ url_for('group_json', group_name=group.group_name) }}",
+                    success: function() {
+                        window.location = "{{ url_for('index_html') }}";
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while deleting group.');
+                });
+            });
+
+            var groupUsersTbody = $('#group-users-tbody');
             var addUsersInput = $('#add-users-input');
             addUsersInput.tokenfield({
                 autocomplete: {
@@ -72,19 +98,42 @@
                     });
                     groupUsers = normalizeUsers(groupUsers);
                 });
+                addUsersInput.tokenfield('setTokens', []);
                 rebuildGroupTable();
             });
 
             function rebuildGroupTable() {
+                groupUsersTbody.empty();
                 groupUsers.forEach(function(user) {
+                    var tr = $(document.createElement('tr'));
+
                     var nameTd = $(document.createElement('td'));
                     var rmUserButton = $(
-                            '<button type="button" class="btn btn-default btn-sm" title="remove ' + $.text(user) + ' from group">' +
+                            '<button type="button" class="btn btn-default btn-sm" title="remove ' + escapeHtml(user.email_address) + ' from group">' +
                             '<span class="fa fa-user-times" aria-hidden="true"></span>' +
                             '</button>');
+                    rmUserButton.click(function() {
+                        groupUsers = groupUsers.filter(function(filterUser) {
+                            return filterUser !== user;
+                        });
+                        tr.remove();
+                    });
+                    nameTd.append(rmUserButton);
+                    nameTd.append($(document.createTextNode(' ')));
                     nameTd.append(document.createTextNode(user.email_address));
 
-                    var tr = $(document.createElement('tr'));
+                    var adminTd = $(document.createElement('td'));
+                    var adminCheckbox = $('<input type="checkbox" value="' + escapeHtml(user.email_address) + '">');
+                    adminCheckbox.prop('checked', user.is_group_admin);
+                    adminCheckbox.change(function() {
+                        user.is_group_admin = adminCheckbox.prop('checked');
+                    });
+                    adminTd.append(adminCheckbox);
+
+                    tr.append(nameTd);
+                    tr.append(adminTd);
+
+                    groupUsersTbody.append(tr);
                 });
             }
             rebuildGroupTable();
@@ -106,6 +155,9 @@
         <a href="{{ url_for('group_html', group_name=group.group_name) }}" class="btn btn-default">
             <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel Edits
         </a>
+        <button id="delete-group-button" type="button" class="btn btn-danger">
+            <span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Delete Group
+        </button>
     </div>
 
     <div class="row">
@@ -128,21 +180,7 @@
                         <th>Administrator</th>
                     </tr>
                 </thead>
-                <tbody id="group-users-tbody">
-                {#
-                {% for group_user in group_users %}
-                    <tr>
-                        <td>
-                            <button type="button" class="btn btn-default btn-sm" title="remove {{ group_user.email_address }} from group">
-                                <span class="fa fa-user-times" aria-hidden="true"></span>
-                            </button>
-                            {{ group_user.email_address }}
-                        </td>
-                        <td>{% if group_user.is_group_admin %}<span class="glyphicon glyphicon-ok" aria-label="{{ group_user.email_address }} is an administrator"></span>{% endif %}</td>
-                    </tr>
-                {% endfor %}
-                #}
-                </tbody>
+                <tbody id="group-users-tbody"></tbody>
             </table>
         </div>
     </div>
