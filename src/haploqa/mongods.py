@@ -37,7 +37,6 @@ def init_db(db=None):
     ])
     db.users.create_index('email_address', unique=True)
     db.users.create_index('password_reset_hash')
-    db.groups.create_index('group_name', unique=True)
 
     return db
 
