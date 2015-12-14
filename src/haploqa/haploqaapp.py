@@ -615,13 +615,13 @@ def sample_data_import_task(platform_id, sample_map_filename, final_report_filen
 def all_samples_html():
     # look up all samples. Only return top level information though (snp-level data is too much)
     db = mds.get_db()
-    samples = db.samples.find(
+    samples = _find_and_anno_samples(
         {},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
+        {'chromosome_data': 0, 'unannotated_snps': 0},
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
     samples = list(samples)
-    for sample in samples:
-        _add_default_attributes(sample)
 
     return flask.render_template('samples.html', samples=samples)
 
@@ -632,13 +632,13 @@ def sample_tag_html(tag_id):
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
-    matching_samples = db.samples.find(
+    matching_samples = _find_and_anno_samples(
         {'tags': tag_id},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
+        {'chromosome_data': 0, 'unannotated_snps': 0},
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
     matching_samples = list(matching_samples)
-    for sample in matching_samples:
-        _add_default_attributes(sample)
 
     return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
 
@@ -649,13 +649,13 @@ def standard_designation_html(standard_designation):
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
-    matching_samples = db.samples.find(
+    matching_samples = _find_and_anno_samples(
         {'standard_designation': standard_designation},
-        {'chromosome_data': 0, 'unannotated_snps': 0}
-    ).sort('sample_id', pymongo.ASCENDING)
+        {'chromosome_data': 0, 'unannotated_snps': 0},
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
     matching_samples = list(matching_samples)
-    for sample in matching_samples:
-        _add_default_attributes(sample)
 
     return flask.render_template(
         'standard-designation.html',
@@ -671,18 +671,24 @@ def standard_designation_html(standard_designation):
 @app.route('/index.html')
 @app.route('/')
 def index_html():
+    user = flask.g.user
     db = mds.get_db()
 
     # this pipeline should get us all tags along with their sample counts
     pipeline = [
-        {"$unwind": "$tags"},
-        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
-        {"$sort": SON([("count", -1), ("_id", -1)])},
+        {'$unwind': '$tags'},
+        {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
+        {'$sort': SON([('count', -1), ('_id', -1)])},
     ]
+    if user is None:
+        # anonymous users should only be given access to public samples
+        pipeline.insert(0, {'$match': {'is_public': True}})
+        sample_count = db.samples.count({'is_public': True})
+    else:
+        sample_count = db.samples.count({})
+
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
-
-    sample_count = db.samples.count({})
 
     return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
 
@@ -744,18 +750,168 @@ def _add_default_attributes(sample):
         viterbi_haplotypes['concordant_percent'] = \
             viterbi_haplotypes['concordant_count'] * 100.0 / viterbi_haplotypes['informative_count']
 
-    # add default color
-    if 'color' not in sample:
-        sample['color'] = '#000000'
+    def default_to(property, default_val):
+        if property not in sample:
+            sample[property] = default_val
 
-    if 'standard_designation' not in sample:
-        sample['standard_designation'] = None
+    default_to('color', '#000000')
+    default_to('standard_designation', None)
+    default_to('gender', None)
+    default_to('notes', None)
+    default_to('owner', None)
+    default_to('write_groups', [])
+    default_to('is_public', False)
 
-    if 'gender' not in sample:
-        sample['gender'] = None
 
-    if 'notes' not in sample:
-        sample['notes'] = None
+# def _find_and_anno_samples(query, projection, db=None, require_write_perms=False):
+#     """
+#     This function is basically performing the sample find operation specified by the
+#     query and projection but it is performing the find in such a way that it only
+#     returns samples that the user has sufficient permissions for. This encapsulates
+#     sample access security in a single function.
+#
+#     :param query: the query to supply to the find function (the actual query performed will
+#                   be more complex to account for security concerns)
+#     :param projection: the projection to supply to the find function
+#     :param db: the mongo database (we'll use mds.get_db() if this value is not supplied)
+#     :param require_write_perms:
+#             if true we will filter out any samples for which the user
+#             only has read permissions
+#     :return: an iterable containing the samples from mongo
+#     """
+#
+#     if db is None:
+#         db = mds.get_db()
+#
+#     user = flask.g.user
+#     user_mongoid = None if user is None else ObjectId(user['id'])
+#
+#     def anno_sample(sample):
+#         if user is None and 'is_public' not in sample:
+#             sample['is_public'] = True
+#         _add_default_attributes(sample)
+#         sample['user_can_write'] = \
+#             user_mongoid is not None and \
+#             (user_mongoid == sample['owner'] or user_mongoid in sample['write_groups'])
+#
+#         sample['user_is_owner'] = user_mongoid is not None and user_mongoid == sample['owner']
+#
+#         return sample
+#
+#     perms_valid_query = None
+#     if user is None:
+#         # anonymous users don't have write access to anything
+#         if not require_write_perms:
+#             # since this is anonymous access only return publicly visible samples
+#             perms_valid_query = {'is_public': True}
+#     else:
+#         # figure out what groups the user belongs to
+#         user_groups = [
+#             usr['_id']
+#             for usr in db.groups.find({'users': ObjectId(user['id'])}, {'_id': 1})
+#         ]
+#
+#         if require_write_perms:
+#             perms_valid_query = {
+#                 '$or': [
+#                     {'owner': user_mongoid},
+#                     {'write_groups':  user_groups},
+#                 ]
+#             }
+#         else:
+#             perms_valid_query = {
+#                 '$or': [
+#                     {'owner': user_mongoid},
+#                     {'write_groups':  user_groups},
+#                     {'is_public': True},
+#                 ]
+#             }
+#
+#     if perms_valid_query:
+#         if query:
+#             query = {
+#                 '$and': [
+#                     perms_valid_query,
+#                     query,
+#                 ]
+#             }
+#         else:
+#             query = perms_valid_query
+#
+#         return map(anno_sample, db.samples.find(query, projection))
+#     else:
+#         return []
+
+
+def _find_and_anno_samples(query, projection, db=None, require_write_perms=False, cursor_func=None):
+    """
+    This function is basically performing the sample find operation specified by the
+    query and projection but it is performing the find in such a way that it only
+    returns samples that the user has sufficient permissions for. This encapsulates
+    sample access security in a single function.
+
+    :param query: the query to supply to the find function (the actual query performed will
+                  be more complex to account for security concerns)
+    :param projection: the projection to supply to the find function
+    :param db: the mongo database (we'll use mds.get_db() if this value is not supplied)
+    :param require_write_perms:
+            if true we will filter out any samples for which the user
+            only has read permissions
+    :param cursor_func:
+            a function that takes a cursor as it's only parameter and returns a compatible
+            cursor. This allows a sort to be applied for example
+    :return: an iterable containing the samples from mongo
+    """
+
+    if db is None:
+        db = mds.get_db()
+
+    user = flask.g.user
+    user_mongoid = None if user is None else ObjectId(user['id'])
+
+    def anno_sample(sample):
+        sample['user_can_write'] = user is not None
+        if user is None and 'is_public' not in sample:
+            sample['is_public'] = True
+        _add_default_attributes(sample)
+
+        sample['user_is_owner'] = user_mongoid is not None and user_mongoid == sample['owner']
+
+        return sample
+
+    if user is None:
+        if require_write_perms:
+            # anonymous users don't have write access to anything
+            return []
+        else:
+            # since this is anonymous access only return publicly visible samples
+            query = {
+                '$and': [
+                    {'is_public': True},
+                    query,
+                ]
+            }
+
+    if projection:
+        cursor = db.samples.find(query, projection)
+    else:
+        cursor = db.samples.find(query)
+    if cursor_func:
+        cursor = cursor_func(cursor)
+
+    return map(anno_sample, cursor)
+
+
+def _find_one_and_anno_samples(query, projection, db=None, require_write_perms=False, cursor_func=None):
+    """
+    parameters work the same as in _find_and_anno_samples.
+    :return: if any samples are found the 1st is returned, otherwise None is returned
+    """
+    samples = _find_and_anno_samples(query, projection, db, require_write_perms, cursor_func)
+    try:
+        return next(iter(samples))
+    except StopIteration:
+        return None
 
 
 @app.route('/sample/<mongo_id>.html')
@@ -768,16 +924,16 @@ def sample_html(mongo_id):
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
-    sample = db.samples.find_one({'_id': obj_id})
-    _add_default_attributes(sample)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
 
-    haplotype_samples = db.samples.find(
+    haplotype_samples = _find_and_anno_samples(
         {'tags': HAPLOTYPE_TAG, 'platform_id': sample['platform_id']},
         {'chromosome_data': 0, 'unannotated_snps': 0},
+        db=db,
     )
     haplotype_samples = list(haplotype_samples)
-    for curr_hap_sample in haplotype_samples:
-        _add_default_attributes(curr_hap_sample)
 
     def contrib_strain_lbl(contrib_strain):
         if contrib_strain['standard_designation']:
@@ -830,7 +986,15 @@ def update_sample(mongo_id):
         update_dict['notes'] = form['notes'].strip()
 
     if 'contributing_strain_ids' in form:
-        sample = db.samples.find_one({'_id': obj_id}, {'platform_id': 1, 'gender': 1})
+        sample = _find_one_and_anno_samples(
+                {'_id': obj_id},
+                {'platform_id': 1, 'gender': 1},
+                db=db,
+                require_write_perms=True)
+        if sample is None:
+            # either the sample does not exist or the user has no permissions to it
+            flask.abort(400)
+
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
 
         # remove Y chromosome from haplotype scan if sample is female
@@ -848,11 +1012,9 @@ def update_sample(mongo_id):
 
         # we need to abort if not all contributing stains have the same platform
         for new_strain_id in new_strain_ids:
-            new_strain = db.samples.find_one({'_id': new_strain_id}, {'platform_id': 1})
+            new_strain = _find_one_and_anno_samples({'_id': new_strain_id}, {'platform_id': 1}, db=db)
             if new_strain is None or 'platform_id' not in new_strain or new_strain['platform_id'] != sample['platform_id']:
-                raise Exception('failed to find strain having id = {} and platform = {}'.format(
-                    new_strain_id,
-                    sample['platform_id']))
+                flask.abort(403)
 
         haplotype_inference_uuid = str(uuid.uuid4())
 
@@ -942,17 +1104,20 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
     best_candidates = []
     if snps:
         # get sliced versions of our main sample and the haplotype samples
-        sample = db.samples.find_one(
+        sample = _find_one_and_anno_samples(
             {'_id': obj_id},
             {
                 'platform_id': 1,
                 'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
                 'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
-            }
+            },
+            db=db,
         )
+        if sample is None:
+            flask.abort(400)
         sample_ab = hhmm.samples_to_ab_codes([sample], chr_id, snps)
 
-        haplotype_samples = list(db.samples.find(
+        haplotype_samples = list(_find_and_anno_samples(
             {
                 '_id': {'$ne': obj_id},
                 'tags': HAPLOTYPE_TAG,
@@ -964,10 +1129,9 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
                 'color': 1,
                 'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
                 'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
-            }
+            },
+            db=db,
         ))
-        for hap_sample in haplotype_samples:
-            _add_default_attributes(hap_sample)
         hap_sample_count = len(haplotype_samples)
         haplotype_samples_ab = hhmm.samples_to_ab_codes(haplotype_samples, chr_id, snps)
 
@@ -1015,16 +1179,17 @@ def viterbi_haplotypes_json(mongo_id):
     :return: the haplotype JSON response
     """
 
+    #TODO how should we deal with the case of a strain that
+
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
-    sample = db.samples.find_one({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1})
-    _add_default_attributes(sample)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1}, db=db)
+    if sample is None:
+        flask.abort(400)
     haplotype_samples = [
-        db.samples.find_one({'_id': x}, {'sample_id': 1, 'color': 1})
+        _find_one_and_anno_samples({'_id': x}, {'sample_id': 1, 'color': 1}, db=db)
         for x in sample['contributing_strains']
     ]
-    for curr_hap_sample in haplotype_samples:
-        _add_default_attributes(curr_hap_sample)
     haplotype_samples = [
         {'obj_id': str(x['_id']), 'sample_id': x['sample_id']}
         for x in haplotype_samples
