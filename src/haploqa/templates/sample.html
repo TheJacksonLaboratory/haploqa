@@ -31,6 +31,7 @@
             {% endfor %}
         };
         var sampleID = {{ sample.sample_id|tojson }};
+        var sampleIsPublic = {{ sample.is_public|tojson }};
         var standardDesignation = {{ sample.standard_designation|tojson }};
         var notes = {{ sample.notes|tojson }};
         var sampleColor = {{ sample.color|tojson }};
@@ -140,8 +141,10 @@
                 hapKaryoPlot.zoomInterval(newInterval);
                 hapIntervalPlot.zoomInterval(newInterval);
 
-                // don't update haplotypes unless we have at least 1 sec of quiet time.
-                updateIntervalDP.delay(findCandidateHaps, 1000);
+                if(user !== null) {
+                    // don't update haplotypes unless we have at least 1 sec of quiet time.
+                    updateIntervalDP.delay(findCandidateHaps, 1000);
+                }
             }
 
             clearIntervalButton.click(function() {
@@ -175,6 +178,17 @@
             var sampleColorText = $('#sample-color-text');
             var colorTableRow = $('#color-table-row');
             editColorComponent.minicolors({theme: 'bootstrap'});
+
+            var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
+            var readonlySampleVisibility = $('#readonly-sample-visibility');
+
+            function updateSampleIsPublic(newSampleIsPublic) {
+                sampleIsPublic = newSampleIsPublic;
+
+                sampleIsPublicCheckbox.prop('checked', newSampleIsPublic);
+                readonlySampleVisibility.text(newSampleIsPublic ? 'Publicly Visible' : 'Requires Login');
+            }
+            updateSampleIsPublic(sampleIsPublic);
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -312,6 +326,8 @@
                 updateHaplotypeStrains(contribStrainTokens);
                 updateSampleID(sampleID);
                 updateSampleColor(sampleColor);
+                updateNotes(notes);
+                updateSampleIsPublic(sampleIsPublic);
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -372,6 +388,12 @@
                     postData['notes'] = newNotes;
                 }
 
+                var newSampleIsPublic = sampleIsPublicCheckbox.prop('checked');
+                var sampleIsPublicChanged = newSampleIsPublic !== sampleIsPublic;
+                if(sampleIsPublicChanged) {
+                    postData['is_public'] = newSampleIsPublic;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
                     url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -396,6 +418,9 @@
                         }
                         if(notesChanged) {
                             updateNotes(newNotes);
+                        }
+                        if(sampleIsPublicChanged) {
+                            updateSampleIsPublic(newSampleIsPublic);
                         }
                     }
                 }).fail(function() {
@@ -530,7 +555,8 @@
         <h1>Sample: <span data-sampleid>{{ sample.sample_id }}</span></h1>
     </div>
 
-    <div data-display-when="logged-in" style="margin-bottom: 10px;">
+    {% if g.user %}
+    <div style="margin-bottom: 10px;">
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
@@ -547,6 +573,7 @@
             </button>
         </span>
     </div>
+    {% endif %}
 
     <div class="row">
         <div class="col-md-12">
@@ -704,6 +731,23 @@
                     </tr>
                     <tr>
                         <th>
+                            Visibility
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span data-display-when="sample-edit" style="display: none;">
+                                <input id="sample-is-public-checkbox" type="checkbox" name="sample-public"> Publicly Visible
+                            </span>
+                            <span id="readonly-sample-visibility" data-display-when="sample-readonly"></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
                             Notes:
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
@@ -803,6 +847,7 @@
         </div>
     </div>
 
+    {% if g.user %}
     <div class="row">
         <div class="col-md-12">
             <table id="candidate-haplotype-table" class="table table-striped" style="margin-top: 10px;">
@@ -815,5 +860,6 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
 {% endblock %}

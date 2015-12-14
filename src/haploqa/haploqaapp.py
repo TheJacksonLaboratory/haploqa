@@ -671,12 +671,13 @@ def sample_html(mongo_id):
     if sample is None:
         flask.abort(400)
 
-    haplotype_samples = _find_and_anno_samples(
+    haplotype_samples = db.samples.find(
         {'tags': HAPLOTYPE_TAG, 'platform_id': sample['platform_id']},
         {'chromosome_data': 0, 'unannotated_snps': 0},
-        db=db,
     )
     haplotype_samples = list(haplotype_samples)
+    for haplotype_sample in haplotype_samples:
+        _add_default_attributes(haplotype_sample)
 
     def contrib_strain_lbl(contrib_strain):
         if contrib_strain['standard_designation']:
@@ -708,6 +709,14 @@ def update_sample(mongo_id):
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples(
+            {'_id': obj_id},
+            {'platform_id': 1, 'gender': 1},
+            db=db,
+            require_write_perms=True)
+    if sample is None:
+        # either the sample does not exist or the user has no permissions to it
+        flask.abort(400)
 
     task_ids = []
 
@@ -728,16 +737,10 @@ def update_sample(mongo_id):
     if 'notes' in form:
         update_dict['notes'] = form['notes'].strip()
 
-    if 'contributing_strain_ids' in form:
-        sample = _find_one_and_anno_samples(
-                {'_id': obj_id},
-                {'platform_id': 1, 'gender': 1},
-                db=db,
-                require_write_perms=True)
-        if sample is None:
-            # either the sample does not exist or the user has no permissions to it
-            flask.abort(400)
+    if 'is_public' in form:
+        update_dict['is_public'] = form['is_public'] == 'true'
 
+    if 'contributing_strain_ids' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
 
         # remove Y chromosome from haplotype scan if sample is female
@@ -930,9 +933,11 @@ def viterbi_haplotypes_json(mongo_id):
     if sample is None:
         flask.abort(400)
     haplotype_samples = [
-        _find_one_and_anno_samples({'_id': x}, {'sample_id': 1, 'color': 1}, db=db)
+        db.samples.find_one({'_id': x}, {'sample_id': 1, 'color': 1})
         for x in sample['contributing_strains']
     ]
+    for haplotype_sample in haplotype_samples:
+        _add_default_attributes(haplotype_sample)
     haplotype_samples = [
         {'obj_id': str(x['_id']), 'sample_id': x['sample_id']}
         for x in haplotype_samples

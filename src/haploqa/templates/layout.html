@@ -34,34 +34,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/haploqa.css') }}">
 
     <script>
-    var userChangeRequiresRefresh = {% if user_change_requires_refresh %}true{% else %}false{% endif %};
     var user = {% if g.user %}{{ g.user|tojson }}{% else %}null{% endif %};
     var flashMessages = {{ get_flashed_messages()|tojson }};
-    function userChanged(requireRefresh) {
-        if(typeof requireRefresh === 'undefined') {
-            requireRefresh = userChangeRequiresRefresh;
-        }
-
-        var currUserLabel = $('#curr-user-label');
-
-        if(requireRefresh) {
-            document.location.reload(true);
-        } else {
-            if(user) {
-                currUserLabel.text(user.email_address);
-                $('[data-display-when="logged-in"]').css('display', '');
-                $('[data-display-when="logged-out"]').css('display', 'none');
-            } else {
-                currUserLabel.text('');
-                $('[data-display-when="logged-in"]').css('display', 'none');
-                $('[data-display-when="logged-out"]').css('display', '');
-            }
-        }
-    }
 
     $(document).ready(function() {
-        userChanged(false);
-
         if(flashMessages.length) {
             showErrorMessage(flashMessages[0]);
         }
@@ -87,8 +63,7 @@
                 },
                 dataType: 'json',
                 success: function(new_user) {
-                    user = new_user;
-                    userChanged();
+                    document.location.reload(true);
                 }
             }).fail(function() {
                 showErrorMessage('login attempt failed');
@@ -123,8 +98,7 @@
                 url: "{{ url_for('logout_json') }}",
                 dataType: 'json',
                 success: function(data) {
-                    user = null;
-                    userChanged();
+                    document.location.reload(true);
                 }
             }).fail(function() {
                 showErrorMessage('logout attempt failed');
@@ -152,12 +126,14 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
+                {% if g.user %}
                 <li>
-                    <a href="{{ url_for('sample_data_import_html') }}" data-display-when="logged-in">
+                    <a href="{{ url_for('sample_data_import_html') }}">
                         <span class="glyphicon glyphicon-upload" aria-hidden="true"></span>
                         Import Sample Data
                     </a>
                 </li>
+                {% endif %}
                 <li>
                     <a href="{{ url_for('about_html') }}">
                         <span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span>
@@ -178,10 +154,11 @@
                 </li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
-                <li data-display-when="logged-in">
+                {% if g.user %}
+                <li>
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                         <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
-                        <span id="curr-user-label">user@example.com</span>
+                        <span id="curr-user-label">{{ g.user.email_address }}</span>
                     </a>
                     <ul class="dropdown-menu">
                         <li><a id="logout-banner" href="#">logout</a></li>
@@ -189,7 +166,8 @@
                         <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
                     </ul>
                 </li>
-                <li class="dropdown" data-display-when="logged-out">
+                {% else %}
+                <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                         <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
                         Login
@@ -209,6 +187,7 @@
                         </form>
                     </div>
                 </li>
+                {% endif %}
             </ul>
         </div>
         <!--/.nav-collapse -->
