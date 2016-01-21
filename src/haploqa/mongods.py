@@ -35,7 +35,7 @@ def init_db(db=None):
         ('position_bp', pymongo.ASCENDING),
         ('snp_id',      pymongo.ASCENDING),
     ])
-    db.users.create_index('email_address', unique=True)
+    db.users.create_index('email_address_lowercase', unique=True)
     db.users.create_index('password_reset_hash')
 
     return db
@@ -77,18 +77,69 @@ def post_proc_sample(sample):
         chr_dict['heterozygous_count'] = 0
         chr_dict['no_read_count'] = 0
 
-        allele1_fwds = chr_dict['allele1_fwds']
-        allele2_fwds = chr_dict['allele2_fwds']
-        for i in range(len(allele1_fwds)):
-            if allele1_fwds[i] == '-' or allele2_fwds[i] == '-':
-                chr_dict['no_read_count'] += 1
-            elif allele1_fwds[i] == allele2_fwds[i]:
-                chr_dict['homozygous_count'] += 1
-            else:
-                chr_dict['heterozygous_count'] += 1
+        try:
+            allele1_fwds = chr_dict['allele1_fwds']
+            allele2_fwds = chr_dict['allele2_fwds']
+            for i in range(len(allele1_fwds)):
+                if allele1_fwds[i] == '-' or allele2_fwds[i] == '-':
+                    chr_dict['no_read_count'] += 1
+                elif allele1_fwds[i] == allele2_fwds[i]:
+                    chr_dict['homozygous_count'] += 1
+                else:
+                    chr_dict['heterozygous_count'] += 1
+        except KeyError:
+            valid_nucs = {'G', 'A', 'T', 'C'}
+            snps = chr_dict['snps']
+            for snp in snps:
+                if snp in valid_nucs:
+                    chr_dict['homozygous_count'] += 1
+                elif snp == '-':
+                    chr_dict['no_read_count'] += 1
+                elif snp == 'H':
+                    chr_dict['heterozygous_count'] += 1
+                else:
+                    raise Exception('unexpected SNP code: {}'.format(snp))
+
         sample['homozygous_count'] += chr_dict['homozygous_count']
         sample['heterozygous_count'] += chr_dict['heterozygous_count']
         sample['no_read_count'] += chr_dict['no_read_count']
+
+
+def within_chr_snp_indices(platform_id, db=None):
+
+    if db is None:
+        db = get_db()
+
+    platform_obj = db.platforms.find_one({'platform_id': platform_id})
+    if platform_obj is None:
+        raise Exception('failed to find a platform named "{}".'.format(platform_id))
+
+    platform_chrs = platform_obj['chromosomes']
+    snp_chr_indexes = dict()
+    snp_count_per_chr = {chr: 0 for chr in platform_chrs}
+
+    prev_chr = None
+    snp_index = 0
+
+    chr_snps = db.snps.find({'platform_id': platform_id}).sort([
+        ('chromosome', pymongo.ASCENDING),
+        ('position_bp', pymongo.ASCENDING),
+        ('snp_id', pymongo.ASCENDING),
+    ])
+    for snp in chr_snps:
+        if snp['chromosome'] != prev_chr:
+            snp_count_per_chr[prev_chr] = snp_index
+            snp_index = 0
+            prev_chr = snp['chromosome']
+        snp_chr_indexes[snp['snp_id']] = {
+            'index': snp_index,
+            'chromosome': snp['chromosome'],
+        }
+        snp_index += 1
+    if prev_chr is not None:
+        snp_count_per_chr[prev_chr] = snp_index
+
+    return platform_chrs, snp_count_per_chr, snp_chr_indexes
 
 
 # as a convenience we can run this file as a script to

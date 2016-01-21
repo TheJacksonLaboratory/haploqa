@@ -21,7 +21,7 @@ def noreply_address():
 
 def lookup_user(email_address, db):
     return db.users.find_one({
-        'email_address': email_address
+        'email_address_lowercase': email_address.strip().lower()
     }, {
         # exclude authentication data for added security (avoid the data leaking out)
         'password_hash': 0,
@@ -34,7 +34,9 @@ def lookup_salt(email_address, db):
     """
     lookup and return a user's password salt
     """
-    salt_dict = db.users.find_one({'email_address': email_address, 'salt': {'$exists': 1}}, {'salt': 1})
+    salt_dict = db.users.find_one(
+            {'email_address_lowercase': email_address.strip().lower(), 'salt': {'$exists': 1}},
+            {'salt': 1})
     if salt_dict is not None:
         return salt_dict['salt']
     else:
@@ -50,7 +52,7 @@ def authenticate_user(email_address, password, db):
     :return: the user dict from mongo upon success and None upon failure
     """
     user = db.users.find_one({
-        'email_address': email_address,
+        'email_address_lowercase': email_address.strip().lower(),
     }, {
         'password_reset_hash': 0,
     })
@@ -78,9 +80,12 @@ def invite_admin(email_address, db=None):
     if db is None:
         db = mds.get_db()
 
+    email_address = email_address.strip()
+
     password_reset_id = str(uuid4())
     db.users.insert({
         'email_address': email_address,
+        'email_address_lowercase': email_address.lower(),
         'administrator': True,
         'password_reset_hash': hash_str(password_reset_id),
     })
@@ -119,10 +124,12 @@ def reset_password(email_address, db=None):
         db = mds.get_db()
 
     password_reset_id = str(uuid4())
-    db.users.update_one(
-        {'email_address': email_address},
+    user = db.users.find_one_and_update(
+        {'email_address_lowercase': email_address.strip().lower()},
         {'$set': {'password_reset_hash': hash_str(password_reset_id)}}
     )
+    if user is None:
+        raise Exception('no such user exists')
 
     msg_template = \
         '''Someone has attempted to reset your password for the HaploQA application. ''' \
@@ -136,12 +143,12 @@ def reset_password(email_address, db=None):
     from_addr = noreply_address()
     msg['Subject'] = 'Reset password request for HaploQA'
     msg['From'] = from_addr
-    msg['To'] = email_address
+    msg['To'] = user['email_address']
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
     s = smtplib.SMTP('localhost')
-    s.sendmail(from_addr, [email_address], msg.as_string())
+    s.sendmail(from_addr, [user['email_address']], msg.as_string())
     s.quit()
 
 
@@ -157,9 +164,12 @@ def _create_admin(email_address, password, db=None):
     if db is None:
         db = mds.get_db()
 
+    email_address = email_address.strip()
+
     salt = str(uuid4())
     db.users.insert({
         'email_address': email_address,
+        'email_address_lowercase': email_address.lower(),
         'administrator': True,
         'salt': salt,
         'password_hash': hash_str(password + salt),

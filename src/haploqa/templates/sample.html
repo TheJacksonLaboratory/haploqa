@@ -21,13 +21,13 @@
             {% for haplotype_sample in haplotype_samples %}
             {
                 label: {% if haplotype_sample.standard_designation %}{{ haplotype_sample.standard_designation|tojson }}{% else %}{{ haplotype_sample.sample_id|tojson }}{% endif %},
-                value: {{ haplotype_sample._id|string|tojson }}
+                value: {{ haplotype_sample._id|tojson }}
             }{% if not loop.last %},{% endif %}
             {% endfor %}
         ];
         var haplotypeColors = {
             {% for haplotype_sample in haplotype_samples %}
-                {{ haplotype_sample._id|string|tojson }}: {{ haplotype_sample.color|tojson }}{% if not loop.last %},{% endif %}
+                {{ haplotype_sample._id|tojson }}: {{ haplotype_sample.color|tojson }}{% if not loop.last %},{% endif %}
             {% endfor %}
         };
         var sampleID = {{ sample.sample_id|tojson }};

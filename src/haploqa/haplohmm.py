@@ -2,6 +2,7 @@ from bson.objectid import ObjectId
 import math
 import numpy as np
 from scipy.stats import norm
+import sys
 
 import haploqa.mongods as mds
 
@@ -127,86 +128,42 @@ def samples_to_ab_codes(samples, chromosome, snps):
     ab_codes.fill(255)
 
     for i, curr_sample in enumerate(samples):
-        allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
-        allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])
+        if 'allele1_fwds' in curr_sample['chromosome_data'][chromosome]:
+            allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
+            allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])
 
-        # here we convert nucleotides (GACT and '-' for no call) into AB codes
-        allele1_is_a = allele1_fwds == x_calls
-        allele2_is_a = allele2_fwds == x_calls
-        allele1_is_b = allele1_fwds == y_calls
-        allele2_is_b = allele2_fwds == y_calls
-        alleles_are_het = np.logical_or(
-            np.logical_and(allele1_is_a, allele2_is_b),
-            np.logical_and(allele1_is_b, allele2_is_a))
-        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = A_CODE
-        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = B_CODE
-        ab_codes[alleles_are_het, i] = H_CODE
-        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = N_CODE
+            # here we convert nucleotides (GACT and '-' for no call) into AB codes
+            allele1_is_a = allele1_fwds == x_calls
+            allele2_is_a = allele2_fwds == x_calls
+            allele1_is_b = allele1_fwds == y_calls
+            allele2_is_b = allele2_fwds == y_calls
+            alleles_are_het = np.logical_or(
+                np.logical_and(allele1_is_a, allele2_is_b),
+                np.logical_and(allele1_is_b, allele2_is_a))
+            ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = A_CODE
+            ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = B_CODE
+            ab_codes[alleles_are_het, i] = H_CODE
+            ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = N_CODE
+        elif 'snps' in curr_sample['chromosome_data'][chromosome]:
+            sample_snps = np.array(curr_sample['chromosome_data'][chromosome]['snps'])
 
-        if np.any(ab_codes[:, i] == 255):
-            raise Exception('found unexpected SNP codes in sample: {}'.format(curr_sample))
-
-    return ab_codes
-
-
-def sample_ids_to_ab_codes(sample_ids, chromosome, db=None):
-    """
-    Look up a matrix of AB codes for the given sample IDs.
-    :param sample_ids:  the sample IDs. If isinstance(sample_id, ObjectId) we look this up as an
-                        '_id' otherwise we use 'sample_id' for lookup
-    :param chromosome: the chromosome
-    :return: a matrix of AB codes. The numerical genotype codes used are: 0->N, 1->A, 2->B, 3->H
-    """
-    if db is None:
-        db = mds.get_db()
-
-    sample_count = len(sample_ids)
-
-    x_calls = None
-    y_calls = None
-    ab_codes = None
-    snp_count = 0
-    for i, sample_id in enumerate(sample_ids):
-        if isinstance(sample_id, ObjectId):
-            curr_sample = db.samples.find_one({'_id': sample_id})
+            ab_codes[sample_snps == x_calls, i] = A_CODE
+            ab_codes[sample_snps == y_calls, i] = B_CODE
+            ab_codes[sample_snps == 'H', i] = H_CODE
+            ab_codes[sample_snps == '-', i] = N_CODE
         else:
-            curr_sample = db.samples.find_one({'sample_id': sample_id})
+            raise Exception('sample does not have allele1_fwds or snps attributes for chromosome {}'.format(chromosome))
 
-        if curr_sample is None:
-            raise Exception('failed to find a sample named "{}"'.format(sample_id))
-
-        if i == 0:
-            platform_id = curr_sample['platform_id']
-            snps = mds.get_snps(platform_id, chromosome)
-            x_calls = []
-            y_calls = []
-            for snp in snps:
-                snp_count += 1
-                x_calls.append(snp['x_probe_call'])
-                y_calls.append(snp['y_probe_call'])
-            x_calls = np.array(x_calls)
-            y_calls = np.array(y_calls)
-            ab_codes = np.empty((snp_count, sample_count), dtype=np.uint8)
-            ab_codes.fill(255)
-
-        allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
-        allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])
-
-        # here we convert nucleotides (GACT and '-' for no call) into AB codes
-        allele1_is_a = allele1_fwds == x_calls
-        allele2_is_a = allele2_fwds == x_calls
-        allele1_is_b = allele1_fwds == y_calls
-        allele2_is_b = allele2_fwds == y_calls
-        alleles_are_het = np.logical_or(
-            np.logical_and(allele1_is_a, allele2_is_b),
-            np.logical_and(allele1_is_b, allele2_is_a))
-        ab_codes[np.logical_and(allele1_is_a, allele2_is_a), i] = A_CODE
-        ab_codes[np.logical_and(allele2_is_b, allele2_is_b), i] = B_CODE
-        ab_codes[alleles_are_het, i] = H_CODE
-        ab_codes[np.logical_or(allele1_fwds == '-', allele2_fwds == '-'), i] = N_CODE
-
-        if np.any(ab_codes[:, i] == 255):
-            raise Exception('found unexpected SNP codes in sample: {}'.format(sample_id))
+        bad_codes = ab_codes[:, i] == 255
+        num_bad_codes = np.count_nonzero(bad_codes)
+        if num_bad_codes:
+            err_msg = 'found unexpected {} SNP codes in sample: {}, chr: {}'.format(
+                    num_bad_codes,
+                    curr_sample['sample_id'],
+                    chromosome)
+            print(err_msg, file=sys.stderr)
+            ab_codes[bad_codes, i] = N_CODE
+            #raise Exception(err_msg)
 
     return ab_codes
 
@@ -417,49 +374,49 @@ class SnpHaploHMM:
         raise Exception('implement me')
 
 
-def main():
-
-    ###########################################################################
-    # This main function is just some smoke-signal test code for this module. #
-    ###########################################################################
-
-    hom_obs_probs = np.array([
-        50,     # matching homozygous
-        0.5,    # opposite homozygous
-        1,      # het
-        1,      # no read
-    ], dtype=np.float64)
-    het_obs_probs = np.array([
-        50,     # het obs
-        2,      # hom obs
-        2,      # no read obs
-    ], dtype=np.float64)
-    n_obs_probs = np.ones(3, dtype=np.float64)
-
-    trans_prob = 0.001
-    test_hmm = SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
-
-    # Each sample is a different set of parental strains but only 129S, B6J, FVB for the most part
-    print('getting AB Codes')
-    for chr in (str(i) for i in range(1, 20)):
-        print('chromosome', chr)
-        ab_codes = sample_ids_to_ab_codes(
-            [
-                # only 'C57BL/6NJm39418', '129S7m', 'FVB001', are expected to really be parental strains
-                'UM-004', 'C57BL/6NJm39418', '129S7m', 'FVB001', 'C3H/HeNTac', 'BALB/cByJm',
-                'NOR/LtJm32299', 'NON/ShiLtJm38111', 'SJL/Jm35807', 'ALR/LtJm34133', 'CZECHII/EiJ',
-                'ZALENDE/EiJ', 'SPRET/EiJ', 'ALR/LtJm34133',
-            ],
-            chr,
-        )
-        print('performing viterbi')
-        np.set_printoptions(threshold=np.nan)
-        max_likelihood_states, max_final_likelihood = test_hmm.viterbi(
-            haplotype_ab_codes=ab_codes[:, 1:],
-            observation_ab_codes=ab_codes[:, 0])
-        print(max_likelihood_states)
-        print(max_final_likelihood)
-        print('done with viterbi')
-
-if __name__ == '__main__':
-    main()
+# def main():
+#
+#     ###########################################################################
+#     # This main function is just some smoke-signal test code for this module. #
+#     ###########################################################################
+#
+#     hom_obs_probs = np.array([
+#         50,     # matching homozygous
+#         0.5,    # opposite homozygous
+#         1,      # het
+#         1,      # no read
+#     ], dtype=np.float64)
+#     het_obs_probs = np.array([
+#         50,     # het obs
+#         2,      # hom obs
+#         2,      # no read obs
+#     ], dtype=np.float64)
+#     n_obs_probs = np.ones(3, dtype=np.float64)
+#
+#     trans_prob = 0.001
+#     test_hmm = SnpHaploHMM(trans_prob, hom_obs_probs, het_obs_probs, n_obs_probs)
+#
+#     # Each sample is a different set of parental strains but only 129S, B6J, FVB for the most part
+#     print('getting AB Codes')
+#     for chr in (str(i) for i in range(1, 20)):
+#         print('chromosome', chr)
+#         ab_codes = sample_ids_to_ab_codes(
+#             [
+#                 # only 'C57BL/6NJm39418', '129S7m', 'FVB001', are expected to really be parental strains
+#                 'UM-004', 'C57BL/6NJm39418', '129S7m', 'FVB001', 'C3H/HeNTac', 'BALB/cByJm',
+#                 'NOR/LtJm32299', 'NON/ShiLtJm38111', 'SJL/Jm35807', 'ALR/LtJm34133', 'CZECHII/EiJ',
+#                 'ZALENDE/EiJ', 'SPRET/EiJ', 'ALR/LtJm34133',
+#             ],
+#             chr,
+#         )
+#         print('performing viterbi')
+#         np.set_printoptions(threshold=np.nan)
+#         max_likelihood_states, max_final_likelihood = test_hmm.viterbi(
+#             haplotype_ab_codes=ab_codes[:, 1:],
+#             observation_ab_codes=ab_codes[:, 0])
+#         print(max_likelihood_states)
+#         print(max_final_likelihood)
+#         print('done with viterbi')
+#
+# if __name__ == '__main__':
+#     main()

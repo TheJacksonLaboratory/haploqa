@@ -15,6 +15,7 @@ from werkzeug.routing import BaseConverter
 import haploqa.haplohmm as hhmm
 import haploqa.mongods as mds
 import haploqa.finalreportimport as finalin
+import haploqa.sampleannoimport as sai
 import haploqa.usermanagement as usrmgmt
 
 app = flask.Flask(__name__)
@@ -63,6 +64,23 @@ class EscForwardSlashConverter(BaseConverter):
 # Attaches the EscForwardSlashConverter to the given app
 # with the typename "escfwd"
 app.url_map.converters['escfwd'] = EscForwardSlashConverter
+
+
+class JSONEncoder(flask.json.JSONEncoder):
+    def default(self, o):
+        """Implement this method in a subclass such that it returns a
+        serializable object for ``o``, or calls the base implementation (to
+        raise a :exc:`TypeError`).
+
+        This implementation supports ObjectId in addition to default values
+        supported by flask
+        """
+        if isinstance(o, ObjectId):
+            return str(o)
+        return flask.json.JSONEncoder.default(self, o)
+
+
+app.json_encoder = JSONEncoder
 
 
 # TODO this key must be changed to something secret (ie. not committed to the repo).
@@ -135,10 +153,6 @@ def lookup_user_from_session():
         if user_email_address:
             if flask.request.remote_addr == flask.session.get('remote_addr'):
                 user = usrmgmt.lookup_user(user_email_address, mds.get_db())
-                user_id = user.pop('_id', None)
-                if user_id:
-                    user['id'] = str(user_id)
-
                 flask.g.user = user
             else:
                 # If IP addresses don't match we're going to reset the session for
@@ -389,9 +403,14 @@ def sample_data_import_html():
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
 
-            sample_map_filename = _unique_temp_filename()
-            files['sample-map-file'].save(sample_map_filename)
+            # sample map is optional
+            sample_map_filename = None
+            if 'sample-map-file' in files:
+                #print('sample-map-file is {}'.format(files['sample-map-file']))
+                sample_map_filename = _unique_temp_filename()
+                files['sample-map-file'].save(sample_map_filename)
 
+            # the final report is required
             final_report_filename = _unique_temp_filename()
             final_report_file = files['final-report-file']
             final_report_file.save(final_report_filename)
@@ -399,8 +418,8 @@ def sample_data_import_html():
             sample_group_name = os.path.splitext(final_report_file.filename)[0]
             import_task = sample_data_import_task.delay(
                 platform_id,
-                sample_map_filename,
                 final_report_filename,
+                sample_map_filename,
                 sample_group_name)
 
             # perform a 303 redirect to the URL that uniquely identifies this run
@@ -411,20 +430,23 @@ def sample_data_import_html():
 
 
 @celery.task(name='sample_data_import_task')
-def sample_data_import_task(platform_id, sample_map_filename, final_report_filename, sample_group_name):
+def sample_data_import_task(platform_id, final_report_filename, sample_map_filename, sample_group_name):
     """
     Our long-running import task, triggered from the import page of the app
     """
     try:
         db = mds.get_db()
         tags = [sample_group_name, platform_id]
-        finalin.import_final_report(final_report_filename, platform_id, tags, db)
+        sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
+        finalin.import_final_report(final_report_filename, sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
-        if os.path.isfile(sample_map_filename):
-            os.remove(sample_map_filename)
-        if os.path.isfile(final_report_filename):
-            os.remove(final_report_filename)
+        try:
+            if sample_map_filename is not None and os.path.isfile(sample_map_filename):
+                os.remove(sample_map_filename)
+        finally:
+            if os.path.isfile(final_report_filename):
+                os.remove(final_report_filename)
 
     return sample_group_name
 
@@ -433,6 +455,25 @@ def sample_data_import_task(platform_id, sample_map_filename, final_report_filen
 # SAMPLE LISTING PAGES
 #####################################################################
 
+def _get_platform_haplotypes(db, samples):
+    platform_ids = set()
+    for sample in samples:
+        platform = sample.get('platform_id', None)
+        if platform:
+            platform_ids.add(platform)
+    platform_ids = list(platform_ids)
+    print(platform_ids)
+
+    haplotype_samples = db.samples.find(
+        {'tags': HAPLOTYPE_TAG, 'platform_id': {'$in': platform_ids}},
+        {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
+    )
+    haplotype_samples = list(haplotype_samples)
+    for haplotype_sample in haplotype_samples:
+        _add_default_attributes(haplotype_sample)
+
+    return platform_ids, haplotype_samples
+
 
 @app.route('/all-samples.html')
 def all_samples_html():
@@ -440,13 +481,25 @@ def all_samples_html():
     db = mds.get_db()
     samples = _find_and_anno_samples(
         {},
-        {'chromosome_data': 0, 'unannotated_snps': 0},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
         db=db,
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     samples = list(samples)
+    platform_ids, haplotype_samples = _get_platform_haplotypes(db, samples)
+    all_tags = db.samples.distinct('tags')
 
-    return flask.render_template('samples.html', samples=samples)
+    return flask.render_template(
+            'samples.html',
+            samples=samples,
+            all_tags=all_tags,
+            platform_ids=platform_ids,
+            haplotype_samples=haplotype_samples)
 
 
 @app.route('/tag/<escfwd:tag_id>.html')
@@ -457,13 +510,26 @@ def sample_tag_html(tag_id):
     db = mds.get_db()
     matching_samples = _find_and_anno_samples(
         {'tags': tag_id},
-        {'chromosome_data': 0, 'unannotated_snps': 0},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
         db=db,
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     matching_samples = list(matching_samples)
+    platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
+    all_tags = db.samples.distinct('tags')
 
-    return flask.render_template('sample-tag.html', samples=matching_samples, tag_id=tag_id)
+    return flask.render_template(
+            'sample-tag.html',
+            samples=matching_samples,
+            all_tags=all_tags,
+            platform_ids=platform_ids,
+            haplotype_samples=haplotype_samples,
+            tag_id=tag_id)
 
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
@@ -474,16 +540,26 @@ def standard_designation_html(standard_designation):
     db = mds.get_db()
     matching_samples = _find_and_anno_samples(
         {'standard_designation': standard_designation},
-        {'chromosome_data': 0, 'unannotated_snps': 0},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
         db=db,
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     matching_samples = list(matching_samples)
+    platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
+    all_tags = db.samples.distinct('tags')
 
     return flask.render_template(
-        'standard-designation.html',
-        samples=matching_samples,
-        standard_designation=standard_designation)
+            'standard-designation.html',
+            samples=matching_samples,
+            all_tags=all_tags,
+            platform_ids=platform_ids,
+            haplotype_samples=haplotype_samples,
+            standard_designation=standard_designation)
 
 
 #####################################################################
@@ -610,7 +686,7 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
         db = mds.get_db()
 
     user = flask.g.user
-    user_mongoid = None if user is None else ObjectId(user['id'])
+    user_mongoid = None if user is None else user['_id']
 
     def anno_sample(sample):
         sample['user_can_write'] = user is not None
@@ -685,7 +761,7 @@ def sample_html(mongo_id):
         else:
             return contrib_strain['sample_id']
     contrib_strain_tokens = [
-        {'value': str(x['_id']), 'label': contrib_strain_lbl(x)}
+        {'value': x['_id'], 'label': contrib_strain_lbl(x)}
         for x in haplotype_samples
         if x['_id'] in sample['contributing_strains']
     ]
@@ -742,16 +818,7 @@ def update_sample(mongo_id):
 
     if 'contributing_strain_ids' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
-
-        # remove Y chromosome from haplotype scan if sample is female
-        unset_dict = dict()
         chr_ids = platform['chromosomes']
-        if sample.get('gender', None) == 'female':
-            unset_dict['viterbi_haplotypes.chromosome_data.Y'] = ''
-            try:
-                chr_ids.remove('Y')
-            except ValueError:
-                pass
 
         new_strain_ids = json.loads(form['contributing_strain_ids'])
         new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
@@ -773,10 +840,7 @@ def update_sample(mongo_id):
             }
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
-        if unset_dict:
-            db.samples.update_one({'_id': obj_id}, {'$set': update_dict, '$unset': unset_dict})
-        else:
-            db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
+        db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
         if new_strain_ids:
@@ -791,6 +855,104 @@ def update_sample(mongo_id):
 
     elif update_dict:
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
+
+    return flask.jsonify(task_ids=task_ids)
+
+
+@app.route('/update-samples.json', methods=['POST'])
+def update_samples():
+    """
+    Accepts a POST to update the sample identified by the given mongo_id string
+    """
+
+    db = mds.get_db()
+
+    # extract form parameters
+    form = flask.request.form
+    sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
+    tags = json.loads(form['tags'])
+    tags_action = form['tags_action']
+    contributing_strain_ids = [ObjectId(x) for x in json.loads(form['contributing_strain_ids'])]
+    contributing_strains_action = form['contributing_strains_action']
+
+    if not sample_ids_to_update:
+        # there's nothing to do
+        print('no samples are selected')
+        return flask.jsonify(task_ids=[])
+
+    add_to_set_dict = dict()
+    remove_dict = dict()
+    set_dict = dict()
+
+    def save_updates():
+        update_dict = dict()
+        if add_to_set_dict:
+            update_dict['$addToSet'] = add_to_set_dict
+        if remove_dict:
+            update_dict['$pullAll'] = remove_dict
+        if set_dict:
+            update_dict['$set'] = set_dict
+
+        db.samples.update_many({'_id': {'$in': sample_ids_to_update}}, update_dict)
+
+    tag_change = tags or tags_action == 'set'
+    if tag_change:
+        if tags_action == 'add':
+            add_to_set_dict['tags'] = {
+                '$each': tags
+            }
+        elif tags_action == 'remove':
+            remove_dict['tags'] = tags
+        elif tags_action == 'set':
+            set_dict['tags'] = tags
+
+    common_platform_id = None
+    chr_ids = []
+    if contributing_strains_action in ('add', 'set'):
+        # we need to abort if not all stains have the same platform
+        for strain_id in sample_ids_to_update + contributing_strain_ids:
+            strain = _find_one_and_anno_samples({'_id': strain_id}, {'platform_id': 1}, db=db)
+            if common_platform_id is None:
+                common_platform_id = strain['platform_id']
+            elif strain is None or 'platform_id' not in strain or strain['platform_id'] != common_platform_id:
+                flask.abort(403)
+    if common_platform_id:
+        common_platform = db.platforms.find_one({'platform_id': common_platform_id})
+        chr_ids = common_platform['chromosomes']
+
+    task_ids = []
+    contributing_strains_change = contributing_strain_ids or contributing_strains_action == 'set'
+    if contributing_strains_change:
+        print('=== contributing_strains_change ===')
+        if contributing_strains_action == 'add':
+            add_to_set_dict['contributing_strains'] = {
+                '$each': contributing_strain_ids
+            }
+        elif contributing_strains_action == 'remove':
+            remove_dict['contributing_strains'] = contributing_strain_ids
+        elif contributing_strains_action == 'set':
+            set_dict['contributing_strains'] = contributing_strain_ids
+
+        haplotype_inference_uuid = str(uuid.uuid4())
+        set_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
+        for chr_id in chr_ids:
+            set_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {'results_pending': True}
+        set_dict['viterbi_haplotypes.informative_count'] = 0
+        set_dict['viterbi_haplotypes.concordant_count'] = 0
+        save_updates()
+
+        for sample_id in sample_ids_to_update:
+            sample_obj_id = str(sample_id)
+            for chr_id in chr_ids:
+                t = infer_haplotype_structure_task.delay(
+                    sample_obj_id,
+                    chr_id,
+                    haplotype_inference_uuid,
+                )
+                task_ids.append(t.task_id)
+    else:
+        print('=== NO contributing_strains_change ===')
+        save_updates()
 
     return flask.jsonify(task_ids=task_ids)
 
@@ -832,12 +994,10 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
     obj_id = ObjectId(sample_mongo_id_str)
     sample = db.samples.find_one(
         {'_id': obj_id},
-        {
-            'platform_id': 1,
-            'chromosome_data.' + chr_id + '.allele1_fwds': 1,
-            'chromosome_data.' + chr_id + '.allele2_fwds': 1,
-        }
+        {'platform_id': 1}
     )
+    if sample is None:
+        flask.abort(400)
 
     # calculate which SNPs fall within the interval of interest
     snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
@@ -853,9 +1013,11 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
         sample = _find_one_and_anno_samples(
             {'_id': obj_id},
             {
+                'sample_id': 1,
                 'platform_id': 1,
                 'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
                 'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.snps': {'$slice': [left_index, snp_limit]},
             },
             db=db,
         )
@@ -875,6 +1037,7 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
                 'color': 1,
                 'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
                 'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.snps': {'$slice': [left_index, snp_limit]},
             },
             db=db,
         ))
@@ -899,12 +1062,12 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
             hap2 = haplotype_samples[j]
             best_candidates.append({
                 'haplotype_1': {
-                    '_id': str(hap1['_id']),
+                    '_id': hap1['_id'],
                     'sample_id': hap1['sample_id'],
                     'standard_designation': hap1['standard_designation'],
                 },
                 'haplotype_2': {
-                    '_id': str(hap2['_id']),
+                    '_id': hap2['_id'],
                     'sample_id': hap2['sample_id'],
                     'standard_designation': hap2['standard_designation'],
                 },
@@ -939,7 +1102,7 @@ def viterbi_haplotypes_json(mongo_id):
     for haplotype_sample in haplotype_samples:
         _add_default_attributes(haplotype_sample)
     haplotype_samples = [
-        {'obj_id': str(x['_id']), 'sample_id': x['sample_id']}
+        {'obj_id': x['_id'], 'sample_id': x['sample_id']}
         for x in haplotype_samples
     ]
 
@@ -1054,15 +1217,33 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
             'haplotype_inference_uuid': haplotype_inference_uuid,
         },
         {
+            'sample_id': 1,
             'contributing_strains': 1,
             'platform_id': 1,
             'chromosome_data.' + chr_id: 1,
+            'gender': 1,
         })
+    if sample is None:
+        # nothing to do if we can't find the sample (or if the UUID has changed)
+        return
 
-    if sample is not None and sample['contributing_strains']:
+    if (chr_id == 'Y' and sample.get('gender', None) == 'female') or not sample['contributing_strains']:
+        # for females we just need to skip past the Y chromosome
+        db.samples.update_one(
+            {
+                # TODO add an index for this
+                '_id': sample_obj_id,
+                'haplotype_inference_uuid': haplotype_inference_uuid,
+            },
+            {
+                '$unset': {'viterbi_haplotypes.chromosome_data.' + chr_id: ''},
+            },
+        )
+
+    else:
         snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
         contrib_strains = [
-            db.samples.find_one({'_id': obj_id}, {'chromosome_data.' + chr_id: 1})
+            db.samples.find_one({'_id': obj_id}, {'sample_id': 1, 'chromosome_data.' + chr_id: 1})
             for obj_id in sample['contributing_strains']
         ]
         contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)

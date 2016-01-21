@@ -1,10 +1,10 @@
 import argparse
 import csv
 from os.path import splitext, basename
-import pymongo
 import time
 
 import haploqa.mongods as mds
+import haploqa.sampleannoimport as sai
 
 header_tag = '[header]'
 data_tag = '[data]'
@@ -23,42 +23,8 @@ data_col_hdrs = {
 }
 
 
-def _within_chr_snp_indices(platform_id, db):
-
-    platform_obj = db.platforms.find_one({'platform_id': platform_id})
-    if platform_obj is None:
-        raise Exception('failed to find a platform named "{}".'.format(platform_id))
-
-    platform_chrs = platform_obj['chromosomes']
-    snp_chr_indexes = dict()
-    snp_count_per_chr = {chr: 0 for chr in platform_chrs}
-
-    prev_chr = None
-    snp_index = 0
-
-    chr_snps = db.snps.find({'platform_id': platform_id}).sort([
-        ('chromosome', pymongo.ASCENDING),
-        ('position_bp', pymongo.ASCENDING),
-        ('snp_id', pymongo.ASCENDING),
-    ])
-    for snp in chr_snps:
-        if snp['chromosome'] != prev_chr:
-            snp_count_per_chr[prev_chr] = snp_index
-            snp_index = 0
-            prev_chr = snp['chromosome']
-        snp_chr_indexes[snp['snp_id']] = {
-            'index': snp_index,
-            'chromosome': snp['chromosome'],
-        }
-        snp_index += 1
-    if prev_chr is not None:
-        snp_count_per_chr[prev_chr] = snp_index
-
-    return platform_chrs, snp_count_per_chr, snp_chr_indexes
-
-
-def import_final_report(final_report_file, platform_id, sample_tags, db):
-    platform_chrs, snp_count_per_chr, snp_chr_indexes = _within_chr_snp_indices(platform_id, db)
+def import_final_report(final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
+    platform_chrs, snp_count_per_chr, snp_chr_indexes = mds.within_chr_snp_indices(platform_id, db)
 
     prev_time = time.time()
     all_sample_ids = set()
@@ -67,7 +33,7 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
         final_report_table = csv.reader(final_report_handle, delimiter='\t')
 
         samples = db.samples
-        curr_section = None
+        curr_section = data_tag
         data_header_indexes = None
         curr_sample = None
 
@@ -82,17 +48,15 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
             def string_val(col_name):
                 return row[data_header_indexes[col_name]].strip()
 
-            def int_val(col_name):
-                try:
-                    return int(string_val(col_name))
-                except ValueError as e:
-                    fmt_err('TODO', e)
-
             def float_val(col_name):
+                str_val = string_val(col_name)
                 try:
-                    return float(string_val(col_name))
+                    return float(str_val)
                 except ValueError as e:
-                    fmt_err('TODO', e)
+                    if str_val.upper() == 'NA':
+                        return float('nan')
+                    else:
+                        fmt_err('failed to convert "' + str_val + '" into a float', e)
 
             # just ignore empty lines
             if row:
@@ -184,12 +148,12 @@ def import_final_report(final_report_file, platform_id, sample_tags, db):
                                 })
 
         if curr_sample is not None:
+            try:
+                curr_sample = sai.merge_dicts(curr_sample, sample_anno_dicts[curr_sample['sample_id']])
+            except KeyError:
+                pass
             mds.post_proc_sample(curr_sample)
-            samples.replace_one(
-                {'sample_id': curr_sample['sample_id']},
-                curr_sample,
-                upsert=True,
-            )
+            samples.insert_one(curr_sample)
 
 
 def main():
@@ -197,18 +161,26 @@ def main():
     parser = argparse.ArgumentParser(description='import the final report with probe intensities')
     parser.add_argument(
         'platform',
-        help='the platform for the data we are importing. eg: MegaMUGA'
-    )
+        help='the platform for the data we are importing. eg: MegaMUGA')
     parser.add_argument(
         'final_report',
         help='the final report file as exported by GenomeStudio Genotyping Module. This report must '
              'be tab separated, must be in the "Standard" format and must contain '
              'at least the following columns: '
              'SNP Name, Sample ID, X, Y, Allele1 - Forward, Allele2 - Forward')
+    parser.add_argument(
+        'sample_annotation_txt',
+        nargs='*',
+        help='an (optional) tab-delimited sample annotation file. There should be a header row and one row per sample')
     args = parser.parse_args()
 
+    sample_anno_dicts = dict()
+    for sample_anno_filename in args.sample_annotation_txt:
+        curr_dicts = sai.sample_anno_dicts(sample_anno_filename)
+        sample_anno_dicts = sai.merge_dicts(sample_anno_dicts, curr_dicts)
+
     report_name = splitext(basename(args.final_report))[0]
-    import_final_report(args.final_report, args.platform, [report_name, args.platform], mds.init_db())
+    import_final_report(args.final_report, sample_anno_dicts, args.platform, [report_name, args.platform], mds.init_db())
 
 
 if __name__ == '__main__':

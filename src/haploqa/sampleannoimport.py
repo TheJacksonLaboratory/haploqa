@@ -88,8 +88,27 @@ def normalize_value(header, value):
         return None
 
 
-def import_sample_anno(sample_anno_file, db):
+def merge_dicts(dict1, dict2):
+    def merge_rec_gen(dict1, dict2):
+        for k in set(dict1.keys()).union(dict2.keys()):
+            val1 = dict1.get(k, None)
+            val2 = dict2.get(k, None)
+            if val1 is not None and val2 is not None:
+                if isinstance(val1, dict) and isinstance(val2, dict):
+                    yield k, dict(merge_rec_gen(val1, val2))
+                else:
+                    yield k, val1
+            elif val1 is None:
+                yield k, val2
+            else:
+                yield k, val1
+
+    return dict(merge_rec_gen(dict1, dict2))
+
+
+def sample_anno_dicts(sample_anno_file):
     with open(sample_anno_file, 'r') as sample_anno_file_handle:
+        sample_properties_dicts = dict()
         sample_anno_table = csv.reader(sample_anno_file_handle, delimiter='\t')
 
         header = next(sample_anno_table)
@@ -107,22 +126,17 @@ def import_sample_anno(sample_anno_file, db):
                 missing_id_count += 1
                 continue
 
-            set_dict = dict()
+            sample_dict = {sample_id_canonical: sample_id}
             standard_designation = sample_properties.pop(standard_designation_canonical, None)
             if standard_designation:
-                set_dict[standard_designation_canonical] = standard_designation
+                sample_dict[standard_designation_canonical] = standard_designation
 
             gender = sample_properties.pop(gender_canonical, None)
             if gender:
-                set_dict[gender_canonical] = gender
+                sample_dict[gender_canonical] = gender
 
-            set_dict['properties'] = sample_properties
-
-            # TODO change this to upsert when we know it should work
-            db.samples.update(
-                {sample_id_canonical: sample_id},
-                {'$set': set_dict},
-            )
+            sample_dict['properties'] = sample_properties
+            sample_properties_dicts[sample_id] = sample_dict
 
         if missing_id_count:
             err_fmt = 'failed to import {} out of {} rows because of missing sample IDs'
@@ -130,17 +144,4 @@ def import_sample_anno(sample_anno_file, db):
                 err_fmt.format(missing_id_count, total_row_count),
                 file=sys.stderr)
 
-
-def main():
-    # parse command line arguments
-    parser = argparse.ArgumentParser(description='import sample annotations')
-    parser.add_argument(
-        'sample_annotation_txt',
-        help='the tab-delimited sample annotation file. There should be a header row and one row per sample')
-    args = parser.parse_args()
-
-    import_sample_anno(args.sample_annotation_txt, mds.init_db())
-
-
-if __name__ == '__main__':
-    main()
+        return sample_properties_dicts

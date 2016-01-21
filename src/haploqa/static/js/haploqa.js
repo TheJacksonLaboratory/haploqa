@@ -95,6 +95,103 @@ function discardDupElems(arr, elemToIdStr) {
 }
 
 /**
+ * A little "class" to help out with tri state checkboxes.
+ */
+function TriStateCheckbox(checkbox) {
+    var self = this;
+
+    var checkedVal = checkbox.prop("checked");
+    var indeterminatePropName = "indeterminate";
+
+    /**
+     * Set this to a function value that should be called when the state changes. This event
+     * will not be fired in response to programatic state changes (via the checked function)
+     */
+    this.onTriStateChanged = null;
+
+    /**
+     * Get or set the checked state of this checkbox. The checked val can be true, false or
+     * null (which represents the indeterminate state)
+     * @param {boolean} [val]
+     * @return {boolean} iff this function is called with no val argument the current state is returned
+     */
+    this.checked = function(val) {
+        if(typeof val === 'undefined') {
+            return checkedVal;
+        } else {
+            checkedVal = val;
+            oldCheckedVal = checkedVal;
+            if(val === null) {
+                checkbox.prop(indeterminatePropName, true);
+                checkbox.prop("checked", false);
+            } else {
+                checkbox.prop(indeterminatePropName, false);
+                checkbox.prop("checked", val);
+            }
+        }
+    };
+
+    var oldCheckedVal = checkedVal;
+    var changeFunc = function() {
+        checkbox.prop(indeterminatePropName, false);
+        checkedVal = checkbox.prop("checked");
+
+        // don't do anything if the value hasn't changed
+        if(checkedVal !== oldCheckedVal) {
+            oldCheckedVal = checkedVal;
+
+            // notify the listener
+            if(self.onTriStateChanged) {
+                self.onTriStateChanged();
+            }
+        }
+    };
+
+    checkbox.on("change", changeFunc);
+}
+
+/**
+ * a class to simplify working with bootstrap dropdowns. For this to work all of the clickable
+ * 'a' element must have a 'data-value' attribute. These values must correspond to the string
+ * values used in the value getter/setter function. Any item under dropdownDiv with an
+ * data-dropdown-label will have its text set to match the text of the selected 'a'
+ * @param dropdownDiv
+ *      the 'div' containing the 'button' and 'ul' elements for the dropdown.
+ * @constructor
+ */
+function BootstrapDropdown(dropdownDiv) {
+    var self = this;
+    var value = null;
+    var opts = dropdownDiv.find('a[data-value]');
+    var ddLbls = dropdownDiv.find('[data-dropdown-label]')
+
+    this.getValue = function() {
+        return value;
+    };
+
+    this.setValue = function(val) {
+        value = val;
+        if(val !== null) {
+            ddLbls.text(dropdownDiv.find('a[data-value="' + val + '"]').text());
+        }
+    };
+
+    this.onChange = null;
+
+    opts.click(function(e) {
+        e.preventDefault();
+
+        var newVal = $(this).attr('data-value');
+        self.setValue(newVal);
+        if(self.onChange) {
+            self.onChange();
+        }
+    });
+
+    self.setValue(opts.first().attr('data-value'));
+}
+
+/**
  * A small wrapper around setTimeout that allows for preemption.
  * @constructor
  */

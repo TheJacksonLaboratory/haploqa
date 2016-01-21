@@ -2,6 +2,155 @@
 
 {% block title %}All Samples{% endblock %}
 
+{% block head %}
+    {{ super() }}
+    <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <script>
+        {# var samples = {{ samples|tojson }}; #}
+        var allTags = {{ all_tags|tojson }};
+        var haplotypeSamples = {{ haplotype_samples|tojson }};
+        var platformIDs = {{ platform_ids | tojson }};
+        function haploLbl(haploSample) {
+            var lbl = haploSample.standard_designation ? haploSample.standard_designation : haploSample.sample_id;
+            if(platformIDs.length > 1 && haploSample.platform_id) {
+                // since there are multiple platforms we need to let the user know which
+                // platform each haplotype sample belongs to
+                lbl += ' (' + haploSample.platform_id + ')';
+            }
+
+            return lbl;
+        }
+        var haplotypeTokens = haplotypeSamples.map(function(haploSample) {
+            return {
+                label: haploLbl(haploSample),
+                value: haploSample._id
+            }
+        });
+        $(function() {
+            var tagActionDropdown = new BootstrapDropdown($('#tag-action-dropdown'));
+            var contribStrainsActionDropdown = new BootstrapDropdown($('#contrib-strains-action-dropdown'));
+            var sampleVisibilityDropdown = new BootstrapDropdown($('#sample-visibility-dropdown'));
+
+            var editTagsInput = $('#edit-tags-input');
+            editTagsInput.tokenfield({
+                autocomplete: {
+                    source: allTags.map(function(tag) {
+                        return {
+                            label: tag,
+                            value: tag
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            });
+
+            var contribStrainTokensInput = $('#contributing-strains');
+            contribStrainTokensInput.tokenfield({
+                autocomplete: {
+                    source: haplotypeTokens,
+                    delay: 100,
+                    autoFocus: true
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true,
+                limit: {{ maximum_contributing_strain_count() }}
+            });
+            contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
+                var value = e.attrs.value;
+
+                return haplotypeTokens.some(function(samp) {
+                    return samp.value === value;
+                });
+            });
+
+            var sampleUpdateSpinner = $('#samples-update-spinner');
+            var editSamplesButton = $('#edit-samples-button');
+            var saveSamplesButton = $('#save-samples-button');
+            var cancelSamplesButton = $('#cancel-samples-button');
+            var selectAllCheckbox = new TriStateCheckbox($('#select-all-checkbox'));
+            var allSampleCheckboxes = $('input[data-sample-id]');
+            selectAllCheckbox.onTriStateChanged = function() {
+                var currState = selectAllCheckbox.checked();
+                if(currState !== null) {
+                    allSampleCheckboxes.prop('checked', currState);
+                }
+            };
+
+            function updateSelectAllCheckbox() {
+                var anyChecked = false;
+                var anyUnchecked = false;
+                allSampleCheckboxes.each(function() {
+                    if($(this).prop('checked')) {
+                        anyChecked = true;
+                    } else {
+                        anyUnchecked = true;
+                    }
+                });
+
+                if(anyChecked && anyUnchecked) {
+                    selectAllCheckbox.checked(null);
+                } else if(anyChecked) {
+                    selectAllCheckbox.checked(true);
+                } else if(anyUnchecked) {
+                    selectAllCheckbox.checked(false);
+                }
+            }
+
+            allSampleCheckboxes.change(function() {
+                console.log('checkbox clicked');
+                updateSelectAllCheckbox();
+            });
+
+            function switchEditSampleView(isEdit) {
+                $('[data-display-when="sample-edit"]').css('display', isEdit ? '' : 'none');
+                $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
+            }
+            editSamplesButton.click(function() {switchEditSampleView(true);});
+            cancelSamplesButton.click(function() {switchEditSampleView(false);});
+            saveSamplesButton.click(function() {
+                saveSamplesButton.prop('disabled', true);
+                sampleUpdateSpinner.css('display', '');
+
+                var newTags = discardDupElems(editTagsInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                }));
+                var newContribStrainIds = discardDupElems(contribStrainTokensInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                }));
+                var selectedCheckboxes = $('input:checked[type=checkbox][data-sample-id]');
+                var selectedSampleIDs = selectedCheckboxes.map(function(){
+                    return $(this).attr('data-sample-id');
+                }).get();
+
+                $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('update_samples') }}",
+                    data: {
+                        samples_to_update: JSON.stringify(selectedSampleIDs),
+                        tags: JSON.stringify(newTags),
+                        tags_action: tagActionDropdown.getValue(),
+                        contributing_strain_ids: JSON.stringify(newContribStrainIds),
+                        contributing_strains_action: contribStrainsActionDropdown.getValue(),
+                        sample_visibility: sampleVisibilityDropdown.getValue()
+                    },
+                    dataType: 'json',
+                    success: function(data) {
+                        document.location.reload(true);
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while updating samples.');
+                }).always(function() {
+                    sampleUpdateSpinner.css('display', 'none');
+                });
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block content %}
     <div class="page-header">
         <h1>{% block header %}All Samples{% endblock %}</h1>
@@ -9,11 +158,92 @@
 
     <p>Select any of the samples below to view or edit details.</p>
 
+    {% if g.user %}
+    <div style="margin-bottom: 10px;">
+        <div class="row" data-display-when="sample-readonly">
+            <div class="col-md-12">
+                <button id="edit-samples-button" type="button" class="btn btn-primary">
+                    <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Samples
+                </button>
+            </div>
+        </div>
+
+        <form data-display-when="sample-edit" style="display: none;">
+            <div class="form-group">
+                <label for="edit-tags-input">Tags</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="edit-tags-input">
+                    <div id="tag-action-dropdown" class="input-group-btn">
+                        <button
+                                type="button"
+                                class="btn btn-default dropdown-toggle"
+                                data-toggle="dropdown"
+                                aria-haspopup="true"
+                                aria-expanded="false"><span data-dropdown-label></span> <span class="caret"></span></button>
+                        <ul class="dropdown-menu dropdown-menu-right">
+                            <li><a href="#" data-value="add">Add Tags to Samples</a></li>
+                            <li><a href="#" data-value="remove">Remove Tags from Samples</a></li>
+                            <li><a href="#" data-value="set">Set Sample Tags</a></li>
+                        </ul>
+                    </div><!-- /btn-group -->
+                </div><!-- /input-group -->
+            </div>
+            <div class="form-group">
+                <label for="contributing-strains">Contributing Strains</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="contributing-strains">
+                    <div id="contrib-strains-action-dropdown" class="input-group-btn">
+                        <button
+                                type="button"
+                                class="btn btn-default dropdown-toggle"
+                                data-toggle="dropdown"
+                                aria-haspopup="true"
+                                aria-expanded="false"><span data-dropdown-label></span> <span class="caret"></span></button>
+                        <ul class="dropdown-menu dropdown-menu-right">
+                            <li><a href="#" data-value="add">Add Contributing Strains to Samples</a></li>
+                            <li><a href="#" data-value="remove">Remove Contributing Strains from Samples</a></li>
+                            <li><a href="#" data-value="set">Set Contributing Strains</a></li>
+                        </ul>
+                    </div><!-- /btn-group -->
+                </div><!-- /input-group -->
+            </div>
+            <div class="form-group">
+                <div id="sample-visibility-dropdown" class="btn-group">
+                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <span data-dropdown-label></span> <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-value="no-change">Leave Sample Visibility Unchanged</a></li>
+                        <li><a href="#" data-value="public">Make Samples Public</a></li>
+                        <li><a href="#" data-value="private">Make Samples Private</a></li>
+                    </ul>
+                </div>
+            </div>
+        </form>
+
+        <div class="row" data-display-when="sample-edit" style="display: none;">
+            <div class="col-md-12">
+                <button id="save-samples-button" type="button" class="btn btn-primary">
+                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Edits
+                    <span id="samples-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
+                </button>
+                <button id="cancel-samples-button" type="button" class="btn btn-default">
+                    <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel Edits
+                </button>
+                <button id="delete-samples-button" type="button" class="btn btn-danger">
+                    <span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Delete Selected Samples
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-md-12">
             <table class="table table-striped">
                 <thead>
                 <tr>
+                    <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" name="sample-public"></th>
                     <th>Sample ID</th>
                     <th>Standard Designation</th>
                     <th>Gender</th>
@@ -22,11 +252,13 @@
                     <th>% Hom. Calls</th>
                     <th>% No Call</th>
                     <th>% Concordance</th>
+                    {% if g.user %}<th>Public</th>{% endif %}
                 </tr>
                 </thead>
                 <tbody>
                     {% for sample in samples %}
                     <tr>
+                        <td data-display-when="sample-edit" style="display: none;"><input data-sample-id="{{ sample._id }}" type="checkbox" name="sample-public"></td>
                         <td>
                             <a href="../sample/{{ sample._id }}.html">
                                 {% if 'haplotype-strain' in sample.tags %}
@@ -50,9 +282,12 @@
                                 {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
                             {% endif %}
                         </td>
+                        {% if g.user %}
+                        <td>{% if sample.is_public %}<span class="glyphicon glyphicon-ok" aria-hidden="true" aria-label="sample is public"></span>{% endif %}</td>
+                        {% endif %}
                     </tr>
                     {% else %}
-                        <tr><td colspan="8">
+                        <tr><td colspan="10">
                             {% block nosamples %}No samples found{% endblock %}
                         </td></tr>
                     {% endfor %}
