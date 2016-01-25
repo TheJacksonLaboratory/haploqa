@@ -41,6 +41,8 @@ notes_aliases = {
     notes_canonical
 }
 
+color_canonical = 'color'
+
 
 def normalize_header(header):
     """
@@ -134,6 +136,10 @@ def sample_anno_dicts(sample_anno_file):
             gender = sample_properties.pop(gender_canonical, None)
             if gender:
                 sample_dict[gender_canonical] = gender
+
+            color = sample_properties.pop(color_canonical, None)
+            if color:
+                sample_dict[color_canonical] = color
 
             sample_dict['properties'] = sample_properties
             sample_properties_dicts[sample_id] = sample_dict

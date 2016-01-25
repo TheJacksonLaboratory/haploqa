@@ -6,7 +6,6 @@
     {{ super() }}
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
     <script>
-        {# var samples = {{ samples|tojson }}; #}
         var allTags = {{ all_tags|tojson }};
         var haplotypeSamples = {{ haplotype_samples|tojson }};
         var platformIDs = {{ platform_ids | tojson }};
@@ -230,9 +229,9 @@
                 <button id="cancel-samples-button" type="button" class="btn btn-default">
                     <span class="glyphicon glyphicon-remove" aria-hidden="true"></span> Cancel Edits
                 </button>
-                <button id="delete-samples-button" type="button" class="btn btn-danger">
+                <!--button id="delete-samples-button" type="button" class="btn btn-danger">
                     <span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Delete Selected Samples
-                </button>
+                </button-->
             </div>
         </div>
     </div>
@@ -243,7 +242,7 @@
             <table class="table table-striped">
                 <thead>
                 <tr>
-                    <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" name="sample-public"></th>
+                    <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" checked></th>
                     <th>Sample ID</th>
                     <th>Standard Designation</th>
                     <th>Gender</th>
@@ -258,9 +257,9 @@
                 <tbody>
                     {% for sample in samples %}
                     <tr>
-                        <td data-display-when="sample-edit" style="display: none;"><input data-sample-id="{{ sample._id }}" type="checkbox" name="sample-public"></td>
+                        <td data-display-when="sample-edit" style="display: none;"><input data-sample-id="{{ sample._id }}" type="checkbox" checked></td>
                         <td>
-                            <a href="../sample/{{ sample._id }}.html">
+                            <a href="{{ url_for('sample_html', mongo_id=sample._id) }}">
                                 {% if 'haplotype-strain' in sample.tags %}
                                     <span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span>
                                 {% endif %}

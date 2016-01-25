@@ -777,7 +777,7 @@
     </p>
 
     <p data-display-when="sample-edit" style="display: none;">
-        You can modify the "Contributing Haplotype Strains" below and click "Save Contributing Strains". This will
+        You can modify the "Contributing Haplotype Strains" below and click "Save Edits". This will
         cause the haplotype structure of this strain to be inferred based on these settings (using a hidden markov
         model) and rendered in a plot below.
     </p>
@@ -803,9 +803,9 @@
 
     <div class="row">
         <div class="col-md-12">
-            <button class="btn btn-default" type="button">
+            <a class="btn btn-default" href="{{ url_for('sample_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_report.txt">
                 <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Genome-Wide Haplotype Report
-            </button>
+            </a>
         </div>
     </div>
 
@@ -839,6 +839,7 @@
         </div>
     </div>
 
+    {#
     <div class="row">
         <div class="col-md-12">
             <button class="btn btn-default" type="button">
@@ -846,6 +847,7 @@
             </button>
         </div>
     </div>
+    #}
 
     {% if g.user %}
     <div class="row">

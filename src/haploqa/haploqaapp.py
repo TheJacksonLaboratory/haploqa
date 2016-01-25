@@ -777,6 +777,102 @@ def sample_html(mongo_id):
     )
 
 
+@app.route('/sample/<mongo_id>-report.txt')
+def sample_report(mongo_id):
+    """
+    Render the HTML template for the sample
+    :param mongo_id: the mongo ID string for the sample we're interested in
+    :return: the Flask response for the template
+    """
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
+    sample_uses_snp_format = False
+    for chr_val in sample['chromosome_data'].values():
+        sample_uses_snp_format = 'snps' in chr_val
+
+    contributing_strains = db.samples.find(
+            {'_id': {'$in': sample['contributing_strains']}},
+            {'sample_id': 1, 'standard_designation': 1}
+    )
+    cs_obj_id_strs = [str(cs_obj_id) for cs_obj_id in sample['contributing_strains']]
+    cs_sample_id_map = {
+        str(cs['_id']): cs['standard_designation'] if cs.get('standard_designation', None) else cs['sample_id']
+        for cs in contributing_strains
+    }
+    cs_sample_id_list = [cs_sample_id_map.get(cs_obj_id_str, cs_obj_id_str) for cs_obj_id_str in cs_obj_id_strs]
+
+    def iter_to_row(iterable):
+        return '\t'.join(iterable) + '\n'
+
+    def tsv_generator():
+        # generate a header 1st
+        if sample_uses_snp_format:
+            yield iter_to_row((
+                'snp_id',
+                'chromosome',
+                'position_bp',
+                'snp_call',
+                'haplotype1',
+                'haplotype2',
+            ))
+        else:
+            yield iter_to_row((
+                'snp_id',
+                'chromosome',
+                'position_bp',
+                'allele1_fwd',
+                'allele2_fwd',
+                'haplotype1',
+                'haplotype2',
+            ))
+
+        platform = db.platforms.find_one({'platform_id': sample['platform_id']})
+        chr_ids = platform['chromosomes']
+        for chr_id in chr_ids:
+            if chr_id in sample['chromosome_data']:
+                snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+                try:
+                    haplotype_blocks = sample['viterbi_haplotypes']['chromosome_data'][chr_id]['haplotype_blocks']
+                except KeyError:
+                    haplotype_blocks = []
+
+                hap_block_index = 0
+                for snp_index, curr_snp in enumerate(snps):
+                    snp_hap_block = None
+                    for hap_block_index in range(hap_block_index, len(haplotype_blocks)):
+                        curr_hap_block = haplotype_blocks[hap_block_index]
+                        if curr_hap_block['end_position_bp'] >= curr_snp['position_bp']:
+                            if curr_hap_block['start_position_bp'] <= curr_snp['position_bp']:
+                                snp_hap_block = curr_hap_block
+                            break
+
+                    if sample_uses_snp_format:
+                        yield iter_to_row((
+                            curr_snp['snp_id'],
+                            curr_snp['chromosome'],
+                            str(curr_snp['position_bp']),
+                            sample['chromosome_data'][chr_id]['snps'][snp_index],
+                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_1']],
+                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
+                        ))
+                    else:
+                        yield iter_to_row((
+                            curr_snp['snp_id'],
+                            curr_snp['chromosome'],
+                            str(curr_snp['position_bp']),
+                            sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index],
+                            sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index],
+                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_1']],
+                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
+                        ))
+
+    return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
+
+
 @app.route('/sample/<mongo_id>.json', methods=['POST'])
 def update_sample(mongo_id):
     """
@@ -874,6 +970,7 @@ def update_samples():
     tags_action = form['tags_action']
     contributing_strain_ids = [ObjectId(x) for x in json.loads(form['contributing_strain_ids'])]
     contributing_strains_action = form['contributing_strains_action']
+    sample_visibility_action = form['sample_visibility']
 
     if not sample_ids_to_update:
         # there's nothing to do
@@ -894,6 +991,11 @@ def update_samples():
             update_dict['$set'] = set_dict
 
         db.samples.update_many({'_id': {'$in': sample_ids_to_update}}, update_dict)
+
+    if sample_visibility_action == 'public':
+        set_dict['is_public'] = True
+    elif sample_visibility_action == 'private':
+        set_dict['is_public'] = False
 
     tag_change = tags or tags_action == 'set'
     if tag_change:
