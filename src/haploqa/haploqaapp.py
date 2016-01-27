@@ -147,6 +147,7 @@ def do_after(response):
 
 @app.before_request
 def lookup_user_from_session():
+    flask.session.permanent = True
     if not flask.request.path.startswith(app.static_url_path):
         # lookup the current user if the user_id is found in the session
         user_email_address = flask.session.get('user_email_address')
@@ -777,23 +778,11 @@ def sample_html(mongo_id):
     )
 
 
-@app.route('/sample/<mongo_id>-report.txt')
-def sample_report(mongo_id):
-    """
-    Render the HTML template for the sample
-    :param mongo_id: the mongo ID string for the sample we're interested in
-    :return: the Flask response for the template
-    """
+def _iter_to_row(iterable):
+    return '\t'.join(iterable) + '\n'
 
-    db = mds.get_db()
-    obj_id = ObjectId(mongo_id)
-    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
-    if sample is None:
-        flask.abort(400)
-    sample_uses_snp_format = False
-    for chr_val in sample['chromosome_data'].values():
-        sample_uses_snp_format = 'snps' in chr_val
 
+def _contrib_strain_sample_id_list(sample, db):
     contributing_strains = db.samples.find(
             {'_id': {'$in': sample['contributing_strains']}},
             {'sample_id': 1, 'standard_designation': 1}
@@ -805,13 +794,33 @@ def sample_report(mongo_id):
     }
     cs_sample_id_list = [cs_sample_id_map.get(cs_obj_id_str, cs_obj_id_str) for cs_obj_id_str in cs_obj_id_strs]
 
-    def iter_to_row(iterable):
-        return '\t'.join(iterable) + '\n'
+    return cs_sample_id_list
+
+
+@app.route('/sample/<mongo_id>-snp-report.txt')
+def sample_snp_report(mongo_id):
+    """
+    tab-delimited row-per-SNP report for the sample
+    :param mongo_id: the mongo ID string for the sample we're interested in
+    :return: the Flask response
+    """
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
+    sample_uses_snp_format = False
+    for chr_val in sample['chromosome_data'].values():
+        sample_uses_snp_format = 'snps' in chr_val
+
+    cs_sample_id_list = _contrib_strain_sample_id_list(sample, db)
 
     def tsv_generator():
         # generate a header 1st
         if sample_uses_snp_format:
-            yield iter_to_row((
+            yield _iter_to_row((
+                'sample_id',
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -820,7 +829,8 @@ def sample_report(mongo_id):
                 'haplotype2',
             ))
         else:
-            yield iter_to_row((
+            yield _iter_to_row((
+                'sample_id',
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -851,7 +861,8 @@ def sample_report(mongo_id):
                             break
 
                     if sample_uses_snp_format:
-                        yield iter_to_row((
+                        yield _iter_to_row((
+                            sample['sample_id'],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
@@ -860,7 +871,8 @@ def sample_report(mongo_id):
                             '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
                         ))
                     else:
-                        yield iter_to_row((
+                        yield _iter_to_row((
+                            sample['sample_id'],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
@@ -869,6 +881,67 @@ def sample_report(mongo_id):
                             '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_1']],
                             '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
                         ))
+
+    return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
+
+
+@app.route('/sample/<mongo_id>-summary-report.txt')
+def sample_summary_report(mongo_id):
+    """
+    tab-delimited report for the sample showing parental strain composition (by percent)
+    :param mongo_id: the mongo ID string for the sample we're interested in
+    :return: the Flask response
+    """
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
+
+    cs_sample_id_list = _contrib_strain_sample_id_list(sample, db)
+
+    # get every possible sample ID combination (where order doesn't matter) and initialize distances to 0
+    total_distance = 0
+    cumulative_distance_dict = dict()
+    for hap_index_lte in range(len(cs_sample_id_list)):
+        for hap_index_gte in range(hap_index_lte, len(cs_sample_id_list)):
+            cumulative_distance_dict[(hap_index_lte, hap_index_gte)] = 0
+
+    # iterate through all of the haplotype blocks and accumulate distances
+    try:
+        chr_ids = sample['viterbi_haplotypes']['chromosome_data'].keys()
+    except KeyError:
+        chr_ids = []
+
+    for chr_id in chr_ids:
+        try:
+            haplotype_blocks = sample['viterbi_haplotypes']['chromosome_data'][chr_id]['haplotype_blocks']
+        except KeyError:
+            haplotype_blocks = []
+
+        for curr_block in haplotype_blocks:
+            curr_dist = 1 + curr_block['end_position_bp'] - curr_block['start_position_bp']
+            total_distance += curr_dist
+
+            hap_index_1 = curr_block['haplotype_index_1']
+            hap_index_2 = curr_block['haplotype_index_2']
+            hap_index_lte = min(hap_index_1, hap_index_2)
+            hap_index_gte = max(hap_index_1, hap_index_2)
+            cumulative_distance_dict[(hap_index_lte, hap_index_gte)] += curr_dist
+
+    def tsv_generator():
+        yield _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+        for hap_index_lte in range(len(cs_sample_id_list)):
+            for hap_index_gte in range(hap_index_lte, len(cs_sample_id_list)):
+                curr_hap_distance = cumulative_distance_dict[(hap_index_lte, hap_index_gte)]
+                if curr_hap_distance:
+                    yield _iter_to_row((
+                        sample['sample_id'],
+                        cs_sample_id_list[hap_index_lte],
+                        cs_sample_id_list[hap_index_gte],
+                        str(100 * curr_hap_distance / total_distance),
+                    ))
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
 
@@ -1106,8 +1179,29 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
     snp_positions = [x['position_bp'] for x in snps]
     left_index = bisect_left(snp_positions, start_pos_bp)
     right_index = bisect_right(snp_positions, end_pos_bp, left_index)
-    snp_limit = right_index - left_index
+    #snp_limit = right_index - left_index
     snps = snps[left_index:right_index]
+
+    def slice_snps(sample_to_slice):
+        try:
+            chr_data = sample_to_slice['chromosome_data'][chr_id]
+            try:
+                chr_data['allele1_fwds'] = chr_data['allele1_fwds'][left_index:right_index]
+            except KeyError:
+                pass
+
+            try:
+                chr_data['allele2_fwds'] = chr_data['allele2_fwds'][left_index:right_index]
+            except KeyError:
+                pass
+
+            try:
+                chr_data['snps'] = chr_data['snps'][left_index:right_index]
+            except KeyError:
+                pass
+
+        except KeyError:
+            pass
 
     best_candidates = []
     if snps:
@@ -1117,14 +1211,15 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
             {
                 'sample_id': 1,
                 'platform_id': 1,
-                'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
-                'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
-                'chromosome_data.' + chr_id + '.snps': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.allele1_fwds': 1,
+                'chromosome_data.' + chr_id + '.allele2_fwds': 1,
+                'chromosome_data.' + chr_id + '.snps': 1,
             },
             db=db,
         )
         if sample is None:
             flask.abort(400)
+        slice_snps(sample)
         sample_ab = hhmm.samples_to_ab_codes([sample], chr_id, snps)
 
         haplotype_samples = list(_find_and_anno_samples(
@@ -1137,12 +1232,14 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
                 'sample_id': 1,
                 'standard_designation': 1,
                 'color': 1,
-                'chromosome_data.' + chr_id + '.allele1_fwds': {'$slice': [left_index, snp_limit]},
-                'chromosome_data.' + chr_id + '.allele2_fwds': {'$slice': [left_index, snp_limit]},
-                'chromosome_data.' + chr_id + '.snps': {'$slice': [left_index, snp_limit]},
+                'chromosome_data.' + chr_id + '.allele1_fwds': 1,
+                'chromosome_data.' + chr_id + '.allele2_fwds': 1,
+                'chromosome_data.' + chr_id + '.snps': 1,
             },
             db=db,
         ))
+        for curr_hap_sample in haplotype_samples:
+            slice_snps(curr_hap_sample)
         hap_sample_count = len(haplotype_samples)
         haplotype_samples_ab = hhmm.samples_to_ab_codes(haplotype_samples, chr_id, snps)
 
@@ -1189,8 +1286,6 @@ def viterbi_haplotypes_json(mongo_id):
     :param mongo_id: the mongo ID string
     :return: the haplotype JSON response
     """
-
-    #TODO how should we deal with the case of a strain that
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)

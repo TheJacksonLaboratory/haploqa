@@ -109,7 +109,16 @@
                 $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
             }
             editSamplesButton.click(function() {switchEditSampleView(true);});
-            cancelSamplesButton.click(function() {switchEditSampleView(false);});
+            cancelSamplesButton.click(function() {
+                // reset all of the edit inputs before we hide them
+                editTagsInput.tokenfield('setTokens', []);
+                tagActionDropdown.setValue('add');
+                contribStrainTokensInput.tokenfield('setTokens', []);
+                contribStrainsActionDropdown.setValue('add');
+                sampleVisibilityDropdown.setValue('no-change');
+
+                switchEditSampleView(false);
+            });
             saveSamplesButton.click(function() {
                 saveSamplesButton.prop('disabled', true);
                 sampleUpdateSpinner.css('display', '');

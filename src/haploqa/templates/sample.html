@@ -206,6 +206,9 @@
                 createTokensOnBlur: true
             });
             function updateSampleTags(newSampleTags) {
+                newSampleTags.sort(function(x, y) {
+                    return x.localeCompare(y);
+                });
                 sampleTags = newSampleTags;
                 tagLinksPanel.empty();
                 var haplotypeStrainTagPresent = false;
@@ -278,6 +281,15 @@
                 });
             });
             function updateHaplotypeStrains(newContribStrainTokens) {
+                newContribStrainTokens.sort(function(tok1, tok2) {
+                    var initCmp = tok1.label.localeCompare(tok2.label);
+                    if(initCmp !== 0) {
+                        return initCmp;
+                    } else {
+                        return tok1.value.localeCompare(tok2.value);
+                    }
+                });
+
                 contribStrainTokens = newContribStrainTokens;
                 readonlyHaplotypesPanel.empty();
                 newContribStrainTokens.forEach(function(strain, i) {
@@ -803,8 +815,11 @@
 
     <div class="row">
         <div class="col-md-12">
-            <a class="btn btn-default" href="{{ url_for('sample_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_report.txt">
-                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Genome-Wide Haplotype Report
+            <a class="btn btn-default" href="{{ url_for('sample_snp_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_snp_report.txt">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download SNP Level Haplotype Report
+            </a>
+            <a class="btn btn-default" href="{{ url_for('sample_summary_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_summary_report.txt">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Haplotype Composition Summary
             </a>
         </div>
     </div>
