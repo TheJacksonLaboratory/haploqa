@@ -62,10 +62,17 @@
                         findCandidateHapsWaiting = true;
                     } else {
                         candidateHaplotypeTableOverlay.overlayActive(true);
+                        var startPos = interval.startPos;
+                        var stopPos = interval.startPos + interval.size - 1;
+                        if(startPos < 0) {
+                            startPos = 0;
+                        }
+                        if(stopPos < startPos) {
+                            stopPos = startPos;
+                        }
                         var candHapURL =
                                 '../best-haplotype-candidates/{{ sample._id }}/chr' +
-                                interval.chr + '-' + interval.startPos + '-' +
-                                (interval.startPos + interval.size - 1) + '.json';
+                                interval.chr + '-' + startPos + '-' + stopPos + '.json';
                         $.getJSON(candHapURL, function(data) {
                             candidateHaplotypeTableBody.empty();
                             data.best_candidates.forEach(function(currCandidate) {
@@ -115,6 +122,10 @@
             var updateIntervalButton = $('#update-interval-button');
             var clearIntervalButton = $('#clear-interval-button');
             var intervalText = $('#interval-edit');
+            var gotoEnsemblLink = $('#goto-ensembl-link');
+            var gotoUCSCLink = $('#goto-ucsc-link');
+            gotoEnsemblLink.addClass('disabled');
+            gotoUCSCLink.addClass('disabled');
 
             var updateIntervalDP = new DelayedPreemptable();
             function updateInterval(newInterval) {
@@ -122,6 +133,8 @@
 
                 if(newInterval === null) {
                     intervalText.val('');
+                    gotoEnsemblLink.addClass('disabled');
+                    gotoUCSCLink.addClass('disabled');
                 } else {
                     newInterval.endPos = newInterval.startPos + newInterval.size - 1;
                     if(Math.round(newInterval.startPos / 1000000) == newInterval.startPos / 1000000 &&
@@ -136,6 +149,24 @@
                                 Math.round(newInterval.startPos) + '-' +
                                 Math.round(newInterval.endPos));
                     }
+
+                    // update the "go to" genome browser links for the new interval
+                    var startPos = interval.startPos;
+                    var stopPos = interval.startPos + interval.size - 1;
+                    if(startPos < 0) {
+                        startPos = 0;
+                    }
+                    if(stopPos > startPos) {
+                        var rangeStr = encodeURIComponent(interval.chr + ':' + startPos + '-' + stopPos);
+                        gotoEnsemblLink.attr(
+                                'href',
+                                'http://ensembl.org/Mus_musculus/Location/View?r=' + rangeStr);
+                        gotoUCSCLink.attr(
+                                'href',
+                                'https://genome.ucsc.edu/cgi-bin/hgTracks?db=mm10&position=chr' + rangeStr);
+                    }
+                    gotoEnsemblLink.removeClass('disabled');
+                    gotoUCSCLink.removeClass('disabled');
                 }
 
                 hapKaryoPlot.zoomInterval(newInterval);
@@ -852,6 +883,16 @@
                     width="900" height="150"
                     class="haplotype-plot"></svg>
         </div>
+    </div>
+
+    <div class="form-inline">
+        <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
+            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to Ensembl Browser
+        </a>
+
+        <a id="goto-ucsc-link" class="btn btn-default" href="#" target="_blank">
+            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
+        </a>
     </div>
 
     {#

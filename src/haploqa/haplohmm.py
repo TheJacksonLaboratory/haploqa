@@ -4,8 +4,6 @@ import numpy as np
 from scipy.stats import norm
 import sys
 
-import haploqa.mongods as mds
-
 
 N_CODE = 0
 A_CODE = 1

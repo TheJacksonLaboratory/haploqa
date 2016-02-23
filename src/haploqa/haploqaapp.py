@@ -952,6 +952,9 @@ def update_sample(mongo_id):
     Accepts a POST to update the sample identified by the given mongo_id string
     """
 
+    if not flask.g.user:
+        flask.abort(401)
+
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = _find_one_and_anno_samples(
@@ -1033,6 +1036,9 @@ def update_samples():
     """
     Accepts a POST to update the sample identified by the given mongo_id string
     """
+
+    if not flask.g.user:
+        flask.abort(401)
 
     db = mds.get_db()
 
@@ -1273,7 +1279,7 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
                 'neg_log_likelihood': -curr_loglikelihood,
             })
 
-    return flask.jsonify(best_candidates=best_candidates);
+    return flask.jsonify(best_candidates=best_candidates)
 
 
 @app.route('/sample/<mongo_id>/viterbi-haplotypes.json')
@@ -1516,9 +1522,6 @@ def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, 
 
     informative_count = 0
     concordant_count = 0
-    # TODO storing indexes in this way is very fragile (if SNP count or ordering changes at all
-    #      the whole thing is broken). The advantage is that it's very space-compact. Is there
-    #      anything that gives us the best of both (how much space do obj ids take?)
     discordant_snp_indexes = []
     concordance_bins = []
     curr_bin_start_pos = -1
