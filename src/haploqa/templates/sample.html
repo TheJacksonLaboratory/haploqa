@@ -33,6 +33,9 @@
         var sampleID = {{ sample.sample_id|tojson }};
         var sampleIsPublic = {{ sample.is_public|tojson }};
         var gender = {{ sample.gender|tojson }};
+        if(gender === null) {
+            gender = 'unknown';
+        }
         var standardDesignation = {{ sample.standard_designation|tojson }};
         var notes = {{ sample.notes|tojson }};
         var sampleColor = {{ sample.color|tojson }};
