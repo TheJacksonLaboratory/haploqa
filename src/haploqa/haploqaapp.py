@@ -661,6 +661,7 @@ def _add_default_attributes(sample):
     default_to('owner', None)
     default_to('write_groups', [])
     default_to('is_public', False)
+    default_to('gender', 'unknown')
 
 
 def _find_and_anno_samples(query, projection, db=None, require_write_perms=False, cursor_func=None):
@@ -988,42 +989,45 @@ def update_sample(mongo_id):
     if 'is_public' in form:
         update_dict['is_public'] = form['is_public'] == 'true'
 
-    if 'contributing_strain_ids' in form:
+    if 'gender' in form:
+        update_dict['gender'] = form['gender']
+
+    if 'contributing_strain_ids' in form or 'gender' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
         chr_ids = platform['chromosomes']
 
-        new_strain_ids = json.loads(form['contributing_strain_ids'])
-        new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
+        if 'contributing_strain_ids' in form:
+            new_strain_ids = json.loads(form['contributing_strain_ids'])
+            new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
 
-        # we need to abort if not all contributing stains have the same platform
-        for new_strain_id in new_strain_ids:
-            new_strain = _find_one_and_anno_samples({'_id': new_strain_id}, {'platform_id': 1}, db=db)
-            if new_strain is None or 'platform_id' not in new_strain or new_strain['platform_id'] != sample['platform_id']:
-                flask.abort(403)
+            # we need to abort if not all contributing stains have the same platform
+            for new_strain_id in new_strain_ids:
+                new_strain = _find_one_and_anno_samples({'_id': new_strain_id}, {'platform_id': 1}, db=db)
+                if new_strain is None or 'platform_id' not in new_strain or new_strain['platform_id'] != sample['platform_id']:
+                    flask.abort(403)
+            update_dict['contributing_strains'] = new_strain_ids
 
+        # we invalidate any existing haplotypes before calculating new haplotypes
         haplotype_inference_uuid = str(uuid.uuid4())
-
-        # we need to update the document and invalidate existing haplotypes
-        update_dict['contributing_strains'] = new_strain_ids
         update_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
         for chr_id in chr_ids:
             update_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {
-                'results_pending': bool(new_strain_ids)
+                #'results_pending': bool(new_strain_ids)
+                'results_pending': True
             }
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
-        if new_strain_ids:
-            sample_obj_id = str(sample['_id'])
-            for chr_id in chr_ids:
-                t = infer_haplotype_structure_task.delay(
-                    sample_obj_id,
-                    chr_id,
-                    haplotype_inference_uuid,
-                )
-                task_ids.append(t.task_id)
+        sample_obj_id = str(sample['_id'])
+        for chr_id in chr_ids:
+            t = infer_haplotype_structure_task.delay(
+                sample_obj_id,
+                chr_id,
+                haplotype_inference_uuid,
+            )
+            task_ids.append(t.task_id)
 
     elif update_dict:
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
@@ -1104,7 +1108,6 @@ def update_samples():
     task_ids = []
     contributing_strains_change = contributing_strain_ids or contributing_strains_action == 'set'
     if contributing_strains_change:
-        print('=== contributing_strains_change ===')
         if contributing_strains_action == 'add':
             add_to_set_dict['contributing_strains'] = {
                 '$each': contributing_strain_ids

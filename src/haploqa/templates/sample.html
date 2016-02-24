@@ -32,6 +32,7 @@
         };
         var sampleID = {{ sample.sample_id|tojson }};
         var sampleIsPublic = {{ sample.is_public|tojson }};
+        var gender = {{ sample.gender|tojson }};
         var standardDesignation = {{ sample.standard_designation|tojson }};
         var notes = {{ sample.notes|tojson }};
         var sampleColor = {{ sample.color|tojson }};
@@ -213,6 +214,22 @@
             var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
             var readonlySampleVisibility = $('#readonly-sample-visibility');
 
+            var editGenderSelect = $('#edit-gender-select');
+            var readonlyGender = $('#readonly-gender');
+
+            function updateGender(newGender) {
+                gender = newGender;
+
+                var genderLower = newGender.toLowerCase();
+                if(['female', 'male', 'unknown'].indexOf(genderLower) === -1) {
+                    editGenderSelect.val('unknown');
+                } else {
+                    editGenderSelect.val(genderLower);
+                }
+                readonlyGender.text(newGender);
+            }
+            updateGender(gender);
+
             function updateSampleIsPublic(newSampleIsPublic) {
                 sampleIsPublic = newSampleIsPublic;
 
@@ -371,6 +388,7 @@
                 updateSampleColor(sampleColor);
                 updateNotes(notes);
                 updateSampleIsPublic(sampleIsPublic);
+                updateGender(gender);
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -437,6 +455,12 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
+                var newGender = editGenderSelect.val();
+                var genderChanged = newGender !== gender;
+                if(genderChanged) {
+                    postData['gender'] = newGender;
+                }
+
                 saveTagRequest = $.ajax({
                     type: "POST",
                     url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -464,6 +488,10 @@
                         }
                         if(sampleIsPublicChanged) {
                             updateSampleIsPublic(newSampleIsPublic);
+                        }
+                        if(genderChanged) {
+                            updateGender(newGender);
+                            updateHaplotypeSVG();
                         }
                     }
                 }).fail(function() {
@@ -667,7 +695,14 @@
                                     title="TODO: add help text"></span>
                         </th>
                         <td>
-                            <span>{{ sample.gender  or 'Unknown'}}</span>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <select id="edit-gender-select" type="text" class="form-control">
+                                    <option value="female">Female</option>
+                                    <option value="male">Male</option>
+                                    <option value="unknown">Unknown</option>
+                                </select>
+                            </span>
+                            <span id="readonly-gender" data-display-when="sample-readonly">{{ sample.gender  or 'Unknown'}}</span>
                         </td>
                     </tr>
                     <tr>
