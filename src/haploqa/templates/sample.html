@@ -32,9 +32,9 @@
         };
         var sampleID = {{ sample.sample_id|tojson }};
         var sampleIsPublic = {{ sample.is_public|tojson }};
-        var gender = {{ sample.gender|tojson }};
-        if(gender === null) {
-            gender = 'unknown';
+        var sex = {{ sample.gender|tojson }};
+        if(sex === null) {
+            sex = 'unknown';
         }
         var standardDesignation = {{ sample.standard_designation|tojson }};
         var notes = {{ sample.notes|tojson }};
@@ -217,21 +217,21 @@
             var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
             var readonlySampleVisibility = $('#readonly-sample-visibility');
 
-            var editGenderSelect = $('#edit-gender-select');
-            var readonlyGender = $('#readonly-gender');
+            var editSexSelect = $('#edit-sex-select');
+            var readonlySex = $('#readonly-sex');
 
-            function updateGender(newGender) {
-                gender = newGender;
+            function updateSex(newSex) {
+                sex = newSex;
 
-                var genderLower = newGender.toLowerCase();
-                if(['female', 'male', 'unknown'].indexOf(genderLower) === -1) {
-                    editGenderSelect.val('unknown');
+                var sexLower = newSex.toLowerCase();
+                if(['female', 'male', 'unknown'].indexOf(sexLower) === -1) {
+                    editSexSelect.val('unknown');
                 } else {
-                    editGenderSelect.val(genderLower);
+                    editSexSelect.val(sexLower);
                 }
-                readonlyGender.text(newGender);
+                readonlySex.text(newSex);
             }
-            updateGender(gender);
+            updateSex(sex);
 
             function updateSampleIsPublic(newSampleIsPublic) {
                 sampleIsPublic = newSampleIsPublic;
@@ -391,7 +391,7 @@
                 updateSampleColor(sampleColor);
                 updateNotes(notes);
                 updateSampleIsPublic(sampleIsPublic);
-                updateGender(gender);
+                updateSex(sex);
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -458,10 +458,10 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
-                var newGender = editGenderSelect.val();
-                var genderChanged = newGender !== gender;
-                if(genderChanged) {
-                    postData['gender'] = newGender;
+                var newSex = editSexSelect.val();
+                var sexChanged = newSex !== sex;
+                if(sexChanged) {
+                    postData['gender'] = newSex;
                 }
 
                 saveTagRequest = $.ajax({
@@ -492,8 +492,8 @@
                         if(sampleIsPublicChanged) {
                             updateSampleIsPublic(newSampleIsPublic);
                         }
-                        if(genderChanged) {
-                            updateGender(newGender);
+                        if(sexChanged) {
+                            updateSex(newSex);
                             updateHaplotypeSVG();
                         }
                     }
@@ -689,7 +689,7 @@
                     </tr>
                     <tr>
                         <th>
-                            Gender
+                            Sex
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -699,13 +699,13 @@
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <select id="edit-gender-select" type="text" class="form-control">
+                                <select id="edit-sex-select" type="text" class="form-control">
                                     <option value="female">Female</option>
                                     <option value="male">Male</option>
                                     <option value="unknown">Unknown</option>
                                 </select>
                             </span>
-                            <span id="readonly-gender" data-display-when="sample-readonly">{{ sample.gender  or 'Unknown'}}</span>
+                            <span id="readonly-sex" data-display-when="sample-readonly">{{ sample.gender or 'Unknown' }}</span>
                         </td>
                     </tr>
                     <tr>

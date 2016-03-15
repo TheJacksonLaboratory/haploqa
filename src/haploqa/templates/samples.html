@@ -254,7 +254,7 @@
                     <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" checked></th>
                     <th>Sample ID</th>
                     <th>Standard Designation</th>
-                    <th>Gender</th>
+                    <th>Sex</th>
                     <th>Platform</th>
                     <th>% Het. Calls</th>
                     <th>% Hom. Calls</th>
@@ -280,7 +280,7 @@
                                 <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
                             {% endif %}
                         </td>
-                        <td>{% if sample.gender %}{{ sample.gender }}{% endif %}</td>
+                        <td>{{ sample.gender or 'Unknown' }}</td>
                         <td>{{ sample.platform_id }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
