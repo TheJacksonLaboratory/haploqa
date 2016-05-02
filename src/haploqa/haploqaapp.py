@@ -662,6 +662,8 @@ def _add_default_attributes(sample):
     default_to('write_groups', [])
     default_to('is_public', False)
     default_to('gender', 'unknown')
+    default_to('pos_ctrl_eng_tgts', [])
+    default_to('neg_ctrl_eng_tgts', [])
 
 
 def _find_and_anno_samples(query, projection, db=None, require_write_perms=False, cursor_func=None):
@@ -745,7 +747,11 @@ def sample_html(mongo_id):
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
-    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    sample = _find_one_and_anno_samples(
+        {'_id': obj_id},
+        {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0, 'haplotype_inference_uuid': 0},
+        db
+    )
     if sample is None:
         flask.abort(400)
 
@@ -769,6 +775,7 @@ def sample_html(mongo_id):
     ]
 
     all_tags = db.samples.distinct('tags')
+    all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
 
     return flask.render_template(
         'sample.html',
@@ -776,6 +783,7 @@ def sample_html(mongo_id):
         haplotype_samples=haplotype_samples,
         contrib_strain_tokens=contrib_strain_tokens,
         all_tags=all_tags,
+        all_eng_tgts=all_eng_tgts,
     )
 
 
@@ -991,6 +999,12 @@ def update_sample(mongo_id):
 
     if 'gender' in form:
         update_dict['gender'] = form['gender']
+
+    if 'pos_ctrl_eng_tgts' in form:
+        update_dict['pos_ctrl_eng_tgts'] = json.loads(form['pos_ctrl_eng_tgts'])
+
+    if 'neg_ctrl_eng_tgts' in form:
+        update_dict['neg_ctrl_eng_tgts'] = json.loads(form['neg_ctrl_eng_tgts'])
 
     if 'contributing_strain_ids' in form or 'gender' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})

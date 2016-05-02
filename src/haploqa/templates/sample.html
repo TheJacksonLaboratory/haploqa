@@ -31,16 +31,13 @@
             {% endfor %}
         };
         var sampleID = {{ sample.sample_id|tojson }};
-        var sampleIsPublic = {{ sample.is_public|tojson }};
         var sex = {{ sample.gender|tojson }};
         if(sex === null) {
             sex = 'unknown';
         }
-        var standardDesignation = {{ sample.standard_designation|tojson }};
-        var notes = {{ sample.notes|tojson }};
-        var sampleColor = {{ sample.color|tojson }};
-        var sampleTags = {{ sample.tags|tojson }};
         var allTags = {{ all_tags|tojson }};
+        var sample = {{ sample|tojson }};
+        var allEngTgts = {{ all_eng_tgts|tojson }};
         var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
 
@@ -193,6 +190,11 @@
             var editTagsInput = $('#edit-tags-input');
             var tagLinksPanel = $('#tag-links');
 
+            var editPosEngTgtsInput = $('#edit-pos-eng-tgt-input');
+            var posEngTgtLinks = $('#pos-eng-tgt-links');
+            var editNegEngTgtsInput = $('#edit-neg-eng-tgt-input');
+            var negEngTgtLinks = $('#neg-eng-tgt-links');
+
             var sampleUpdateSpinner = $('#sample-update-spinner');
             var editSampleButton = $('#edit-sample-button');
             var saveSampleButton = $('#save-sample-button');
@@ -231,15 +233,13 @@
                 }
                 readonlySex.text(newSex);
             }
-            updateSex(sex);
 
             function updateSampleIsPublic(newSampleIsPublic) {
-                sampleIsPublic = newSampleIsPublic;
+                sample.is_public = newSampleIsPublic;
 
                 sampleIsPublicCheckbox.prop('checked', newSampleIsPublic);
                 readonlySampleVisibility.text(newSampleIsPublic ? 'Publicly Visible' : 'Requires Login');
             }
-            updateSampleIsPublic(sampleIsPublic);
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -260,7 +260,7 @@
                 newSampleTags.sort(function(x, y) {
                     return x.localeCompare(y);
                 });
-                sampleTags = newSampleTags;
+                sample.tags = newSampleTags;
                 tagLinksPanel.empty();
                 var haplotypeStrainTagPresent = false;
                 newSampleTags.forEach(function(tag, i) {
@@ -283,8 +283,73 @@
                 }));
             }
 
+            var engTgtsTokenfieldParams = {
+                autocomplete: {
+                    source: allEngTgts.map(function(engTgt) {
+                        return {
+                            label: engTgt,
+                            value: engTgt
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            };
+            function createEngTgtToken(e) {
+                // before a target is generated make sure it is valid (i.e. it should be
+                // in the allEngTgts list
+                var value = e.attrs.value;
+                return allEngTgts.indexOf(value) >= 0;
+            }
+            editPosEngTgtsInput.tokenfield(engTgtsTokenfieldParams);
+            editPosEngTgtsInput.on('tokenfield:createtoken', createEngTgtToken);
+            editNegEngTgtsInput.tokenfield(engTgtsTokenfieldParams);
+            editNegEngTgtsInput.on('tokenfield:createtoken', createEngTgtToken);
+            function updateCtrlEngTgts(newEngTgts, isPosCtrl) {
+                newEngTgts.sort(function(x, y) {
+                    return x.localeCompare(y);
+                });
+
+                var samplePropStr = null;
+                var tgtInput = null;
+                var linksPanel = null;
+                if(isPosCtrl) {
+                    samplePropStr = 'pos_ctrl_eng_tgts';
+                    tgtInput = editPosEngTgtsInput;
+                    linksPanel = posEngTgtLinks;
+                } else {
+                    samplePropStr = 'neg_ctrl_eng_tgts';
+                    tgtInput = editNegEngTgtsInput;
+                    linksPanel = negEngTgtLinks;
+                }
+                sample[samplePropStr] = newEngTgts;
+
+                linksPanel.empty();
+                if(newEngTgts.length) {
+                    newEngTgts.forEach(function (tgt, i) {
+                        if (i >= 1) {
+                            // TODO add links here rather than text nodes once we have
+                            // pages for engineered targets
+                            linksPanel.append(document.createTextNode(', '));
+                        }
+                        linksPanel.append(document.createTextNode(tgt));
+                    });
+                } else {
+                    linksPanel.text('None');
+                }
+                tgtInput.tokenfield('setTokens', newEngTgts.map(function(tgt) {
+                    return {
+                        label: tgt,
+                        value: tgt
+                    };
+                }));
+            }
+
             function updateStandardDesignation(newStandardDesignation) {
-                standardDesignation = newStandardDesignation;
+                sample.standard_designation = newStandardDesignation;
 
                 readonlyStandardDesignationPanel.empty();
                 if(newStandardDesignation) {
@@ -295,15 +360,15 @@
 
                 editStandardDesignationInput.val(newStandardDesignation);
             }
-            updateStandardDesignation(standardDesignation);
+            updateStandardDesignation(sample.standard_designation);
 
             function updateNotes(newNotes) {
                 if(!newNotes) {
                     newNotes = '';
                 }
                 readonlyNotesPanel.empty();
-                notes = newNotes;
-                notes.split(/\n/).forEach(function(line) {
+                sample.notes = newNotes;
+                newNotes.split(/\n/).forEach(function(line) {
                     var p = $(document.createElement('p'));
                     p.text(line);
                     readonlyNotesPanel.append(p);
@@ -311,7 +376,7 @@
 
                 editNotesInput.val(newNotes);
             }
-            updateNotes(notes);
+            updateNotes(sample.notes);
 
             var contribStrainTokensInput = $('#contrib-strains-tokens');
             contribStrainTokensInput.tokenfield({
@@ -366,7 +431,7 @@
             }
 
             function updateSampleColor(newColor) {
-                sampleColor = newColor;
+                sample.color = newColor;
 
                 editColorComponent.minicolors('value', newColor);
                 sampleColorIcon.css({'color': newColor});
@@ -379,19 +444,23 @@
             }
             editSampleButton.click(function() {switchEditSampleView(true);});
 
-            cancelSampleButton.click(function() {
-                switchEditSampleView(false);
-
+            function resetEdits() {
                 // restore old values to inputs so that if the user clicks edit again they
                 // won't be presented with the values that they just cancelled.
-                updateSampleTags(sampleTags);
-                updateStandardDesignation(standardDesignation);
+                updateSampleTags(sample.tags);
+                updateStandardDesignation(sample.standard_designation);
                 updateHaplotypeStrains(contribStrainTokens);
                 updateSampleID(sampleID);
-                updateSampleColor(sampleColor);
-                updateNotes(notes);
-                updateSampleIsPublic(sampleIsPublic);
+                updateSampleColor(sample.color);
+                updateNotes(sample.notes);
+                updateSampleIsPublic(sample.is_public);
                 updateSex(sex);
+                updateCtrlEngTgts(sample.pos_ctrl_eng_tgts, true);
+                updateCtrlEngTgts(sample.neg_ctrl_eng_tgts, false);
+            }
+            cancelSampleButton.click(function() {
+                switchEditSampleView(false);
+                resetEdits();
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
@@ -402,10 +471,29 @@
                 }
 
                 var postData = {};
+
+                var newPosCtrlEngTgts = editPosEngTgtsInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                });
+                newPosCtrlEngTgts = discardDupElems(newPosCtrlEngTgts);
+                var posCtrlEngTgtsChanged = !arraysEq(newPosCtrlEngTgts, sample.pos_ctrl_eng_tgts);
+                if(posCtrlEngTgtsChanged) {
+                    postData['pos_ctrl_eng_tgts'] = JSON.stringify(newPosCtrlEngTgts);
+                }
+
+                var newNegCtrlEngTgts = editNegEngTgtsInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                });
+                newNegCtrlEngTgts = discardDupElems(newNegCtrlEngTgts);
+                var negCtrlEngTgtsChanged = !arraysEq(newNegCtrlEngTgts, sample.neg_ctrl_eng_tgts);
+                if(negCtrlEngTgtsChanged) {
+                    postData['neg_ctrl_eng_tgts'] = JSON.stringify(newNegCtrlEngTgts);
+                }
+
                 var newTags = discardDupElems(editTagsInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
                 }));
-                var tagsChanged = !arraysEq(newTags, sampleTags);
+                var tagsChanged = !arraysEq(newTags, sample.tags);
                 if(tagsChanged) {
                     postData['tags'] = JSON.stringify(newTags);
                 }
@@ -435,25 +523,25 @@
                 }
 
                 var newColor = editColorComponent.minicolors('value');
-                var colorChanged = newColor !== sampleColor;
+                var colorChanged = newColor !== sample.color;
                 if(colorChanged) {
                     postData['color'] = newColor;
                 }
 
                 var newStandardDesignation = editStandardDesignationInput.val();
-                var standardDesignationChanged = newStandardDesignation != standardDesignation;
+                var standardDesignationChanged = newStandardDesignation != sample.standard_designation;
                 if(standardDesignationChanged) {
                     postData['standard_designation'] = newStandardDesignation;
                 }
 
                 var newNotes = editNotesInput.val();
-                var notesChanged = newNotes != notes;
+                var notesChanged = newNotes != sample.notes;
                 if(notesChanged) {
                     postData['notes'] = newNotes;
                 }
 
                 var newSampleIsPublic = sampleIsPublicCheckbox.prop('checked');
-                var sampleIsPublicChanged = newSampleIsPublic !== sampleIsPublic;
+                var sampleIsPublicChanged = newSampleIsPublic !== sample.is_public;
                 if(sampleIsPublicChanged) {
                     postData['is_public'] = newSampleIsPublic;
                 }
@@ -472,6 +560,12 @@
                     success: function(data) {
                         if(tagsChanged) {
                             updateSampleTags(newTags);
+                        }
+                        if(posCtrlEngTgtsChanged) {
+                            updateCtrlEngTgts(newPosCtrlEngTgts, true);
+                        }
+                        if(negCtrlEngTgtsChanged) {
+                            updateCtrlEngTgts(newNegCtrlEngTgts, false);
                         }
                         if(contribStrainsChanged) {
                             updateHaplotypeStrains(newContribStrainTokens);
@@ -602,12 +696,8 @@
 
             switchEditSampleView(false);
 
-            // initialize the UI by calling a bunch of the "update" functions
-            updateSampleTags(sampleTags);
-            updateStandardDesignation(standardDesignation);
-            updateHaplotypeStrains(contribStrainTokens);
-            updateSampleID(sampleID);
-            updateSampleColor(sampleColor);
+            // initialize the UI
+            resetEdits();
             updateHaplotypeSVG();
 
             $('[data-toggle="tooltip"]').tooltip()
@@ -808,6 +898,40 @@
                                 <span id="sample-color-icon" class="fa fa-square"></span>
                                 <span id="sample-color-text"></span>
                             </span>
+                        </td>
+                    </tr>
+                    <tr style="display: none"><!-- TODO turn display on when implementation is complete -->
+                        <th>
+                            Engineered Target Positive Controls
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-pos-eng-tgt-input" type="text" class="form-control"/>
+                            </span>
+                            <span id="pos-eng-tgt-links" data-display-when="sample-readonly"></span>
+                        </td>
+                    </tr>
+                    <tr style="display: none"><!-- TODO turn display on when implementation is complete -->
+                        <th>
+                            Engineered Target Negative Controls
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add help text"></span>
+                        </th>
+                        <td>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-neg-eng-tgt-input" type="text" class="form-control"/>
+                            </span>
+                            <span id="neg-eng-tgt-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
                     <tr>

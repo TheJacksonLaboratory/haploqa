@@ -20,6 +20,7 @@ def normalize_chr(chrom):
     for prefix in prefixes_to_remove:
         if chrom.startswith(prefix):
             chrom = chrom[len(prefix):]
+            break
 
     # make sure that the value is valid
     if not chrom in valid_nonnumeric_chromosome_names:

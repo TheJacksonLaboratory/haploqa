@@ -10,14 +10,14 @@ In order to install HaploQA you must first install and configure RabbitMQ, Celer
 
 Start Mongo like:
 
-    mongod
+    mongod --dbpath db
 
 Stop mongo with `crtl+c`
 
 Start/Stop RabbitMQ like:
 
-    ~/bin/rabbitmq_server-3.5.4/sbin/rabbitmq-server
-    ~/bin/rabbitmq_server-3.5.4/sbin/rabbitmqctl stop
+    ~/bin/rabbitmq_server-3.6.1/sbin/rabbitmq-server
+    ~/bin/rabbitmq_server-3.6.1/sbin/rabbitmqctl stop
 
 Start Celery worker like:
 
