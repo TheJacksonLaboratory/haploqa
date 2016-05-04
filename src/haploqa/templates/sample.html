@@ -119,6 +119,39 @@
                 }
             }
 
+            var gemmTable = $('#gemm-table');
+            var gemmTableOverlay = new ElemOverlay(
+                    gemmTable,
+                    $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Calculating GEMM Probabilities</span>'));
+            var gemmTableBody = $('#gemm-table-body');
+            gemmTableOverlay.overlayActive(true);
+            if(user !== null) {
+                $.getJSON("{{ url_for('gemm_probs_json', mongo_id=sample._id) }}", function (data) {
+                    if (data.gemm_probs.length) {
+                        gemmTableBody.empty();
+                        data.gemm_probs.forEach(function (gemProbPair) {
+                            var gemmName = gemProbPair[0];
+                            var gemmProb = gemProbPair[1];
+                            var tr = $(document.createElement('tr'));
+
+                            var labelsTD = $(document.createElement('td'));
+                            labelsTD.text(gemmName);
+                            tr.append(labelsTD);
+
+                            var likelihoodTD = $(document.createElement('td'));
+                            likelihoodTD.text(gemmProb.toFixed(4));
+                            tr.append(likelihoodTD);
+
+                            gemmTableBody.append(tr);
+                        });
+                    }
+                }).fail(function () {
+                    showErrorMessage('An error occurred while calculating GEMM probabilities.');
+                }).always(function () {
+                    gemmTableOverlay.overlayActive(false);
+                });
+            }
+
             var interval = null;
             var updateIntervalButton = $('#update-interval-button');
             var clearIntervalButton = $('#clear-interval-button');
@@ -900,7 +933,7 @@
                             </span>
                         </td>
                     </tr>
-                    <tr style="display: none"><!-- TODO turn display on when implementation is complete -->
+                    <tr>
                         <th>
                             Engineered Target Positive Controls
                             <span
@@ -917,7 +950,7 @@
                             <span id="pos-eng-tgt-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
-                    <tr style="display: none"><!-- TODO turn display on when implementation is complete -->
+                    <tr>
                         <th>
                             Engineered Target Negative Controls
                             <span
@@ -1075,6 +1108,23 @@
                 <tbody id="candidate-haplotype-table-body" style="height: 100px;">
                 <tr>
                     <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>Select an interval to view Candidate Haplotypes</strong></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <h2>GEMM Probabilities</h2>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <table id="gemm-table" class="table table-striped" style="margin-top: 10px;">
+                <thead><tr><th>GEMM Target</th><th>Negative Log Likelihood</th></tr></thead>
+                <tbody id="gemm-table-body" style="height: 100px;">
+                <tr>
+                    <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>No GEMM Probabilities Available</strong></td>
                 </tr>
                 </tbody>
             </table>

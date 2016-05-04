@@ -12,6 +12,7 @@ import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
 
+import haploqa.gemminference as gemminf
 import haploqa.haplohmm as hhmm
 import haploqa.mongods as mds
 import haploqa.finalreportimport as finalin
@@ -1596,6 +1597,35 @@ def _call_concordance(max_likelihood_states, sample_ab_codes, contrib_ab_codes, 
         'discordant_snp_indexes': discordant_snp_indexes,
         'concordance_bins': concordance_bins,
     }
+
+
+#####################################################################
+# GEMM FUNCTIONS
+#####################################################################
+
+
+@app.route('/sample/<mongo_id>/gemm-probs.json')
+def gemm_probs_json(mongo_id):
+    """
+    :param mongo_id: the mongo ID string
+    :return: the GEMM probability dictionary
+    """
+    user = flask.g.user
+    if user is None:
+        response = flask.jsonify({'success': False})
+        response.status_code = 400
+
+        return response
+    else:
+        obj_id = ObjectId(mongo_id)
+        gemm_probs = gemminf.est_gemm_probs([obj_id])
+
+        # clean it up a bit for JSON. Turn it into a list of tuples
+        # sorted from highest probability to lowest
+        gemm_probs = [(tgt, val) for (tgt, [val]) in gemm_probs.items() if np.isfinite(val)]
+        gemm_probs.sort(key=lambda x: x[1], reverse=True)
+
+        return flask.jsonify(gemm_probs=gemm_probs)
 
 
 if __name__ == '__main__':

@@ -24,6 +24,8 @@ def init_db(db=None):
     db.samples.create_index('tags')
     db.samples.create_index('standard_designation')
     db.samples.create_index('gender')
+    db.samples.create_index('pos_ctrl_eng_tgts')
+    db.samples.create_index('neg_ctrl_eng_tgts')
     db.platforms.create_index('platform_id')
     db.snps.create_index([
         ('platform_id', pymongo.ASCENDING),
@@ -109,6 +111,19 @@ def post_proc_sample(sample):
         sample['no_read_count'] += chr_dict['no_read_count']
 
 
+def update_snp_indices(db=None):
+    if db is None:
+        db = get_db()
+
+    for platform in db.platforms.find():
+        for chr in platform['chromosomes']:
+            for i, snp in enumerate(get_snps(platform['platform_id'], chr, db)):
+                db.snps.update_one(
+                    {'_id': snp['_id']},
+                    {'$set': {'within_chr_index': i}},
+                )
+
+
 def within_chr_snp_indices(platform_id, db=None):
 
     if db is None:
@@ -147,6 +162,9 @@ def within_chr_snp_indices(platform_id, db=None):
 
 
 # as a convenience we can run this file as a script to
-# rebuild DB indexes
+# rebuild DB indexes and SNP indices
 if __name__ == '__main__':
-    init_db()
+    db = get_db()
+    init_db(db)
+    update_snp_indices(db)
+
