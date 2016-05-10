@@ -594,19 +594,14 @@ def index_html():
     return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
 
 
-@app.route('/help.html')
-def help_html():
-    return flask.render_template('help.html')
-
-
-@app.route('/about.html')
-def about_html():
-    return flask.render_template('about.html')
-
-
 @app.route('/contact.html')
 def contact_html():
     return flask.render_template('contact.html')
+
+
+@app.route('/help.html')
+def help_html():
+    return flask.render_template('help.html')
 
 
 #####################################################################
@@ -717,7 +712,11 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
             }
 
     if projection:
+        print('running query/proj:')
+        print(query)
+        print(projection)
         cursor = db.samples.find(query, projection)
+        print('finished query/proj')
     else:
         cursor = db.samples.find(query)
     if cursor_func:
@@ -1622,8 +1621,11 @@ def gemm_probs_json(mongo_id):
 
         # clean it up a bit for JSON. Turn it into a list of tuples
         # sorted from highest probability to lowest
-        gemm_probs = [(tgt, val) for (tgt, [val]) in gemm_probs.items() if np.isfinite(val)]
-        gemm_probs.sort(key=lambda x: x[1], reverse=True)
+        gemm_probs = [
+            (tgt, val if np.isfinite(val) else None)
+            for (tgt, [val]) in gemm_probs.items()
+        ]
+        gemm_probs.sort(key=lambda x: -1 if x[1] is None else x[1], reverse=True)
 
         return flask.jsonify(gemm_probs=gemm_probs)
 

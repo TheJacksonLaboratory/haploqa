@@ -139,7 +139,11 @@
                             tr.append(labelsTD);
 
                             var likelihoodTD = $(document.createElement('td'));
-                            likelihoodTD.text(gemmProb.toFixed(4));
+                            if(gemmProb === null) {
+                                likelihoodTD.text('N/A');
+                            } else {
+                                likelihoodTD.text(gemmProb.toFixed(4));
+                            }
                             tr.append(likelihoodTD);
 
                             gemmTableBody.append(tr);
