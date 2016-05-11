@@ -466,11 +466,18 @@ def _get_platform_haplotypes(db, samples):
     platform_ids = list(platform_ids)
     print(platform_ids)
 
+    # haplotype_samples = db.samples.find(
+    #     {'tags': HAPLOTYPE_TAG, 'platform_id': {'$in': platform_ids}},
+    #     {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
+    # )
+    print('find haplo samples')
     haplotype_samples = db.samples.find(
-        {'tags': HAPLOTYPE_TAG, 'platform_id': {'$in': platform_ids}},
+        {'tags': HAPLOTYPE_TAG, 'platform_id': platform_ids[0]},
         {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
     )
+    print('found em')
     haplotype_samples = list(haplotype_samples)
+    print('listified them!!')
     for haplotype_sample in haplotype_samples:
         _add_default_attributes(haplotype_sample)
 
@@ -510,6 +517,7 @@ def sample_tag_html(tag_id):
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
+    print('finding matching samples')
     matching_samples = _find_and_anno_samples(
         {'tags': tag_id},
         {
@@ -521,9 +529,13 @@ def sample_tag_html(tag_id):
         db=db,
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
+    print('done finding matching samples')
     matching_samples = list(matching_samples)
+    print('done listing matching samples')
     platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
+    print('finding distinct tags')
     all_tags = db.samples.distinct('tags')
+    print('done finding distinct tags')
 
     return flask.render_template(
             'sample-tag.html',
@@ -577,6 +589,7 @@ def index_html():
 
     # this pipeline should get us all tags along with their sample counts
     pipeline = [
+        # {'$project': {'tags': 1}},
         {'$unwind': '$tags'},
         {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
         {'$sort': SON([('count', -1), ('_id', -1)])},
@@ -587,6 +600,7 @@ def index_html():
         sample_count = db.samples.count({'is_public': True})
     else:
         sample_count = db.samples.count({})
+    #sample_count = 44
 
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
@@ -720,6 +734,7 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
     else:
         cursor = db.samples.find(query)
     if cursor_func:
+        print("we're getting funcadelic")
         cursor = cursor_func(cursor)
 
     return map(anno_sample, cursor)

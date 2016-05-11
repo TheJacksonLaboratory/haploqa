@@ -22,6 +22,10 @@ def init_db(db=None):
 
     db.samples.create_index('sample_id')
     db.samples.create_index('tags')
+    db.samples.create_index([
+        ('tags',        pymongo.ASCENDING),
+        ('sample_id',   pymongo.ASCENDING),
+    ])
     db.samples.create_index('standard_designation')
     db.samples.create_index('gender')
     db.samples.create_index('pos_ctrl_eng_tgts')
