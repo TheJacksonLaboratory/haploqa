@@ -75,7 +75,7 @@ def get_gemm_intens(sample_obj_ids, min_pos_neg_count=4, db=None):
     for snp in gemm_snps:
         snp['pos_ctrls'] = []
         snp['neg_ctrls'] = []
-        snp['sample_intens'] = []
+        snp['non_ctrls'] = []
         gemm_snp_dict[snp['engineered_target']].append(snp)
 
     # find all pos/neg samples and collect their probe intensities for all of the engineered targets
@@ -84,23 +84,35 @@ def get_gemm_intens(sample_obj_ids, min_pos_neg_count=4, db=None):
     # of SNPs) but I'm just going to go with this for now.
     for sample in db.samples.find({'pos_ctrl_eng_tgts': {'$exists': True, '$ne': []}}):
         for pos_tgt in set(sample['pos_ctrl_eng_tgts']):
-            for pos_tgt_snp in gemm_snp_dict.get(pos_tgt, []):
-                intens_val = _get_gemm_snp_intens(pos_tgt_snp, sample)
-                pos_tgt_snp['pos_ctrls'].append(intens_val)
+            for snp in gemm_snp_dict.get(pos_tgt, []):
+                intens_val = _get_gemm_snp_intens(snp, sample)
+                snp['pos_ctrls'].append({
+                    'sample_obj_id': sample['_id'],
+                    'sample_id': sample['sample_id'],
+                    'probe_intensity': intens_val
+                })
 
     # and now the same for the negative samples
     for sample in db.samples.find({'neg_ctrl_eng_tgts': {'$exists': True, '$ne': []}}):
         for neg_tgt in set(sample['neg_ctrl_eng_tgts']):
-            for neg_tgt_snp in gemm_snp_dict.get(neg_tgt, []):
-                intens_val = _get_gemm_snp_intens(neg_tgt_snp, sample)
-                neg_tgt_snp['neg_ctrls'].append(intens_val)
+            for snp in gemm_snp_dict.get(neg_tgt, []):
+                intens_val = _get_gemm_snp_intens(snp, sample)
+                snp['neg_ctrls'].append({
+                    'sample_obj_id': sample['_id'],
+                    'sample_id': sample['sample_id'],
+                    'probe_intensity': intens_val
+                })
 
     # and now the same for test samples
     for sample_obj_id in sample_obj_ids:
         sample = db.samples.find_one({'_id': sample_obj_id})
         for snp in gemm_snps:
             intens_val = _get_gemm_snp_intens(snp, sample)
-            snp['sample_intens'].append(intens_val)
+            snp['non_ctrls'].append({
+                'sample_obj_id': sample['_id'],
+                'sample_id': sample['sample_id'],
+                'probe_intensity': intens_val
+            })
 
     # here we remove any targets that don't meet the minimum count threshold
     for tgt in list(gemm_snp_dict.keys()):
@@ -124,13 +136,22 @@ def est_gemm_probs(sample_obj_ids, min_pos_neg_count=4, max_mahalanobis_dist=2, 
     mixture_probs = dict()
     for gemm_eng_tgt, gemm_snps in gemm_snp_dict.items():
 
-        sample_intens = np.array([gemm_snp['sample_intens'] for gemm_snp in gemm_snps])
+        sample_intens = np.array([
+            [x['probe_intensity'] for x in gemm_snp['non_ctrls']]
+            for gemm_snp in gemm_snps
+        ])
         sample_intens = np.transpose(sample_intens)
 
-        pos_ctrls = np.array([gemm_snp['pos_ctrls'] for gemm_snp in gemm_snps])
+        pos_ctrls = np.array([
+            [x['probe_intensity'] for x in gemm_snp['pos_ctrls']]
+            for gemm_snp in gemm_snps
+        ])
         pos_pdf_densities, neg_mah_dists = _calc_pd_and_dist(pos_ctrls, sample_intens)
 
-        neg_ctrls = np.array([gemm_snp['neg_ctrls'] for gemm_snp in gemm_snps])
+        neg_ctrls = np.array([
+            [x['probe_intensity'] for x in gemm_snp['neg_ctrls']]
+            for gemm_snp in gemm_snps
+        ])
         neg_pdf_densities, pos_mah_dists = _calc_pd_and_dist(neg_ctrls, sample_intens)
 
         # calculate a vector of per-sample probabilities that a sample came from

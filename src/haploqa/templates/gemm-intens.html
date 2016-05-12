@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+
+{% block title %}GEMM Intensities for {{ sample.sample_id }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script>
+    var gemmIntens = {{ gemm_intens|tojson }};
+    $(function() {
+        //var svg = d3.select('#intens-plot-svg');
+        //var stripPlot = new StripPlot(svg);
+        var targetSelectDropdown = new BootstrapDropdown($('#target-select-dropdown'));
+        targetSelectDropdown.onChange = function() {
+            var currVal = targetSelectDropdown.getValue();
+            if(currVal === 'all-targets') {
+                stripPlot.render({
+                    yAxisLabel: 'Probe Intensity',
+                    widthPx: 900,
+                    heightPx: 500,
+                    pointSizePx: 2,
+                    gemmIntens: gemmIntens
+                });
+            } else {
+                var selectedIntens = {};
+                selectedIntens[currVal] = gemmIntens[currVal];
+                stripPlot.render({
+                    yAxisLabel: 'Probe Intensity',
+                    widthPx: 900,
+                    heightPx: 500,
+                    pointSizePx: 2,
+                    gemmIntens: selectedIntens
+                });
+            }
+        };
+        var stripPlot = new StripPlot(document.getElementById('intens-plot-svg'));
+        stripPlot.render({
+            yAxisLabel: 'Probe Intensity',
+            widthPx: 900,
+            heightPx: 800,
+            pointSizePx: 2,
+            gemmIntens: gemmIntens
+        });
+    });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <h2>GEMM Intensities for {{ sample.sample_id }}</h2>
+
+    <div class="row">
+        <label for="target-select-dropdown">Show:</label>
+        <div id="target-select-dropdown" class="dropdown">
+            <button
+                    type="button"
+                    class="btn btn-default dropdown-toggle"
+                    data-toggle="dropdown"
+                    aria-haspopup="true"
+                    aria-expanded="false"><span data-dropdown-label></span> <span class="caret"></span></button>
+            <ul class="dropdown-menu">
+                <li><a href="#" data-value="all-targets">All Targets</a></li>
+                {% for target in gemm_intens.keys()|sort %}
+                <li><a href="#" data-value="{{ target }}">{{ target }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <svg
+                    id="intens-plot-svg" width="900" height="800"
+                    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
+        </div>
+    </div>
+{% endblock %}

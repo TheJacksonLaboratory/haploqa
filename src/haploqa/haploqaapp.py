@@ -1645,6 +1645,56 @@ def gemm_probs_json(mongo_id):
         return flask.jsonify(gemm_probs=gemm_probs)
 
 
+@app.route('/sample/<mongo_id>/gemm-intens.json')
+def gemm_intens_json(mongo_id):
+    """
+    :param mongo_id: the mongo ID string
+    :return: the GEMM probability dictionary
+    """
+    user = flask.g.user
+    if user is None:
+        response = flask.jsonify({'success': False})
+        response.status_code = 400
+
+        return response
+    else:
+        obj_id = ObjectId(mongo_id)
+        gemm_intens = gemminf.get_gemm_intens([obj_id])
+
+        return flask.jsonify(gemm_intens=gemm_intens)
+
+
+@app.route('/sample/<mongo_id>/gemm-intens.html')
+def gemm_intens_html(mongo_id):
+    """
+    :param mongo_id: the mongo ID string
+    :return: the GEMM probability dictionary
+    """
+    user = flask.g.user
+    if user is None:
+        return None
+    else:
+        obj_id = ObjectId(mongo_id)
+        db = mds.get_db()
+        sample = db.samples.find_one(
+            {
+                # TODO add an index for this
+                '_id': obj_id,
+            },
+            {
+                'sample_id': 1,
+                'platform_id': 1,
+                'gender': 1,
+            })
+        if sample is None:
+            # nothing to do if we can't find the sample (or if the UUID has changed)
+            return
+
+        gemm_intens = gemminf.get_gemm_intens([obj_id], db=db)
+
+        return flask.render_template('gemm-intens.html', sample=sample, gemm_intens=gemm_intens)
+
+
 if __name__ == '__main__':
     # start server (for development use only)
     app.debug = True

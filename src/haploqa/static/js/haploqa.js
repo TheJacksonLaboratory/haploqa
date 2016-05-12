@@ -667,3 +667,177 @@ function HaploKaryoPlot(params) {
         return {x: x, y: y};
     };
 }
+
+function StripPlot(svgNode) {
+    // we define "self" here because the meaning of "this" can easily change with context
+    var self = this;
+
+    var svg = d3.select(svgNode);
+
+    // We create this root so that we can safely do a plot
+    var plotRoot = svg.append('g').classed('plot-content', true);
+
+    // this ratio determines how much white space we leave between min/max values and the end of the axis
+    var dataAxisMarginRatio = 0.05;
+
+    /**
+     * Render the plot
+     * @param {number} [params.paddingPx=10] the amount of padding to leave around the plot in pixels
+     * @param {string} [params.title] the plot label (appears over the plot)
+     * @param params.widthPx the width of the SVG canvas
+     * @param params.heightPx the width of the SVG canvas
+     * @param {number} [params.pointSizePx=5] the default size used for point shapes
+     */
+    this.render = function(params) {
+        plotRoot.selectAll('*').remove();
+
+        var gemmIntens = params.gemmIntens;
+
+        var title = params.title;
+        if(typeof title === 'undefined') {
+            title = null;
+        }
+
+        var widthPx = params.widthPx;
+        var heightPx = params.heightPx;
+
+        var paddingPx = params.paddingPx;
+        if(typeof paddingPx === 'undefined') {
+            paddingPx = 10;
+        }
+
+        var pointSizePx = params.pointSizePx;
+        if(typeof pointSizePx === 'undefined') {
+            pointSizePx = 5;
+        }
+
+        var yAxisLabel = params.yAxisLabel;
+        if(typeof yAxisLabel === 'undefined') {
+            yAxisLabel = 'Value';
+        }
+
+        var leftAxisPadding = paddingPx + 50;
+        var rightAxisPadding = paddingPx;
+        var topAxisPadding = paddingPx;
+        var bottomAxisPadding = paddingPx + 100;
+
+        var maxVal = null;
+        var minVal = null;
+        var gemmProbeIntens = [];
+        $.each(gemmIntens, function(gemmTgt, gemmTgtProbes) {
+            gemmTgtProbes.forEach(function(gemmTgtProbe) {
+                var currProbe = {
+                    gemmTarget: gemmTgt,
+                    gemmProbeId: gemmTgtProbe['snp_id'],
+                    nonCtrlIntens: gemmTgtProbe['non_ctrls'],
+                    posCtrlIntens: gemmTgtProbe['pos_ctrls'],
+                    negCtrlIntens: gemmTgtProbe['neg_ctrls']
+                };
+                gemmProbeIntens.push(currProbe);
+                var allProbeIntens = currProbe.nonCtrlIntens.concat(currProbe.posCtrlIntens);
+                allProbeIntens = allProbeIntens.concat(currProbe.negCtrlIntens);
+                allProbeIntens.forEach(function(intens) {
+                    if(maxVal === null || intens.probe_intensity > maxVal) {
+                        maxVal = intens.probe_intensity;
+                    }
+
+                    if(minVal === null || intens.probe_intensity < minVal) {
+                        minVal = intens.probe_intensity;
+                    }
+                });
+            });
+        });
+
+        // Create the X scale and axis objects
+        var leftmostXAxisPixel = leftAxisPadding;
+        var rightmostXAxisPixel = widthPx - (leftAxisPadding + rightAxisPadding);
+        var spacingPerProbe = (rightmostXAxisPixel - leftmostXAxisPixel) / gemmProbeIntens.length;
+        var xScale = d3.scale.ordinal()
+            .domain(gemmProbeIntens.map(function(probe) {return probe.gemmProbeId;}))
+            .rangePoints([leftmostXAxisPixel + spacingPerProbe / 2.0, rightmostXAxisPixel - spacingPerProbe / 2.0]);
+        var xAxis = d3.svg.axis()
+            .scale(xScale)
+            .orient('bottom');
+        var xAxisGrp = plotRoot.append('g').classed('axis x-axis', true).call(xAxis);
+        xAxisGrp.attr('transform', 'translate(0, ' + (heightPx - bottomAxisPadding) + ')');
+        xAxisGrp.selectAll('text')
+            .attr("y", 0)
+            .attr("x", -9)
+            .attr("transform", function() {
+                return "translate(" + (-this.getBBox().height / 2.0) + ")rotate(-90)";
+            })
+            .style("text-anchor", "end")
+            .style("dominant-baseline", "middle");
+        xAxisGrp.selectAll('.domain').remove();
+        var bottomPixel = heightPx - bottomAxisPadding;
+        xAxisGrp.append('line')
+            .attr('x1', leftmostXAxisPixel)
+            .attr('x2', rightmostXAxisPixel)
+            .classed('domain', true);
+
+        // Create the Y scale and axis objects
+        var topPixel = topAxisPadding;
+        var dataMargin = 0;
+        if(dataAxisMarginRatio > 0) {
+            dataMargin = (maxVal - minVal) * dataAxisMarginRatio;
+        }
+
+        var yAxisLabelGrp = plotRoot.append('g');
+        yAxisLabelGrp.append('text')
+            .classed('axis-label y-axis-label', true)
+            .html(yAxisLabel)
+            .style('text-anchor', 'middle')
+            .attr('transform', function() {
+                return 'translate(' + this.getBBox().height + ', ' + ((topPixel + bottomPixel) / 2.0) + ')rotate(-90)';
+            });
+
+        var yScale = d3.scale.linear()
+            .domain([minVal - dataMargin, maxVal + dataMargin])
+            .range([bottomPixel, topPixel]);
+        var yAxis = d3.svg.axis()
+            .scale(yScale)
+            .orient('left');
+        var yAxisGrp = plotRoot.append('g').classed('axis y-axis', true).call(yAxis);
+        yAxisGrp.attr('transform', 'translate(' + leftAxisPadding + ')');
+
+
+        var pointsGrp = plotRoot.append('g').classed('points', true);
+
+        var probeKindStyle = {
+            nonCtrlIntens: {
+                className: 'sample-point',
+                offset: 0
+            },
+            posCtrlIntens: {
+                className: 'pos-ctrl-point',
+                offset: pointSizePx * 4
+            },
+            negCtrlIntens: {
+                className: 'neg-ctrl-point',
+                offset: -pointSizePx * 4
+            }
+        };
+        gemmProbeIntens.forEach(function(currProbe) {
+            $.each(probeKindStyle, function(probeKind, probeStyle) {
+                currProbe[probeKind].forEach(function(currIntens) {
+                    var pointLink = pointsGrp.append('a')
+                        .attr('xlink:href', '/sample/' + currIntens.sample_obj_id + '.html');
+                    pointLink.append('circle')
+                        .attr('r', pointSizePx)
+                        .attr('cx', function() {
+                            return xScale(currProbe.gemmProbeId) + probeStyle.offset;
+                        })
+                        .attr('cy', yScale(currIntens.probe_intensity))
+                        .classed('data-point', true)
+                        .classed(probeStyle.className, true);
+                        //.on('mouseover', function() {
+                        //})
+                        //.on('mouseout', function() {
+                        //})
+                        //.on('mousemove', function() {
+                        //});
+                });
+            });
+        });
+    };
+}

@@ -132,6 +132,14 @@ th {
     fill: rgba(229, 223, 143, 0.75);
 }
 
+.pos-ctrl-point {
+    fill: red;
+}
+
+.neg-ctrl-point {
+    fill: blue;
+}
+
 .elem-overlay {
     display: table;
     position: absolute;
