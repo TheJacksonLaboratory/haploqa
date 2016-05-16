@@ -819,25 +819,38 @@ function StripPlot(svgNode) {
         };
         gemmProbeIntens.forEach(function(currProbe) {
             $.each(probeKindStyle, function(probeKind, probeStyle) {
-                currProbe[probeKind].forEach(function(currIntens) {
+                currProbe[probeKind].forEach(function(currDataPoint) {
                     var pointLink = pointsGrp.append('a')
-                        .attr('xlink:href', '/sample/' + currIntens.sample_obj_id + '.html');
+                        .attr('xlink:href', '/sample/' + currDataPoint.sample_obj_id + '.html');
                     pointLink.append('circle')
                         .attr('r', pointSizePx)
                         .attr('cx', function() {
                             return xScale(currProbe.gemmProbeId) + probeStyle.offset;
                         })
-                        .attr('cy', yScale(currIntens.probe_intensity))
+                        .attr('cy', yScale(currDataPoint.probe_intensity))
                         .classed('data-point', true)
-                        .classed(probeStyle.className, true);
-                        //.on('mouseover', function() {
-                        //})
-                        //.on('mouseout', function() {
-                        //})
-                        //.on('mousemove', function() {
-                        //});
+                        .classed(probeStyle.className, true)
+                        .on('mouseover', function() {
+                            if(self.mouseOverPoint) {
+                                self.mouseOverPoint(currProbe, currDataPoint);
+                            }
+                        })
+                        .on('mouseout', function() {
+                            if(self.mouseOutPoint) {
+                                self.mouseOutPoint(currProbe, currDataPoint);
+                            }
+                        })
+                        .on('mousemove', function() {
+                            if(self.mouseMovePoint) {
+                                self.mouseMovePoint(currProbe, currDataPoint);
+                            }
+                        });
                 });
             });
         });
+
+        this.mouseOverPoint = null;
+        this.mouseOutPoint = null;
+        this.mouseMovePoint = null;
     };
 }

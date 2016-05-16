@@ -4,11 +4,64 @@
 
 {% block head %}
     {{ super() }}
+
+    <style>
+        #cursor-status {
+            display: none;
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.75);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        #cursor-status td {
+            border: 2px solid lightgrey;
+        }
+    </style>
+
     <script>
     var gemmIntens = {{ gemm_intens|tojson }};
     $(function() {
-        //var svg = d3.select('#intens-plot-svg');
-        //var stripPlot = new StripPlot(svg);
+        var svg = document.getElementById('intens-plot-svg');
+        var stripPlot = new StripPlot(svg);
+        stripPlot.render({
+            yAxisLabel: 'Probe Intensity',
+            widthPx: 900,
+            heightPx: 800,
+            pointSizePx: 2,
+            gemmIntens: gemmIntens
+        });
+
+        var cursorStatusPopup = d3.select("#cursor-status");
+        var hideCursorPopup = function() {
+            cursorStatusPopup.style("display", null);
+        };
+        var prevDataPoint = null;
+        function mouseOverOrMouseMovePoint(probe, dataPoint) {
+            var popupOffset = 20;
+            var pastCenterX = false;
+            var pastCenterY = false;
+            var xPos = d3.event.pageX + (pastCenterX ? -popupOffset : popupOffset);
+            var yPos = d3.event.pageY + (pastCenterY ? -popupOffset : popupOffset);
+            var xTrans = pastCenterX ? -100 : 0;
+            var yTrans = pastCenterY ? -100 : 0;
+            var transformStr = "translate(" + xTrans + "%," + yTrans + "%)";
+            cursorStatusPopup.style({
+                display: "block",
+                top: yPos + "px",
+                left: xPos + "px",
+                transform: transformStr,
+                "-webkit-transform": transformStr});
+
+            if(dataPoint !== prevDataPoint) {
+                prevDataPoint = dataPoint;
+                $('#sample-id-out').text(dataPoint.sample_id);
+            }
+        }
+        stripPlot.mouseOverPoint = mouseOverOrMouseMovePoint;
+        stripPlot.mouseMovePoint = mouseOverOrMouseMovePoint;
+        d3.select(svg).on('mouseout', hideCursorPopup);
+
         var targetSelectDropdown = new BootstrapDropdown($('#target-select-dropdown'));
         targetSelectDropdown.onChange = function() {
             var currVal = targetSelectDropdown.getValue();
@@ -32,14 +85,6 @@
                 });
             }
         };
-        var stripPlot = new StripPlot(document.getElementById('intens-plot-svg'));
-        stripPlot.render({
-            yAxisLabel: 'Probe Intensity',
-            widthPx: 900,
-            heightPx: 800,
-            pointSizePx: 2,
-            gemmIntens: gemmIntens
-        });
     });
     </script>
 {% endblock %}
@@ -71,5 +116,9 @@
                     id="intens-plot-svg" width="900" height="800"
                     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
         </div>
+    </div>
+
+    <div id="cursor-status">
+        <table><tr><td>Sample ID:</td><td id="sample-id-out"></td></tr></table>
     </div>
 {% endblock %}
