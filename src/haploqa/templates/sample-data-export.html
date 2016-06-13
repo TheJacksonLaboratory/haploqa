@@ -1,0 +1,288 @@
+{% extends "layout.html" %}
+
+{% block title %}Sample Data Export{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <script>
+        var allSamples = {{ samples|tojson }};
+        var allTags = {{ all_tags|tojson }};
+        var selectedTags = allTags.slice(0);
+        var platformIDs = {{ platform_ids | tojson }};
+        $(function() {
+            var sampleTableBody = $('#sample-table-body');
+
+            allSamples.forEach(function(sample) {
+                // grab the row corresponding to the sample. We'll use this for quick filtering
+                // operations later on.
+                sample.tableRow = $('tr[data-sample-id="' + sample._id + '"]');
+            });
+
+            function passesFilter(sample) {
+                var someTagMatch = sample.tags.some(function(sampleTag) {
+                    return selectedTags.some(function(selectedTag) {
+                        return sampleTag === selectedTag;
+                    });
+                });
+
+                return someTagMatch;
+            }
+
+            function refilterSampleTable() {
+                var lastPassedSample = null;
+                allSamples.forEach(function(sample) {
+                    if(passesFilter(sample)) {
+                        var isDetatched = sample.tableRow.parent().length === 0;
+                        if(isDetatched) {
+                            // we need to perform a reattach
+                            if(lastPassedSample === null) {
+                                sampleTableBody.prepend(sample.tableRow);
+                            } else {
+                                sample.tableRow.insertAfter(lastPassedSample.tableRow);
+                            }
+                        }
+
+                        lastPassedSample = sample;
+                    } else {
+                        sample.tableRow.detach();
+                    }
+                });
+
+                updateSelectAllCheckbox();
+            }
+
+            function updateSelectedTags() {
+                selectedTags = [];
+                allTagCheckboxes.each(function() {
+                    var currCheckbox = $(this);
+                    if(currCheckbox.prop('checked')) {
+                        selectedTags.push(currCheckbox.attr('data-filter-tag'));
+                    }
+                });
+            }
+
+            var toggleAllTagsTriState = new TriStateCheckbox($('#toggle-all-tags'));
+            var allTagCheckboxes = $('input[data-filter-tag]');
+            toggleAllTagsTriState.onTriStateChanged = function() {
+                var currState = toggleAllTagsTriState.checked();
+                if(currState !== null) {
+                    allTagCheckboxes.prop('checked', currState);
+                }
+                updateSelectedTags();
+                refilterSampleTable();
+            };
+
+            function updateToggleAllTagsCheckbox() {
+                var anyChecked = false;
+                var anyUnchecked = false;
+                allTagCheckboxes.each(function() {
+                    if($(this).prop('checked')) {
+                        anyChecked = true;
+                    } else {
+                        anyUnchecked = true;
+                    }
+                });
+
+                if(anyChecked && anyUnchecked) {
+                    toggleAllTagsTriState.checked(null);
+                } else if(anyChecked) {
+                    toggleAllTagsTriState.checked(true);
+                } else if(anyUnchecked) {
+                    toggleAllTagsTriState.checked(false);
+                }
+            }
+            allTagCheckboxes.change(function() {
+                updateToggleAllTagsCheckbox();
+                updateSelectedTags();
+                refilterSampleTable();
+            });
+
+            var selectAllCheckbox = new TriStateCheckbox($('#select-all-checkbox'));
+            var allSampleCheckboxes = $('input[data-sample-id]');
+            selectAllCheckbox.onTriStateChanged = function() {
+                var currState = selectAllCheckbox.checked();
+                if(currState !== null) {
+                    allSampleCheckboxes.prop('checked', currState);
+                }
+            };
+
+            function updateSelectAllCheckbox() {
+                var anyChecked = false;
+                var anyUnchecked = false;
+                allSampleCheckboxes.each(function() {
+                    if($(this).prop('checked')) {
+                        anyChecked = true;
+                    } else {
+                        anyUnchecked = true;
+                    }
+                });
+
+                if(anyChecked && anyUnchecked) {
+                    selectAllCheckbox.checked(null);
+                } else if(anyChecked) {
+                    selectAllCheckbox.checked(true);
+                } else if(anyUnchecked) {
+                    selectAllCheckbox.checked(false);
+                }
+            }
+            allSampleCheckboxes.change(updateSelectAllCheckbox);
+
+            function buildRequest() {
+                var selectedSampleIDs = [];
+                allSamples.forEach(function(sample) {
+                    if(passesFilter(sample)) {
+                        // TODO this check is too slow!
+                        if($('input[data-sample-id="' + sample._id + '"]').is(':checked')) {
+                            selectedSampleIDs.push(sample._id);
+                        }
+                    }
+                });
+
+                var intervalText = $('#interval-text').val();
+
+                return {
+                    selectedSampleIDs: selectedSampleIDs,
+                    interval: parseInterval(intervalText)
+                }
+            }
+
+            var downloadReqForm = $('#download-request-form');
+            var downloadRequestJsonInput = $('#download-request-json-input');
+            var downloadButton = $('#download-button');
+            downloadButton.click(function() {
+                var jsonStr = JSON.stringify(buildRequest());
+                downloadRequestJsonInput.val(jsonStr);
+                downloadReqForm.submit();
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>{% block header %}Sample Data Export{% endblock %}</h1>
+    </div>
+
+    <p>
+        Use the form controls below to filter the set of samples to be downloaded. You can then
+        use the checkboxes in the sample table to select (or exclude) individual samples.
+    </p>
+
+    <div class="form-horizontal" role="form">
+        <div class="form-group">
+            <label for="platform-select" class="col-md-3 control-label">Platform:</label>
+
+            <div class="col-md-6">
+                <select
+                        id="platform-select"
+                        class="form-control tooltip-enabled"
+                        name="platform-select"
+                        title="Choose a platform to filter by"
+                        data-placement="right">
+
+                    {% for platform_id in platform_ids %}
+                    <option value="{{ platform_id }}">{{ platform_id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="interval-text" class="col-md-3 control-label">Download Interval:</label>
+
+            <div class="col-md-6">
+                <input type="text" class="form-control" id="interval-text" size="50" placeholder="Chr2:45Mb-55Mb">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="col-md-3 control-label">Sample Tags:</label>
+
+            <div class="col-md-6" style="padding-top: 7px;">
+                <label style="border-bottom: 1px solid rgb(203, 203, 203); width: 100%; margin-bottom: 5px; padding-bottom: 5px;"><input id="toggle-all-tags" type="checkbox" value="toggle-all" checked> Toggle All Tags</label><br/>
+
+                {% for tag in all_tags %}
+                <label style="width: 100%;"><input id="filter-tag-{{ loop.index0 }}" type="checkbox" value="filter-tag-{{ tag }}" data-filter-tag="{{ tag }}" checked> {{ tag }}</label><br/>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-md-offset-3 col-md-3">
+                <button
+                        id="download-button"
+                        class="btn btn-default tooltip-enabled"
+                        value="Download Results"
+                        title=""
+                        data-placement="right">
+                    <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Genotype Matrix ...
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th><input id="select-all-checkbox" type="checkbox" checked></th>
+                    <th>Sample ID</th>
+                    <th>Standard Designation</th>
+                    <th>Sex</th>
+                    <th>Platform</th>
+                    <th>% Het. Calls</th>
+                    <th>% Hom. Calls</th>
+                    <th>% No Call</th>
+                    <th>% Concordance</th>
+                    {% if g.user %}<th>Public</th>{% endif %}
+                </tr>
+                </thead>
+                <tbody id="sample-table-body">
+                    {% for sample in samples %}
+                    <tr data-sample-id="{{ sample._id }}">
+                        <td><input data-sample-id="{{ sample._id }}" type="checkbox" checked></td>
+                        <td>
+                            <a href="{{ url_for('sample_html', mongo_id=sample._id) }}">
+                                {% if 'haplotype-strain' in sample.tags %}
+                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span>
+                                {% endif %}
+                                {{ sample.sample_id }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if sample.standard_designation %}
+                                <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ sample.gender or 'Unknown' }}</td>
+                        <td>{{ sample.platform_id }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
+                        <td>
+                            {% if sample.viterbi_haplotypes.concordant_percent != None %}
+                                {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
+                            {% endif %}
+                        </td>
+                        {% if g.user %}
+                        <td>{% if sample.is_public %}<span class="glyphicon glyphicon-ok" aria-hidden="true" aria-label="sample is public"></span>{% endif %}</td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                        <tr><td colspan="10">
+                            {% block nosamples %}No samples found{% endblock %}
+                        </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- hidden form used for submitting via javascript -->
+    <form id="download-request-form" style="display: none;" action="{{ url_for('sample_data_export_file') }}" method="post">
+        <input id="download-request-json-input" type="hidden" name="download-request-json">
+    </form>
+
+{% endblock %}

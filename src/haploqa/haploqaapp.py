@@ -386,6 +386,85 @@ def sample_import_status_json(task_id):
         return flask.jsonify(**msg_dict)
 
 
+@app.route('/sample-data-export.html')
+def sample_data_export_html():
+    db = mds.get_db()
+    samples = _find_and_anno_samples(
+        {},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+    samples = list(samples)
+    platform_ids, haplotype_samples = _get_platform_haplotypes(db, samples)
+    all_tags = db.samples.distinct('tags')
+
+    return flask.render_template(
+            'sample-data-export.html',
+            samples=samples,
+            all_tags=all_tags,
+            platform_ids=platform_ids,
+            haplotype_samples=haplotype_samples)
+
+
+@app.route('/sample-data-export.txt', methods=['POST'])
+def sample_data_export_file():
+    db = mds.get_db()
+    req_data_json_str = flask.request.form['download-request-json']
+    req_data = json.loads(req_data_json_str)
+    interval = None
+    try:
+        interval = req_data['interval']
+    except KeyError:
+        pass
+
+    @flask.stream_with_context
+    def response_gen():
+        samples = []
+        platform = None
+        for mongo_id in req_data['selectedSampleIDs']:
+            obj_id = ObjectId(mongo_id)
+            curr_sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+            for chr_val in curr_sample['chromosome_data'].values():
+                curr_sample['uses_snp_format'] = 'snps' in chr_val
+            samples.append(curr_sample)
+
+            if platform is None:
+                platform = db.platforms.find_one({'platform_id': curr_sample['platform_id']})
+
+        # yield the header
+        yield _iter_to_row(['snp_id', 'chromosome', 'position_bp'] + [curr_sample['sample_id'] for curr_sample in samples])
+
+        chr_ids = platform['chromosomes']
+        for chr_id in chr_ids:
+            if (interval is None or interval['chr'] == chr_id) and any(chr_id in sample['chromosome_data'] for sample in samples):
+                snps = list(mds.get_snps(platform['platform_id'], chr_id, db))
+                for snp_index, curr_snp in enumerate(snps):
+                    if interval is None or interval['startPos'] <= curr_snp['position_bp'] <= interval['endPos']:
+                        snp_calls = []
+                        for curr_sample in samples:
+                            if curr_sample['uses_snp_format']:
+                                snp_calls.append(curr_sample['chromosome_data'][chr_id]['snps'][snp_index])
+                            else:
+                                curr_call = (
+                                    curr_sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index] +
+                                    curr_sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index]
+                                )
+                                snp_calls.append(curr_call)
+
+                        yield _iter_to_row([curr_snp['snp_id'], curr_snp['chromosome'], str(curr_snp['position_bp'])] + snp_calls)
+
+    resp = flask.Response(response_gen(), mimetype='text/plain')
+    resp.headers['Content-Disposition'] = 'attachment; filename="sample-data-export.txt"'
+
+    return resp
+
+
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
     """
@@ -726,15 +805,10 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
             }
 
     if projection:
-        print('running query/proj:')
-        print(query)
-        print(projection)
         cursor = db.samples.find(query, projection)
-        print('finished query/proj')
     else:
         cursor = db.samples.find(query)
     if cursor_func:
-        print("we're getting funcadelic")
         cursor = cursor_func(cursor)
 
     return map(anno_sample, cursor)
