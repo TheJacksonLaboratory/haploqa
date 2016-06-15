@@ -1,13 +1,37 @@
 import pymongo
 
 
+DB_NAME = 'haploqa'
+SCHEMA_VERSION = 0, 0, 1
+
+
 def get_db():
     """
     Gets a reference to the HaploQA database
     :return: the DB
     """
     client = pymongo.MongoClient('localhost', 27017)
-    return client.haploqa
+    return client[DB_NAME]
+
+
+def get_schema_version(db=None):
+    if db is None:
+        db = get_db()
+
+    version_doc = db.meta.find_one()
+    if version_doc is None:
+        # there are two reasons we could get a None and we want to differentiate
+        # 1) it's older than when we started inserting schema versions (we'll call this
+        #    version "0.0.0")
+        # 2) or it's an uninitialized database and we'll return None
+        if 'samples' in set(db.collection_names()):
+            # the schema is old
+            return 0, 0, 0
+        else:
+            # there is no database
+            return None
+    else:
+        return tuple(version_doc['schema_version'])
 
 
 def init_db(db=None):
@@ -20,6 +44,7 @@ def init_db(db=None):
     if db is None:
         db = get_db()
 
+    db.meta.replace_one({}, {'schema_version': SCHEMA_VERSION}, upsert=True)
     db.samples.create_index('sample_id')
     db.samples.create_index('tags')
     db.samples.create_index([
@@ -27,7 +52,7 @@ def init_db(db=None):
         ('sample_id',   pymongo.ASCENDING),
     ])
     db.samples.create_index('standard_designation')
-    db.samples.create_index('gender')
+    db.samples.create_index('sex')
     db.samples.create_index('pos_ctrl_eng_tgts')
     db.samples.create_index('neg_ctrl_eng_tgts')
     db.platforms.create_index('platform_id')
@@ -166,9 +191,6 @@ def within_chr_snp_indices(platform_id, db=None):
 
 
 # as a convenience we can run this file as a script to
-# rebuild DB indexes and SNP indices
+# upgrade or initialize the DB
 if __name__ == '__main__':
-    db = get_db()
-    init_db(db)
-    update_snp_indices(db)
-
+    init_db()

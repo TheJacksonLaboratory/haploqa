@@ -31,7 +31,7 @@
             {% endfor %}
         };
         var sampleID = {{ sample.sample_id|tojson }};
-        var sex = {{ sample.gender|tojson }};
+        var sex = {{ sample.sex|tojson }};
         if(sex === null) {
             sex = 'unknown';
         }
@@ -586,7 +586,7 @@
                 var newSex = editSexSelect.val();
                 var sexChanged = newSex !== sex;
                 if(sexChanged) {
-                    postData['gender'] = newSex;
+                    postData['sex'] = newSex;
                 }
 
                 saveTagRequest = $.ajax({
@@ -832,7 +832,7 @@
                                     <option value="unknown">Unknown</option>
                                 </select>
                             </span>
-                            <span id="readonly-sex" data-display-when="sample-readonly">{{ sample.gender or 'Unknown' }}</span>
+                            <span id="readonly-sex" data-display-when="sample-readonly">{{ sample.sex or 'Unknown' }}</span>
                         </td>
                     </tr>
                     <tr>

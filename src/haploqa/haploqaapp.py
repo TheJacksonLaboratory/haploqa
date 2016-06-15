@@ -20,6 +20,7 @@ import haploqa.sampleannoimport as sai
 import haploqa.usermanagement as usrmgmt
 
 app = flask.Flask(__name__)
+APP_VERSION = 0, 0
 BROKER_URL = 'amqp://guest:guest@localhost:5672//'
 app.config.update(
     CELERY_BROKER_URL=BROKER_URL,
@@ -67,7 +68,7 @@ class EscForwardSlashConverter(BaseConverter):
 app.url_map.converters['escfwd'] = EscForwardSlashConverter
 
 
-class JSONEncoder(flask.json.JSONEncoder):
+class CustomJSONEncoder(flask.json.JSONEncoder):
     def default(self, o):
         """Implement this method in a subclass such that it returns a
         serializable object for ``o``, or calls the base implementation (to
@@ -81,7 +82,7 @@ class JSONEncoder(flask.json.JSONEncoder):
         return flask.json.JSONEncoder.default(self, o)
 
 
-app.json_encoder = JSONEncoder
+app.json_encoder = CustomJSONEncoder
 
 
 # TODO this key must be changed to something secret (ie. not committed to the repo).
@@ -120,6 +121,16 @@ def _make_celery(app):
     return celery
 
 celery = _make_celery(app)
+
+
+@app.context_processor
+def inject_vars():
+    """
+    Inject variables to be available in all template contexts
+    """
+    return {
+        'app_version': '.'.join([str(x) for x in APP_VERSION])
+    }
 
 
 MAX_CONTRIB_STRAIN_COUNT = 15
@@ -487,7 +498,6 @@ def sample_data_import_html():
             # sample map is optional
             sample_map_filename = None
             if 'sample-map-file' in files:
-                #print('sample-map-file is {}'.format(files['sample-map-file']))
                 sample_map_filename = _unique_temp_filename()
                 files['sample-map-file'].save(sample_map_filename)
 
@@ -543,20 +553,16 @@ def _get_platform_haplotypes(db, samples):
         if platform:
             platform_ids.add(platform)
     platform_ids = list(platform_ids)
-    print(platform_ids)
 
     # haplotype_samples = db.samples.find(
     #     {'tags': HAPLOTYPE_TAG, 'platform_id': {'$in': platform_ids}},
     #     {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
     # )
-    print('find haplo samples')
     haplotype_samples = db.samples.find(
         {'tags': HAPLOTYPE_TAG, 'platform_id': platform_ids[0]},
         {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
     )
-    print('found em')
     haplotype_samples = list(haplotype_samples)
-    print('listified them!!')
     for haplotype_sample in haplotype_samples:
         _add_default_attributes(haplotype_sample)
 
@@ -596,7 +602,6 @@ def sample_tag_html(tag_id):
     # look up all samples with this tag ID. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
-    print('finding matching samples')
     matching_samples = _find_and_anno_samples(
         {'tags': tag_id},
         {
@@ -608,13 +613,9 @@ def sample_tag_html(tag_id):
         db=db,
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
-    print('done finding matching samples')
     matching_samples = list(matching_samples)
-    print('done listing matching samples')
     platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
-    print('finding distinct tags')
     all_tags = db.samples.distinct('tags')
-    print('done finding distinct tags')
 
     return flask.render_template(
             'sample-tag.html',
@@ -668,7 +669,6 @@ def index_html():
 
     # this pipeline should get us all tags along with their sample counts
     pipeline = [
-        # {'$project': {'tags': 1}},
         {'$unwind': '$tags'},
         {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
         {'$sort': SON([('count', -1), ('_id', -1)])},
@@ -679,7 +679,6 @@ def index_html():
         sample_count = db.samples.count({'is_public': True})
     else:
         sample_count = db.samples.count({})
-    #sample_count = 44
 
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
@@ -745,12 +744,11 @@ def _add_default_attributes(sample):
 
     default_to('color', '#000000')
     default_to('standard_designation', None)
-    default_to('gender', None)
     default_to('notes', None)
     default_to('owner', None)
     default_to('write_groups', [])
     default_to('is_public', False)
-    default_to('gender', 'unknown')
+    default_to('sex', 'unknown')
     default_to('pos_ctrl_eng_tgts', [])
     default_to('neg_ctrl_eng_tgts', [])
 
@@ -1057,7 +1055,7 @@ def update_sample(mongo_id):
     obj_id = ObjectId(mongo_id)
     sample = _find_one_and_anno_samples(
             {'_id': obj_id},
-            {'platform_id': 1, 'gender': 1},
+            {'platform_id': 1, 'sex': 1},
             db=db,
             require_write_perms=True)
     if sample is None:
@@ -1086,8 +1084,8 @@ def update_sample(mongo_id):
     if 'is_public' in form:
         update_dict['is_public'] = form['is_public'] == 'true'
 
-    if 'gender' in form:
-        update_dict['gender'] = form['gender']
+    if 'sex' in form:
+        update_dict['sex'] = form['sex']
 
     if 'pos_ctrl_eng_tgts' in form:
         update_dict['pos_ctrl_eng_tgts'] = json.loads(form['pos_ctrl_eng_tgts'])
@@ -1095,7 +1093,7 @@ def update_sample(mongo_id):
     if 'neg_ctrl_eng_tgts' in form:
         update_dict['neg_ctrl_eng_tgts'] = json.loads(form['neg_ctrl_eng_tgts'])
 
-    if 'contributing_strain_ids' in form or 'gender' in form:
+    if 'contributing_strain_ids' in form or 'sex' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
         chr_ids = platform['chromosomes']
 
@@ -1160,7 +1158,6 @@ def update_samples():
 
     if not sample_ids_to_update:
         # there's nothing to do
-        print('no samples are selected')
         return flask.jsonify(task_ids=[])
 
     add_to_set_dict = dict()
@@ -1238,7 +1235,6 @@ def update_samples():
                 )
                 task_ids.append(t.task_id)
     else:
-        print('=== NO contributing_strains_change ===')
         save_updates()
 
     return flask.jsonify(task_ids=task_ids)
@@ -1530,13 +1526,13 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
             'contributing_strains': 1,
             'platform_id': 1,
             'chromosome_data.' + chr_id: 1,
-            'gender': 1,
+            'sex': 1,
         })
     if sample is None:
         # nothing to do if we can't find the sample (or if the UUID has changed)
         return
 
-    if (chr_id == 'Y' and sample.get('gender', None) == 'female') or not sample['contributing_strains']:
+    if (chr_id == 'Y' and sample.get('sex', None) == 'female') or not sample['contributing_strains']:
         # for females we just need to skip past the Y chromosome
         db.samples.update_one(
             {
@@ -1600,7 +1596,6 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         haplotype_dict['haplotype_blocks'] = haplotype_blocks
         haplotype_dict['results_pending'] = False
 
-        print('updating haplotypes for sample {}, chr {}'.format(sample_obj_id_str, chr_id))
         db.samples.update_one(
             {
                 # TODO add an index for this
@@ -1758,7 +1753,7 @@ def gemm_intens_html(mongo_id):
             {
                 'sample_id': 1,
                 'platform_id': 1,
-                'gender': 1,
+                'sex': 1,
             })
         if sample is None:
             # nothing to do if we can't find the sample (or if the UUID has changed)

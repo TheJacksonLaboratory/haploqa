@@ -5,12 +5,12 @@ import sys
 
 import haploqa.mongods as mds
 
-gender_canonical = 'gender'
-gender_aliases = {'sex', gender_canonical}
+sex_canonical = 'sex'
+sex_aliases = {'gender', sex_canonical}
 
 male_canonical = 'male'
 female_canonical = 'female'
-gender_alias_dict = {
+sex_alias_dict = {
     'm': male_canonical,
     male_canonical: male_canonical,
     'f': female_canonical,
@@ -46,7 +46,7 @@ color_canonical = 'color'
 
 def normalize_header(header):
     """
-    Some headers are just treated as key/value pairs but some headers (such as Gender) have
+    Some headers are just treated as key/value pairs but some headers (such as sex) have
     special meaning and so we must make sure to convert these headers to their canonical form
     :param header: the header string to normalize
     :return: the normalized string
@@ -63,8 +63,8 @@ def normalize_header(header):
         simplified_header = re.sub(r'_+', '_', simplified_header)
 
         # here we convert to canonical if needed
-        if simplified_header in gender_aliases:
-            return gender_canonical
+        if simplified_header in sex_aliases:
+            return sex_canonical
         elif simplified_header in standard_designation_aliases:
             return standard_designation_canonical
         elif simplified_header in sample_id_aliases:
@@ -78,8 +78,8 @@ def normalize_header(header):
 def normalize_value(header, value):
     value = value.strip()
     if value:
-        if header == gender_canonical:
-            norm_val = gender_alias_dict.get(value.lower(), None)
+        if header == sex_canonical:
+            norm_val = sex_alias_dict.get(value.lower(), None)
             if norm_val is not None:
                 return norm_val
             else:
@@ -133,9 +133,9 @@ def sample_anno_dicts(sample_anno_file):
             if standard_designation:
                 sample_dict[standard_designation_canonical] = standard_designation
 
-            gender = sample_properties.pop(gender_canonical, None)
-            if gender:
-                sample_dict[gender_canonical] = gender
+            sex = sample_properties.pop(sex_canonical, None)
+            if sex:
+                sample_dict[sex_canonical] = sex
 
             color = sample_properties.pop(color_canonical, None)
             if color:

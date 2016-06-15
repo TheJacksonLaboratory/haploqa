@@ -256,7 +256,7 @@
                                 <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
                             {% endif %}
                         </td>
-                        <td>{{ sample.gender or 'Unknown' }}</td>
+                        <td>{{ sample.sex or 'Unknown' }}</td>
                         <td>{{ sample.platform_id }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
