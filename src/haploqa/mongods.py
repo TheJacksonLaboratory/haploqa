@@ -2,7 +2,70 @@ import pymongo
 
 
 DB_NAME = 'haploqa'
-SCHEMA_VERSION = 0, 0, 1
+SCHEMA_VERSION = 0, 0, 2
+
+
+# this list of characters represents the full range of characters we
+# allow ourselves to use when generating unique IDs. We want our IDs
+# to have two properties:
+#
+# 1) all characters used should be easy to visually distinguish. For this reason we exclude
+#    '1', 'L', '0' and 'O'. We also limit ourselves to upper-case.
+# 2) they should be short so that they're easy to remember and don't take up too much space.
+#    Using almost all of the upper-case alphanumeric characters in our alphabet helps us
+#    generate short IDs
+#
+# The full alphabet we use is [0-9] + [A-H] + [J-K] + [M, N] + [P-Z] for a total of 32 characters
+UNIQUE_ID_ALPHABET = sorted(
+    set(list(map(str, range(2, 10))) + list(map(chr, range(ord('A'), ord('Z') + 1)))) -
+    {'I', 'L', 'O'}
+)
+
+
+def base10_id_to_alphabet_id(base10_id):
+    alphabet_base = len(UNIQUE_ID_ALPHABET)
+    alphabet_int_list = []
+    curr_val = base10_id
+    while True:
+        curr_val, curr_remainder = divmod(curr_val, alphabet_base)
+        alphabet_int_list.append(curr_remainder)
+
+        if curr_val == 0:
+            break
+
+    return ''.join(UNIQUE_ID_ALPHABET[x] for x in reversed(alphabet_int_list))
+
+
+def gen_unique_id(db=None):
+    """
+    This function will generate an ID that is unique to the given db. The ID generation
+    process tries to generate an ID that is both short and easy to visually distinguish.
+
+    :param db: the DB that the generated ID will be unique within. If this is None we
+                use the db returned from get_db()
+    :return: the unique string ID
+    """
+    if db is None:
+        db = get_db()
+
+    meta_doc = db.meta.find_one_and_update(
+        {},
+        {'$inc': {'unique_id_count': 1}},
+    )
+
+    if 'unique_id_count' not in meta_doc:
+        # in the case that there is no unique_id_count before we increment
+        # we treat that as 0
+        meta_doc['unique_id_count'] = 0
+
+    return base10_id_to_alphabet_id(meta_doc['unique_id_count'])
+
+
+def version_to_str(vsn):
+    """
+    Convert the given version tuple to a dot separated string representation
+    """
+    return '.'.join(str(x) for x in vsn)
 
 
 def get_db():
@@ -45,6 +108,7 @@ def init_db(db=None):
         db = get_db()
 
     db.meta.replace_one({}, {'schema_version': SCHEMA_VERSION}, upsert=True)
+    db.samples.create_index('canonical_id', unique=True)
     db.samples.create_index('sample_id')
     db.samples.create_index('tags')
     db.samples.create_index([
