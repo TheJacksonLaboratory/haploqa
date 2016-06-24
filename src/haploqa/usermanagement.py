@@ -9,7 +9,7 @@ from uuid import uuid4
 
 
 MIN_PASSWORD_LENGTH = 8
-
+SMTP_SERVER = 'smtp.jax.org'
 
 def hash_str(s):
     return sha512(s.encode('utf-8')).hexdigest()
@@ -106,7 +106,7 @@ def invite_admin(email_address, db=None):
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
-    s = smtplib.SMTP('localhost')
+    s = smtplib.SMTP(SMTP_SERVER)
     s.sendmail(from_addr, [email_address], msg.as_string())
     s.quit()
 
@@ -147,7 +147,7 @@ def reset_password(email_address, db=None):
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
-    s = smtplib.SMTP('localhost')
+    s = smtplib.SMTP(SMTP_SERVER)
     s.sendmail(from_addr, [user['email_address']], msg.as_string())
     s.quit()
 
