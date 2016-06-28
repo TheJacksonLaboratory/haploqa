@@ -11,6 +11,7 @@ from uuid import uuid4
 MIN_PASSWORD_LENGTH = 8
 SMTP_SERVER = 'smtp.jax.org'
 
+
 def hash_str(s):
     return sha512(s.encode('utf-8')).hexdigest()
 
@@ -71,8 +72,7 @@ def authenticate_user(email_address, password, db):
 
 def invite_admin(email_address, db=None):
     """
-    invite a new user with the given email address (sends out an invite email via an SMTP
-    server on localhost)
+    invite a new user with the given email address (sends out an invite email via an SMTP server)
     :param email_address: the address of the user to invite
     :param db: the mongo database
     """
@@ -91,7 +91,7 @@ def invite_admin(email_address, db=None):
     })
 
     msg_template = \
-        '''You have been invited by to be an administrator of the HaploQA application. ''' \
+        '''You have been invited to create a HaploQA account. ''' \
         '''To validate your account and create a password, visit this link: {} ''' \
         '''Please ignore this message if it was sent in error.'''
     msg = MIMEText(msg_template.format(flask.url_for(
@@ -114,7 +114,7 @@ def invite_admin(email_address, db=None):
 def reset_password(email_address, db=None):
     """
     Reset password for user with the given email address (sends out a reset email via an SMTP
-    server on localhost). If the user does not follow the link from the email that's sent out
+    server). If the user does not follow the link from the email that's sent out
     this should have no effect.
     :param email_address: the address of the user to invite
     :param db: the mongo database
