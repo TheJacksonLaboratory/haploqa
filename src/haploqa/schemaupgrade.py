@@ -32,9 +32,29 @@ def upgrade_from_0_0_1(db):
     db.meta.replace_one({}, {'schema_version': upgrade_to_schema_version}, upsert=True)
 
 
+def upgrade_from_0_0_2(db):
+    upgrade_to_schema_version = 0, 0, 3
+
+    # add unique IDs to each sample
+    for sample in db.samples.find({}, {'_id': 1, 'sample_id': 1}):
+        update_dict = dict()
+        other_ids = []
+        if 'sample_id' in sample:
+            other_ids = [sample['sample_id']]
+            update_dict['$unset'] = {'sample_id': ''}
+        update_dict['$set'] = {'other_ids': other_ids}
+
+        db.samples.update_one({'_id': sample['_id']}, update_dict)
+    db.samples.drop_index('sample_id_1')
+    db.samples.create_index('other_ids')
+
+    db.meta.replace_one({}, {'schema_version': upgrade_to_schema_version}, upsert=True)
+
+
 SCHEMA_UPGRADE_FUNCTIONS = [
     ((0, 0, 0), upgrade_from_0_0_0),
     ((0, 0, 1), upgrade_from_0_0_1),
+    ((0, 0, 2), upgrade_from_0_0_2),
 ]
 
 

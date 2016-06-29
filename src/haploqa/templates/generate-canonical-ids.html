@@ -1,0 +1,60 @@
+{% set no_robots = True %}
+
+{% extends "layout.html" %}
+
+{% block title %}Generate Canonical IDs{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Generate Canonical IDs</h1>
+</div>
+
+<p>
+    This page will simply generate a list of canonical IDs that are guaranteed to be unique within
+    the context of this application.
+</p>
+
+<form class="form-horizontal" method="post">
+    <div class="form-group">
+        <label for="num-ids" class="col-md-3 control-label">Number of IDs to Generate:</label>
+
+        <div class="col-md-6">
+            <input type="number" class="form-control" id="num-ids" name="num-ids" value="{{ num_ids }}" step="1" min="1" required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label for="num-ids" class="col-md-3 control-label">ID Prefix:</label>
+
+        <div class="col-md-6">
+            <input type="text" class="form-control" id="id-prefix" name="id-prefix" value="{{ id_prefix }}" placeholder="(optional)">
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-3 col-md-3">
+            <button class="btn btn-primary" type="submit">
+                <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span> Generate IDs
+            </button>
+        </div>
+    </div>
+</form>
+
+{% if canonical_ids %}
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th>Canonical IDs</th>
+                </tr>
+                </thead>
+                <tbody>
+                    {% for canonical_id in canonical_ids %}
+                    <tr><td>{{ canonical_id }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}

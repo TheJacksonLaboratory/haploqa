@@ -2,7 +2,7 @@ import pymongo
 
 
 DB_NAME = 'haploqa'
-SCHEMA_VERSION = 0, 0, 2
+SCHEMA_VERSION = 0, 0, 3
 
 
 # this list of characters represents the full range of characters we
@@ -109,7 +109,7 @@ def init_db(db=None):
 
     db.meta.replace_one({}, {'schema_version': SCHEMA_VERSION}, upsert=True)
     db.samples.create_index('canonical_id', unique=True)
-    db.samples.create_index('sample_id')
+    db.samples.create_index('other_ids')
     db.samples.create_index('tags')
     db.samples.create_index([
         ('tags',        pymongo.ASCENDING),

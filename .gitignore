@@ -19,3 +19,4 @@ haploqa.db
 /haploqa-mongodump*
 erl_crash.dump
 /db/
+/scratch/

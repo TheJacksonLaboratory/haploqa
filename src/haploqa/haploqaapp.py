@@ -1764,6 +1764,37 @@ def gemm_intens_html(mongo_id):
         return flask.render_template('gemm-intens.html', sample=sample, gemm_intens=gemm_intens)
 
 
+#####################################################################
+# CANONICAL IDs
+#####################################################################
+
+
+@app.route('/generate-canonical-ids.html', methods=['GET', 'POST'])
+def generate_canonical_ids():
+    user = flask.g.user
+    if user is None:
+        return None
+    else:
+        num_ids = 1
+        id_prefix = ''
+        canonical_ids = []
+        if flask.request.method == 'POST':
+            db = mds.get_db()
+            form = flask.request.form
+            num_ids = int(form['num-ids'])
+            id_prefix = form['id-prefix']
+            canonical_ids = [mds.gen_unique_id(db) for _ in range(num_ids)]
+            if id_prefix:
+                canonical_ids = [id_prefix + ':' + x for x in canonical_ids]
+
+        return flask.render_template(
+            'generate-canonical-ids.html',
+            num_ids=num_ids,
+            id_prefix=id_prefix,
+            canonical_ids=canonical_ids,
+        )
+
+
 if __name__ == '__main__':
     # start server (for development use only)
     app.debug = True
