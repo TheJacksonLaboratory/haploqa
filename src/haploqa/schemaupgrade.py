@@ -1,5 +1,4 @@
 import haploqa.mongods as mds
-import pymongo
 
 
 def upgrade_from_0_0_0(db):
@@ -22,39 +21,28 @@ def upgrade_from_0_0_1(db):
     upgrade_to_schema_version = 0, 0, 2
 
     # add unique IDs to each sample
-    for sample in db.samples.find({}, {'_id': 1}):
+    for sample in db.samples.find({}, {'sample_id': 1}):
         db.samples.update_one(
             {'_id': sample['_id']},
-            {'$set': {'canonical_id': mds.gen_unique_id(db)}},
+            {
+                '$set': {
+                    'sample_id': mds.gen_unique_id(db),
+                    'other_ids': [sample['sample_id']],
+                },
+            },
         )
-    db.samples.create_index('canonical_id', unique=True)
-
-    db.meta.replace_one({}, {'schema_version': upgrade_to_schema_version}, upsert=True)
-
-
-def upgrade_from_0_0_2(db):
-    upgrade_to_schema_version = 0, 0, 3
-
-    # add unique IDs to each sample
-    for sample in db.samples.find({}, {'_id': 1, 'sample_id': 1}):
-        update_dict = dict()
-        other_ids = []
-        if 'sample_id' in sample:
-            other_ids = [sample['sample_id']]
-            update_dict['$unset'] = {'sample_id': ''}
-        update_dict['$set'] = {'other_ids': other_ids}
-
-        db.samples.update_one({'_id': sample['_id']}, update_dict)
-    db.samples.drop_index('sample_id_1')
     db.samples.create_index('other_ids')
 
-    db.meta.replace_one({}, {'schema_version': upgrade_to_schema_version}, upsert=True)
+    db.meta.update_one(
+        {},
+        {'$set': {'schema_version': upgrade_to_schema_version}},
+    )
 
 
 SCHEMA_UPGRADE_FUNCTIONS = [
     ((0, 0, 0), upgrade_from_0_0_0),
     ((0, 0, 1), upgrade_from_0_0_1),
-    ((0, 0, 2), upgrade_from_0_0_2),
+    # ((0, 0, 2), upgrade_from_0_0_2),
 ]
 
 

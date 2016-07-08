@@ -12,6 +12,7 @@ import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
 
+from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
 import haploqa.haplohmm as hhmm
 import haploqa.mongods as mds
@@ -348,6 +349,15 @@ def change_password_html():
             return flask.render_template('change-password.html')
 
 
+@app.route('/users.html')
+def users_html():
+    user = flask.g.user
+    if user is not None:
+        db = mds.get_db()
+        users = list(db.users.find({}, {'email_address': 1}))
+        return flask.render_template('users.html', users=users)
+
+
 #####################################################################
 # DATA IMPORT FUNCTIONS
 #####################################################################
@@ -506,12 +516,18 @@ def sample_data_import_html():
             final_report_file = files['final-report-file']
             final_report_file.save(final_report_filename)
 
+            generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
+            on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
+
             sample_group_name = os.path.splitext(final_report_file.filename)[0]
             import_task = sample_data_import_task.delay(
-                platform_id,
+                generate_ids,
+                on_duplicate,
                 final_report_filename,
                 sample_map_filename,
-                sample_group_name)
+                platform_id,
+                sample_group_name,
+            )
 
             # perform a 303 redirect to the URL that uniquely identifies this run
             new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
@@ -521,7 +537,7 @@ def sample_data_import_html():
 
 
 @celery.task(name='sample_data_import_task')
-def sample_data_import_task(platform_id, final_report_filename, sample_map_filename, sample_group_name):
+def sample_data_import_task(generate_ids, on_duplicate, final_report_filename, sample_map_filename, platform_id, sample_group_name):
     """
     Our long-running import task, triggered from the import page of the app
     """
@@ -529,7 +545,7 @@ def sample_data_import_task(platform_id, final_report_filename, sample_map_filen
         db = mds.get_db()
         tags = [sample_group_name, platform_id]
         sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
-        finalin.import_final_report(final_report_filename, sample_anno_dicts, platform_id, tags, db)
+        finalin.import_final_report(generate_ids, on_duplicate, final_report_filename, sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
         try:
@@ -1765,33 +1781,33 @@ def gemm_intens_html(mongo_id):
 
 
 #####################################################################
-# CANONICAL IDs
+# UNIQUE IDs
 #####################################################################
 
 
-@app.route('/generate-canonical-ids.html', methods=['GET', 'POST'])
-def generate_canonical_ids():
+@app.route('/generate-unique-ids.html', methods=['GET', 'POST'])
+def generate_unique_ids():
     user = flask.g.user
     if user is None:
         return None
     else:
         num_ids = 1
         id_prefix = ''
-        canonical_ids = []
+        unique_ids = []
         if flask.request.method == 'POST':
             db = mds.get_db()
             form = flask.request.form
             num_ids = int(form['num-ids'])
             id_prefix = form['id-prefix']
-            canonical_ids = [mds.gen_unique_id(db) for _ in range(num_ids)]
+            unique_ids = [mds.gen_unique_id(db) for _ in range(num_ids)]
             if id_prefix:
-                canonical_ids = [id_prefix + ':' + x for x in canonical_ids]
+                unique_ids = [id_prefix + ':' + x for x in unique_ids]
 
         return flask.render_template(
-            'generate-canonical-ids.html',
+            'generate-unique-ids.html',
             num_ids=num_ids,
             id_prefix=id_prefix,
-            canonical_ids=canonical_ids,
+            unique_ids=unique_ids,
         )
 
 

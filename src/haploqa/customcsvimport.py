@@ -67,7 +67,8 @@ def import_samples(platform, geno_matrix_csv, x_matrix_csv, y_matrix_csv, sample
                         'snps': ['-'] * curr_snp_count,
                     }
                 curr_sample = {
-                    'sample_id': sample_name,
+                    'sample_id': mds.gen_unique_id(db),
+                    'other_ids': [sample_name],
                     'platform_id': platform,
                     'chromosome_data': chr_dict,
                     'tags': sample_tags,
@@ -94,11 +95,7 @@ def import_samples(platform, geno_matrix_csv, x_matrix_csv, y_matrix_csv, sample
 
             for curr_sample in samples:
                 mds.post_proc_sample(curr_sample)
-                db.samples.replace_one(
-                    {'sample_id': curr_sample['sample_id']},
-                    curr_sample,
-                    upsert=True,
-                )
+                db.samples.insert_one(curr_sample)
             print('inserted samples:', ', '.join(sample_names))
 
         curr_sample_start_index += SAMPLE_BATCH_SIZE

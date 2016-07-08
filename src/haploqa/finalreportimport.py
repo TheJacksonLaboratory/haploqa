@@ -1,10 +1,13 @@
 import argparse
 import csv
 from os.path import splitext, basename
+import sys
 import time
 
 import haploqa.mongods as mds
 import haploqa.sampleannoimport as sai
+
+from pymongo.errors import DuplicateKeyError
 
 header_tag = '[header]'
 data_tag = '[data]'
@@ -23,7 +26,46 @@ data_col_hdrs = {
 }
 
 
-def import_final_report(final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
+def import_final_report(generate_ids, on_duplicate, final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
+
+    def save_sample(samp):
+        if samp is not None:
+            try:
+                samp = sai.merge_dicts(samp, sample_anno_dicts[samp['sample_id']])
+            except KeyError:
+                pass
+
+            if generate_ids:
+                # if we're asked to generate IDs we move the sample ID into "other_ids"
+                samp['other_ids'] = [samp['sample_id']]
+                samp['sample_id'] = mds.gen_unique_id(db)
+            else:
+                samp['other_ids'] = []
+
+            mds.post_proc_sample(samp)
+
+            if on_duplicate == 'replace':
+                update_res = db.samples.replace_one(
+                    {'sample_id': samp['sample_id']},
+                    samp,
+                    upsert=True,
+                )
+                if update_res.upserted_id is None:
+                    print('replaced sample with canonical ID:', samp['sample_id'])
+            else:
+                try:
+                    db.samples.insert_one(samp)
+                except DuplicateKeyError:
+                    if on_duplicate == 'skip':
+                        print('skipping insert of duplicate sample with canonical ID:', samp['sample_id'])
+                    else:
+                        print(
+                            'halting import after detecting duplicate canonical ID:',
+                            samp['sample_id'],
+                            file=sys.stderr,
+                        )
+                        raise
+
     platform_chrs, snp_count_per_chr, snp_chr_indexes = mds.within_chr_snp_indices(platform_id, db)
 
     prev_time = time.time()
@@ -32,7 +74,6 @@ def import_final_report(final_report_file, sample_anno_dicts, platform_id, sampl
 
         final_report_table = csv.reader(final_report_handle, delimiter='\t')
 
-        samples = db.samples
         curr_section = data_tag
         data_header_indexes = None
         curr_sample = None
@@ -88,25 +129,19 @@ def import_final_report(final_report_file, sample_anno_dicts, platform_id, sampl
                             allele2_fwd = string_val(allele2_fwd_col_hdr)
 
                             if curr_sample is None or sample_id != curr_sample['sample_id']:
+                                # if we've seen this ID before it means that rows are not grouped by sample ID
                                 if sample_id in all_sample_ids:
                                     raise Exception('Final report must be grouped by sample ID but it is not')
 
+                                # we hit a new sample so at this point we commit the curr_sample to the
+                                # DB and move on to building a new sample
                                 all_sample_ids.add(sample_id)
-
-                                if curr_sample is not None:
-                                    mds.post_proc_sample(curr_sample)
-                                    samples.replace_one(
-                                        {'sample_id': curr_sample['sample_id']},
-                                        curr_sample,
-                                        upsert=True,
-                                    )
+                                save_sample(curr_sample)
 
                                 curr_time = time.time()
                                 print('took {:.1f} sec. importing sample: {}'.format(curr_time - prev_time, sample_id))
                                 prev_time = curr_time
 
-                                # curr_sample = samples.find_one({'sample_id': sample_id})
-                                # if curr_sample is None:
                                 chr_dict = dict()
                                 for chr in platform_chrs:
                                     curr_snp_count = snp_count_per_chr[chr]
@@ -147,18 +182,25 @@ def import_final_report(final_report_file, sample_anno_dicts, platform_id, sampl
                                     'allele2_fwd': allele2_fwd,
                                 })
 
-        if curr_sample is not None:
-            try:
-                curr_sample = sai.merge_dicts(curr_sample, sample_anno_dicts[curr_sample['sample_id']])
-            except KeyError:
-                pass
-            mds.post_proc_sample(curr_sample)
-            samples.insert_one(curr_sample)
+        save_sample(curr_sample)
 
 
 def main():
     # parse command line arguments
     parser = argparse.ArgumentParser(description='import the final report with probe intensities')
+    parser.add_argument(
+        '--generate-ids',
+        action='store_true',
+        help='this option indicates that the "Sample ID" column should be treated as a non-canonical identifier and '
+             'a canonical ID will be automatically generated for each sample',
+    )
+    parser.add_argument(
+        '--on-duplicate',
+        choices=['halt', 'skip', 'replace'],
+        help='this option is only meaningful if --canonical-ids is also set. This indicates what action to take if a '
+             'duplicate canonical ID is encountered during import: halt the import process with an error message, '
+             'skip the sample with a warning message or replace the existing sample with a warning',
+    )
     parser.add_argument(
         'platform',
         help='the platform for the data we are importing. eg: MegaMUGA')
@@ -180,7 +222,14 @@ def main():
         sample_anno_dicts = sai.merge_dicts(sample_anno_dicts, curr_dicts)
 
     report_name = splitext(basename(args.final_report))[0]
-    import_final_report(args.final_report, sample_anno_dicts, args.platform, [report_name, args.platform], mds.init_db())
+    import_final_report(
+        args.generate_ids,
+        args.on_duplicate,
+        args.final_report,
+        sample_anno_dicts,
+        args.platform,
+        [report_name, args.platform],
+        mds.init_db())
 
 
 if __name__ == '__main__':

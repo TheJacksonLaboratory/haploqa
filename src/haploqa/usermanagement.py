@@ -1,15 +1,12 @@
 from email.mime.text import MIMEText
 import flask
+from haploqa.config import HAPLOQA_CONFIG
 import haploqa.mongods as mds
 from hashlib import sha512
 from os import EX_USAGE
 import smtplib
 import socket
 from uuid import uuid4
-
-
-MIN_PASSWORD_LENGTH = 8
-SMTP_SERVER = 'smtp.jax.org'
 
 
 def hash_str(s):
@@ -106,7 +103,7 @@ def invite_admin(email_address, db=None):
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
-    s = smtplib.SMTP(SMTP_SERVER)
+    s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
     s.sendmail(from_addr, [email_address], msg.as_string())
     s.quit()
 
@@ -147,7 +144,7 @@ def reset_password(email_address, db=None):
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
-    s = smtplib.SMTP(SMTP_SERVER)
+    s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
     s.sendmail(from_addr, [user['email_address']], msg.as_string())
     s.quit()
 
@@ -184,8 +181,8 @@ def main():
     print('Creating a new admin user...')
     email = input('E-mail Address: ')
     password = input('password: ')
-    if len(password) < MIN_PASSWORD_LENGTH:
-        print('Please use a password containing at least {} characters.'.format(MIN_PASSWORD_LENGTH))
+    if len(password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
+        print('Please use a password containing at least {} characters.'.format(HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']))
         exit(EX_USAGE)
     else:
         _create_admin(email, password)

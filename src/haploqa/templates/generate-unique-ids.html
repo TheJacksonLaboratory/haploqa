@@ -2,16 +2,19 @@
 
 {% extends "layout.html" %}
 
-{% block title %}Generate Canonical IDs{% endblock %}
+{% block title %}Generate Unique IDs{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Generate Canonical IDs</h1>
+    <h1>Generate Unique IDs</h1>
 </div>
 
 <p>
-    This page will simply generate a list of canonical IDs that are guaranteed to be unique within
-    the context of this application.
+    This page will simply generate a list of unique IDs that are guaranteed to be unique within
+    the context of this application and are therefore suitable for assignment to samples and
+    organisms. The prefix is optional and the uniqueness of the IDs does not depend on this prefix,
+    so there is no risk of ID conflicts in cases where the suffix needs to be modified after
+    ID generation.
 </p>
 
 <form class="form-horizontal" method="post">
@@ -38,18 +41,18 @@
     </div>
 </form>
 
-{% if canonical_ids %}
+{% if unique_ids %}
     <div class="row">
         <div class="col-md-12">
             <table class="table table-striped">
                 <thead>
                 <tr>
-                    <th>Canonical IDs</th>
+                    <th>Unique IDs</th>
                 </tr>
                 </thead>
                 <tbody>
-                    {% for canonical_id in canonical_ids %}
-                    <tr><td>{{ canonical_id }}</td></tr>
+                    {% for unique_id in unique_ids %}
+                    <tr><td>{{ unique_id }}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

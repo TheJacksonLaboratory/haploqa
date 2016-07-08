@@ -1,29 +1,12 @@
 import pymongo
-
+from haploqa.config import HAPLOQA_CONFIG
 
 DB_NAME = 'haploqa'
-SCHEMA_VERSION = 0, 0, 3
-
-
-# this list of characters represents the full range of characters we
-# allow ourselves to use when generating unique IDs. We want our IDs
-# to have two properties:
-#
-# 1) all characters used should be easy to visually distinguish. For this reason we exclude
-#    '1', 'L', '0' and 'O'. We also limit ourselves to upper-case.
-# 2) they should be short so that they're easy to remember and don't take up too much space.
-#    Using almost all of the upper-case alphanumeric characters in our alphabet helps us
-#    generate short IDs
-#
-# The full alphabet we use is [0-9] + [A-H] + [J-K] + [M, N] + [P-Z] for a total of 32 characters
-UNIQUE_ID_ALPHABET = sorted(
-    set(list(map(str, range(2, 10))) + list(map(chr, range(ord('A'), ord('Z') + 1)))) -
-    {'I', 'L', 'O'}
-)
+SCHEMA_VERSION = 0, 0, 2
 
 
 def base10_id_to_alphabet_id(base10_id):
-    alphabet_base = len(UNIQUE_ID_ALPHABET)
+    alphabet_base = len(HAPLOQA_CONFIG['UNIQUE_ID_ALPHABET'])
     alphabet_int_list = []
     curr_val = base10_id
     while True:
@@ -33,7 +16,7 @@ def base10_id_to_alphabet_id(base10_id):
         if curr_val == 0:
             break
 
-    return ''.join(UNIQUE_ID_ALPHABET[x] for x in reversed(alphabet_int_list))
+    return ''.join(HAPLOQA_CONFIG['UNIQUE_ID_ALPHABET'][x] for x in reversed(alphabet_int_list))
 
 
 def gen_unique_id(db=None):
@@ -73,7 +56,7 @@ def get_db():
     Gets a reference to the HaploQA database
     :return: the DB
     """
-    client = pymongo.MongoClient('localhost', 27017)
+    client = pymongo.MongoClient(HAPLOQA_CONFIG['DB_HOST'], HAPLOQA_CONFIG['DB_PORT'])
     return client[DB_NAME]
 
 
@@ -107,8 +90,9 @@ def init_db(db=None):
     if db is None:
         db = get_db()
 
-    db.meta.replace_one({}, {'schema_version': SCHEMA_VERSION}, upsert=True)
-    db.samples.create_index('canonical_id', unique=True)
+    if not db.meta.count():
+        db.meta.replace_one({}, {'schema_version': SCHEMA_VERSION}, upsert=True)
+    db.samples.create_index('sample_id', unique=True)
     db.samples.create_index('other_ids')
     db.samples.create_index('tags')
     db.samples.create_index([

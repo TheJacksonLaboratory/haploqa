@@ -251,7 +251,7 @@
                 <thead>
                 <tr>
                     <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" checked></th>
-                    <th>Sample ID</th>
+                    <th>ID (Secondary IDs)</th>
                     <th>Standard Designation</th>
                     <th>Sex</th>
                     <th>Platform</th>
@@ -273,6 +273,9 @@
                                 {% endif %}
                                 {{ sample.sample_id }}
                             </a>
+                            {% if sample.other_ids %}
+                                ({% for other_id in sample.other_ids %}{{ other_id }}{% if not loop.last %}, {% endif %}{% endfor %})
+                            {% endif %}
                         </td>
                         <td>
                             {% if sample.standard_designation %}
