@@ -31,6 +31,8 @@ def upgrade_from_0_0_1(db):
                 },
             },
         )
+    db.samples.drop_index('sample_id_1')
+    db.samples.create_index('sample_id', unique=True)
     db.samples.create_index('other_ids')
 
     db.meta.update_one(
@@ -42,7 +44,6 @@ def upgrade_from_0_0_1(db):
 SCHEMA_UPGRADE_FUNCTIONS = [
     ((0, 0, 0), upgrade_from_0_0_0),
     ((0, 0, 1), upgrade_from_0_0_1),
-    # ((0, 0, 2), upgrade_from_0_0_2),
 ]
 
 
@@ -67,6 +68,7 @@ def main():
                 print('upgrading schema from version:', mds.version_to_str(from_version))
                 conversion_func(db)
 
+    mds.init_db(db)
     print(
         'successfully upgraded schema to version:',
         mds.version_to_str(mds.get_schema_version(db)),
