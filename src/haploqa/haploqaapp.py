@@ -275,9 +275,9 @@ def validate_reset(password_reset_id):
 
     if flask.request.method == 'POST':
         new_password = form['password']
-        if len(new_password) < usrmgmt.MIN_PASSWORD_LENGTH:
+        if len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
             flask.flash('The given password is too short. It must contain at least {} characters.'.format(
-                usrmgmt.MIN_PASSWORD_LENGTH
+                HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']
             ))
             return flask.render_template('validate-reset.html', reset_user=user_to_reset)
         else:
@@ -316,9 +316,9 @@ def change_password_html():
             form = flask.request.form
             old_password = form['old-password']
             new_password = form['new-password']
-            if len(new_password) < usrmgmt.MIN_PASSWORD_LENGTH:
+            if len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
                 flask.flash('The given password is too short. It must contain at least {} characters.'.format(
-                    usrmgmt.MIN_PASSWORD_LENGTH
+                    HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']
                 ))
                 return flask.render_template('change-password.html')
             else:
