@@ -1,39 +1,67 @@
 #!/usr/bin/Rscript
+library(methods)
+library(h5)
 
-dump.all <- function(inDir = NULL, outDir = NULL) {
-    if (is.null(inDir) || is.na(outDir))
+sampleFilePattern <- "^(.+)\\.genotype\\.probs\\.Rdata$"
+codeStrainList <- list(
+    A='A/J',
+    B='C57BL/6J',
+    C='129S1/SvImJ',
+    D='NOD/ShiLtJ',
+    E='NZO/HlLtJ',
+    F='CAST/EiJ',
+    G='PWK/PhJ',
+    H='WSB/EiJ'
+)
+ccDiploCodeToStrains <- function(ccDiploCode) {
+    code1 <- substr(ccDiploCode, 1, 1)
+    code2 <- substr(ccDiploCode, 2, 2)
+
+    c(codeStrainList[[code1]], codeStrainList[[code2]])
+}
+
+dump.all <- function(platform, inDir, outFile) {
+    if (is.null(inDir) || is.na(outFile))
         stop("inDir can't be null or NA")
     if (!file.info(inDir)$isdir)
         stop("inDir must be a directory")
-    
-    if (is.null(outDir) || is.na(outDir))
-        stop("outDir can't be null or NA")
-    if (!file.exists(outDir))
-        dir.create(outDir)
-    if (!file.info(outDir)$isdir)
-        stop("outDir must be a directory")
-    
-    for (f in list.files(inDir, pattern="\\.rdata$", recursive=T, ignore.case=T)) {
-        currFile <- file.path(inDir, f)
-        outFile <- file.path(outDir, f)
-		outFile <- paste(substr(outFile, 0, nchar(outFile) - 6), '.txt', sep='')
-        if (file.exists(outFile))
-            stop(paste("refusing to overwrite", outFile))
 
-		cat(paste('processing:', currFile), sep='\n')
-		load(currFile)
-		dir.create(dirname(outFile), recursive=T, showWarnings=F)
-		mode(prsmth) <- "character"
-		prsmth <- cbind(rownames(prsmth), prsmth)
-		prsmth <- rbind(colnames(prsmth), prsmth)
-		prsmth[1, 1] <- "snp_id"
-		write.table(prsmth, file=outFile, sep = "\t", row.names=F, col.names=F)
-		rm("prsmth")
+    dir.create(dirname(outFile), recursive=T, showWarnings=F)
+    genoProbH5 <- h5file(outFile, 'a')
+    currSampleIndex <- length(list.groups(genoProbH5['samples']))
+    currFileIndex <- 1
+    allFiles <- list.files(inDir, pattern=sampleFilePattern, recursive=T, ignore.case=T)
+    for (f in allFiles) {
+        sampleName <- gsub(sampleFilePattern, "\\1", f)
+        sampleName <- gsub('.', '-', sampleName, fixed=T)
+
+        currFile <- file.path(inDir, f)
+        cat(paste('processing file', currFileIndex, 'of', length(allFiles), currFile), sep='\n')
+
+        load(currFile)
+
+        diplotypeCodes <- colnames(prsmth)
+        diplotypeStrains <- matrix("", nrow=length(diplotypeCodes), ncol=2)
+        for(i in seq_along(diplotypeCodes)) {
+            diplotypeStrains[i, ] <- ccDiploCodeToStrains(diplotypeCodes[i])
+        }
+
+        genoProbH5[paste("samples", currSampleIndex, "sample_id", sep="/")] <- sampleName
+        genoProbH5[paste("samples", currSampleIndex, "platform", sep="/")] <- platform
+        genoProbH5[paste("samples", currSampleIndex, "probeset_ids", sep="/")] <- rownames(prsmth)
+        genoProbH5[paste("samples", currSampleIndex, "diplotype_strains", sep="/")] <- diplotypeStrains
+        genoProbH5[paste("samples", currSampleIndex, "diplotype_probabilities", sep="/")] <- t(prsmth)
+
+        rm("prsmth")
+        currSampleIndex <- currSampleIndex + 1
+        currFileIndex <- currFileIndex + 1
     }
+
+    h5close(genoProbH5)
 }
 
 cmdArgs <- commandArgs(trailingOnly=T)
-if(length(cmdArgs) != 2)
-    stop("Usage: dumpgenoprobs.R IN_DIR OUT_DIR")
+if(length(cmdArgs) != 3)
+    stop("Usage: dumpgenoprobs.R PLATFORM IN_DIR OUT_FILE")
 
-dump.all(cmdArgs[1], cmdArgs[2])
+dump.all(cmdArgs[1], cmdArgs[2], cmdArgs[3])
