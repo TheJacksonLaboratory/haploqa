@@ -34,6 +34,7 @@ dump.all <- function(platform, inDir, outFile) {
     for (f in allFiles) {
         sampleName <- gsub(sampleFilePattern, "\\1", f)
         sampleName <- gsub('.', '-', sampleName, fixed=T)
+        sampleName <- gsub('^JAC', '', sampleName)
 
         currFile <- file.path(inDir, f)
         cat(paste('processing file', currFileIndex, 'of', length(allFiles), currFile), sep='\n')
