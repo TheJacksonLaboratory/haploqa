@@ -1,4 +1,5 @@
 import haploqa.mongods as mds
+import pymongo
 
 
 def upgrade_from_0_0_0(db):
@@ -34,6 +35,10 @@ def upgrade_from_0_0_1(db):
     db.samples.drop_index('sample_id_1')
     db.samples.create_index('sample_id', unique=True)
     db.samples.create_index('other_ids')
+    db.diplotype_probabilities.create_index([
+        ('sample_id',   pymongo.ASCENDING),
+        ('chromosome',  pymongo.ASCENDING),
+    ])
 
     db.meta.update_one(
         {},

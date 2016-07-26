@@ -120,6 +120,10 @@ def init_db(db=None):
     ])
     db.users.create_index('email_address_lowercase', unique=True)
     db.users.create_index('password_reset_hash')
+    db.diplotype_probabilities.create_index([
+        ('sample_id',   pymongo.ASCENDING),
+        ('chromosome',  pymongo.ASCENDING)
+    ])
 
     return db
 
@@ -224,7 +228,8 @@ def within_chr_snp_indices(platform_id, db=None):
     ])
     for snp in chr_snps:
         if snp['chromosome'] != prev_chr:
-            snp_count_per_chr[prev_chr] = snp_index
+            if prev_chr is not None:
+                snp_count_per_chr[prev_chr] = snp_index
             snp_index = 0
             prev_chr = snp['chromosome']
         snp_chr_indexes[snp['snp_id']] = {

@@ -880,6 +880,8 @@ def sample_html(mongo_id):
     all_tags = db.samples.distinct('tags')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
 
+    #max_likelihood_genoprobs(sample['sample_id'], db)
+
     return flask.render_template(
         'sample.html',
         sample=sample,
@@ -1809,6 +1811,59 @@ def generate_unique_ids():
             id_prefix=id_prefix,
             unique_ids=unique_ids,
         )
+
+
+#####################################################################
+# GENOTYPE PROBABILITIES
+#####################################################################
+
+
+def max_likelihood_genoprobs(sample_id, db=None):
+
+    if db is None:
+        db = mds.get_db()
+
+    diplo_prob_platform = db.diplotype_probabilities.find_one({'sample_id': sample_id}, {'platform_id': 1})
+
+    if diplo_prob_platform is not None:
+        platform_obj = db.platforms.find_one({'platform_id': diplo_prob_platform['platform_id']})
+        if platform_obj is None:
+            raise Exception('failed to find a platform named "{}".'.format(diplo_prob_platform['platform_id']))
+        platform_chrs = platform_obj['chromosomes']
+        for chrom in platform_chrs:
+            max_likelihood_chr_genoprobs(sample_id, chrom, db)
+
+
+def max_likelihood_chr_genoprobs(sample_id, chrom, db):
+    print('======', chrom, '=======')
+    ml_diplotype_indices = []
+    ml_positions_bp = []
+    sample_genoprob = db.diplotype_probabilities.find_one({'sample_id': sample_id, 'chromosome': chrom})
+    if sample_genoprob:
+        snps = list(mds.get_snps(sample_genoprob['platform_id'], sample_genoprob['chromosome']))
+        if snps:
+            diplo_strains = sample_genoprob['diplotype_strains']
+            diplo_genoprobs = sample_genoprob['diplotype_probabilities']
+            prev_start_pos_bp = snps[0]['position_bp']
+            prev_max_likelihood_diplo = np.argmax(diplo_genoprobs[0])
+            ml_diplotype_indices.append(prev_max_likelihood_diplo)
+            ml_positions_bp.append(prev_start_pos_bp)
+            i = 0
+
+            for i, snp_genoprobs in enumerate(diplo_genoprobs):
+                curr_max_likelihood_diplo = np.argmax(snp_genoprobs)
+                if curr_max_likelihood_diplo != prev_max_likelihood_diplo and not math.isnan(snp_genoprobs[curr_max_likelihood_diplo]):
+                    # since we don't know exactly where the maximum likelihood diplotype has changed we'll choose a
+                    # point half way between the previous and current position
+                    ml_diplotype_indices.append(curr_max_likelihood_diplo)
+                    ml_positions_bp.append((snps[i - 1]['position_bp'] + snps[i]['position_bp']) / 2.0)
+                    prev_max_likelihood_diplo = curr_max_likelihood_diplo
+
+            ml_positions_bp.append(snps[i]['position_bp'])
+            ml_diplotypes = [diplo_strains[i] for i in ml_diplotype_indices]
+
+            print(ml_positions_bp)
+            print(ml_diplotypes)
 
 
 if __name__ == '__main__':
