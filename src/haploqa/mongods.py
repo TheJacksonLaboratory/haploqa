@@ -2,7 +2,7 @@ import pymongo
 from haploqa.config import HAPLOQA_CONFIG
 
 DB_NAME = 'haploqa'
-SCHEMA_VERSION = 0, 0, 2
+SCHEMA_VERSION = 0, 0, 3
 
 
 def base10_id_to_alphabet_id(base10_id):
@@ -100,6 +100,7 @@ def init_db(db=None):
         ('sample_id',   pymongo.ASCENDING),
     ])
     db.samples.create_index('standard_designation')
+    db.samples.create_index('contributing_strains')
     db.samples.create_index('sex')
     db.samples.create_index('pos_ctrl_eng_tgts')
     db.samples.create_index('neg_ctrl_eng_tgts')
@@ -124,6 +125,7 @@ def init_db(db=None):
         ('sample_id',   pymongo.ASCENDING),
         ('chromosome',  pymongo.ASCENDING)
     ])
+    db.standard_designations.create_index('standard_designation')
 
     return db
 

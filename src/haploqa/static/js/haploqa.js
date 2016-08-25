@@ -424,8 +424,9 @@ function HaploKaryoPlot(params) {
 
     var cachedHaplotypeData = null;
     var cachedHaplotypeColors = {};
+    var cachedStrainNames = null;
     var plotContentsGroup = svg.append("g").attr("class", "plot-contents");
-    this.updateHaplotypes = function(haploData, haplotypeColors) {
+    this.updateHaplotypes = function(haploData, haplotypeColors, strainNames) {
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
@@ -436,6 +437,12 @@ function HaploKaryoPlot(params) {
             haplotypeColors = cachedHaplotypeColors;
         } else {
             cachedHaplotypeColors = haplotypeColors;
+        }
+
+        if(typeof strainNames == 'undefined') {
+            strainNames = cachedStrainNames;
+        } else {
+            cachedStrainNames = strainNames;
         }
 
         plotContentsGroup.selectAll("*").remove();
@@ -477,6 +484,11 @@ function HaploKaryoPlot(params) {
 
             if(haplos.haplotype_blocks) {
                 haplos.haplotype_blocks.forEach(function(currHaplo) {
+                    var currStrain1 = haploData.contributing_strains[currHaplo.haplotype_index_1];
+                    var currStrainIdx1 = strainNames.indexOf(currStrain1);
+                    var currStrain2 = haploData.contributing_strains[currHaplo.haplotype_index_2];
+                    var currStrainIdx2 = strainNames.indexOf(currStrain2);
+
                     var currHaploStart;
                     var currHaploEnd;
                     if(intervalMode) {
@@ -492,9 +504,7 @@ function HaploKaryoPlot(params) {
                     }
 
                     var currRect;
-                    var currHapID;
                     if(currHaplo.haplotype_index_1 === currHaplo.haplotype_index_2) {
-                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
                         currRect = plotContentsGroup.append("rect")
                             .attr("class", "bar")
                             .attr("x", genomeScale(currHaploStart))
@@ -503,22 +513,21 @@ function HaploKaryoPlot(params) {
                             .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
                             .attr("height", chrOrdinalScale.rangeBand() / 2.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
-                            .attr("class", "hap hap" + currHapID)
+                            .attr("class", "hap hap" + currStrainIdx1)
                             .on("mouseover", function() {
                                 if(self.mouseOverHaplotype !== null) {
-                                    self.mouseOverHaplotype(currHaplo.haplotype_index_1, haploData);
+                                    self.mouseOverHaplotype(currStrain1);
                                 }
                             }).on("mouseout", function() {
                                 if(self.mouseOutHaplotype !== null) {
-                                    self.mouseOutHaplotype(currHaplo.haplotype_index_1, haploData);
+                                    self.mouseOutHaplotype(currStrain1);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currHapID)) {
-                            currRect.style('fill', haplotypeColors[currHapID]);
+                        if(haplotypeColors.hasOwnProperty(currStrain1)) {
+                            currRect.style('fill', haplotypeColors[currStrain1]);
                         }
                     } else {
                         // TODO these bars may be flipped!
-                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_1].obj_id;
                         currRect = plotContentsGroup.append("rect")
                             .attr("class", "bar")
                             .attr("x", genomeScale(currHaploStart))
@@ -527,21 +536,20 @@ function HaploKaryoPlot(params) {
                             .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
                             .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
-                            .attr("class", "hap hap" + currHapID)
+                            .attr("class", "hap hap" + currStrainIdx1)
                             .on("mouseover", function() {
                                 if(self.mouseOverHaplotype !== null) {
-                                    self.mouseOverHaplotype(currHaplo.haplotype_index_1, haploData);
+                                    self.mouseOverHaplotype(currStrain1);
                                 }
                             }).on("mouseout", function() {
                                 if(self.mouseOutHaplotype !== null) {
-                                    self.mouseOutHaplotype(currHaplo.haplotype_index_1, haploData);
+                                    self.mouseOutHaplotype(currStrain1);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currHapID)) {
-                            currRect.style('fill', haplotypeColors[currHapID]);
+                        if(haplotypeColors.hasOwnProperty(currStrain1)) {
+                            currRect.style('fill', haplotypeColors[currStrain1]);
                         }
 
-                        currHapID = haploData.haplotype_samples[currHaplo.haplotype_index_2].obj_id;
                         currRect = plotContentsGroup.append("rect")
                             .attr("class", "bar")
                             .attr("x", genomeScale(currHaploStart))
@@ -550,18 +558,18 @@ function HaploKaryoPlot(params) {
                             .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0))
                             .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
-                            .attr("class", "hap hap" + currHapID)
+                            .attr("class", "hap hap" + currStrainIdx2)
                             .on("mouseover", function() {
                                 if(self.mouseOverHaplotype !== null) {
-                                    self.mouseOverHaplotype(currHaplo.haplotype_index_2, haploData);
+                                    self.mouseOverHaplotype(currStrain2);
                                 }
                             }).on("mouseout", function() {
                                 if(self.mouseOutHaplotype !== null) {
-                                    self.mouseOutHaplotype(currHaplo.haplotype_index_2, haploData);
+                                    self.mouseOutHaplotype(currStrain2);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currHapID)) {
-                            currRect.style('fill', haplotypeColors[currHapID]);
+                        if(haplotypeColors.hasOwnProperty(currStrain2)) {
+                            currRect.style('fill', haplotypeColors[currStrain2]);
                         }
                     }
                 });

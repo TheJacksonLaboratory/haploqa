@@ -7,24 +7,8 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
     <script>
         var allTags = {{ all_tags|tojson }};
-        var haplotypeSamples = {{ haplotype_samples|tojson }};
-        var platformIDs = {{ platform_ids | tojson }};
-        function haploLbl(haploSample) {
-            var lbl = haploSample.standard_designation ? haploSample.standard_designation : haploSample.sample_id;
-            if(platformIDs.length > 1 && haploSample.platform_id) {
-                // since there are multiple platforms we need to let the user know which
-                // platform each haplotype sample belongs to
-                lbl += ' (' + haploSample.platform_id + ')';
-            }
-
-            return lbl;
-        }
-        var haplotypeTokens = haplotypeSamples.map(function(haploSample) {
-            return {
-                label: haploLbl(haploSample),
-                value: haploSample._id
-            }
-        });
+        var strainColors = {{ strain_colors|tojson }};
+        var strainNames = $.map(strainColors, function(color, strainName) {return strainName});
         $(function() {
             var tagActionDropdown = new BootstrapDropdown($('#tag-action-dropdown'));
             var contribStrainsActionDropdown = new BootstrapDropdown($('#contrib-strains-action-dropdown'));
@@ -50,7 +34,7 @@
             var contribStrainTokensInput = $('#contributing-strains');
             contribStrainTokensInput.tokenfield({
                 autocomplete: {
-                    source: haplotypeTokens,
+                    source: strainNames,
                     delay: 100,
                     autoFocus: true
                 },
@@ -61,8 +45,8 @@
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
                 var value = e.attrs.value;
 
-                return haplotypeTokens.some(function(samp) {
-                    return samp.value === value;
+                return strainNames.some(function(samp) {
+                    return samp === value;
                 });
             });
 
@@ -268,8 +252,8 @@
                         <td data-display-when="sample-edit" style="display: none;"><input data-sample-id="{{ sample._id }}" type="checkbox" checked></td>
                         <td>
                             <a href="{{ url_for('sample_html', mongo_id=sample._id) }}">
-                                {% if 'haplotype-strain' in sample.tags %}
-                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span>
+                                {% if sample.haplotype_candidate %}
+                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ strain_colors[sample.standard_designation] }};"></span>
                                 {% endif %}
                                 {{ sample.sample_id }}
                             </a>

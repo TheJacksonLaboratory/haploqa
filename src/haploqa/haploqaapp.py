@@ -8,6 +8,7 @@ import math
 import numpy as np
 import os
 import pymongo
+import sys
 import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
@@ -95,10 +96,6 @@ print('"How to generate good secret keys" AT			  ')
 print('http://flask.pocoo.org/docs/quickstart/ FOR DETAILS')
 print('===================================================')
 app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\xa1\xab\x0f'
-
-
-# special sample tag used to mark a strain as a potential haplotype
-HAPLOTYPE_TAG = 'haplotype-strain'
 
 
 #####################################################################
@@ -422,7 +419,7 @@ def sample_data_export_html():
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     samples = list(samples)
-    platform_ids, haplotype_samples = _get_platform_haplotypes(db, samples)
+    platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
     all_tags = db.samples.distinct('tags')
 
     return flask.render_template(
@@ -430,8 +427,7 @@ def sample_data_export_html():
             samples=samples,
             all_tags=all_tags,
             platform_ids=platform_ids,
-            haplotype_samples=haplotype_samples)
-
+    )
 
 @app.route('/sample-data-export.txt', methods=['POST'])
 def sample_data_export_file():
@@ -562,27 +558,8 @@ def sample_data_import_task(generate_ids, on_duplicate, final_report_filename, s
 # SAMPLE LISTING PAGES
 #####################################################################
 
-def _get_platform_haplotypes(db, samples):
-    platform_ids = set()
-    for sample in samples:
-        platform = sample.get('platform_id', None)
-        if platform:
-            platform_ids.add(platform)
-    platform_ids = list(platform_ids)
-
-    # haplotype_samples = db.samples.find(
-    #     {'tags': HAPLOTYPE_TAG, 'platform_id': {'$in': platform_ids}},
-    #     {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
-    # )
-    haplotype_samples = db.samples.find(
-        {'tags': HAPLOTYPE_TAG, 'platform_id': platform_ids[0]},
-        {'chromosome_data': 0, 'unannotated_snps': 0, 'viterbi_haplotypes': 0},
-    )
-    haplotype_samples = list(haplotype_samples)
-    for haplotype_sample in haplotype_samples:
-        _add_default_attributes(haplotype_sample)
-
-    return platform_ids, haplotype_samples
+def _get_strain_colors(db):
+    return {x['standard_designation']: x['color'] for x in db.standard_designations.find({})}
 
 
 @app.route('/all-samples.html')
@@ -601,15 +578,14 @@ def all_samples_html():
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     samples = list(samples)
-    platform_ids, haplotype_samples = _get_platform_haplotypes(db, samples)
     all_tags = db.samples.distinct('tags')
 
     return flask.render_template(
             'samples.html',
             samples=samples,
+            strain_colors=_get_strain_colors(db),
             all_tags=all_tags,
-            platform_ids=platform_ids,
-            haplotype_samples=haplotype_samples)
+    )
 
 
 @app.route('/tag/<escfwd:tag_id>.html')
@@ -630,15 +606,13 @@ def sample_tag_html(tag_id):
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     matching_samples = list(matching_samples)
-    platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
     all_tags = db.samples.distinct('tags')
 
     return flask.render_template(
             'sample-tag.html',
             samples=matching_samples,
+            strain_colors=_get_strain_colors(db),
             all_tags=all_tags,
-            platform_ids=platform_ids,
-            haplotype_samples=haplotype_samples,
             tag_id=tag_id)
 
 
@@ -660,15 +634,13 @@ def standard_designation_html(standard_designation):
         cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
     )
     matching_samples = list(matching_samples)
-    platform_ids, haplotype_samples = _get_platform_haplotypes(db, matching_samples)
     all_tags = db.samples.distinct('tags')
 
     return flask.render_template(
             'standard-designation.html',
             samples=matching_samples,
+            strain_colors=_get_strain_colors(db),
             all_tags=all_tags,
-            platform_ids=platform_ids,
-            haplotype_samples=haplotype_samples,
             standard_designation=standard_designation)
 
 
@@ -767,6 +739,7 @@ def _add_default_attributes(sample):
     default_to('sex', 'unknown')
     default_to('pos_ctrl_eng_tgts', [])
     default_to('neg_ctrl_eng_tgts', [])
+    default_to('haplotype_candidate', False)
 
 
 def _find_and_anno_samples(query, projection, db=None, require_write_perms=False, cursor_func=None):
@@ -858,37 +831,15 @@ def sample_html(mongo_id):
     if sample is None:
         flask.abort(400)
 
-    haplotype_samples = db.samples.find(
-        {'tags': HAPLOTYPE_TAG, 'platform_id': sample['platform_id']},
-        {'chromosome_data': 0, 'unannotated_snps': 0},
-    )
-    haplotype_samples = list(haplotype_samples)
-    for haplotype_sample in haplotype_samples:
-        _add_default_attributes(haplotype_sample)
-
-    def contrib_strain_lbl(contrib_strain):
-        if contrib_strain['standard_designation']:
-            return contrib_strain['standard_designation']
-        else:
-            return contrib_strain['sample_id']
-    contrib_strain_tokens = [
-        {'value': x['_id'], 'label': contrib_strain_lbl(x)}
-        for x in haplotype_samples
-        if x['_id'] in sample['contributing_strains']
-    ]
-
     all_tags = db.samples.distinct('tags')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
-
-    #max_likelihood_genoprobs(sample['sample_id'], db)
 
     return flask.render_template(
         'sample.html',
         sample=sample,
-        haplotype_samples=haplotype_samples,
-        contrib_strain_tokens=contrib_strain_tokens,
         all_tags=all_tags,
         all_eng_tgts=all_eng_tgts,
+        strain_colors=_get_strain_colors(db),
     )
 
 
@@ -897,6 +848,8 @@ def _iter_to_row(iterable):
 
 
 def _contrib_strain_sample_id_list(sample, db):
+    raise Exception('TODO fix how this function works')
+
     contributing_strains = db.samples.find(
             {'_id': {'$in': sample['contributing_strains']}},
             {'sample_id': 1, 'standard_designation': 1}
@@ -1111,27 +1064,18 @@ def update_sample(mongo_id):
     if 'neg_ctrl_eng_tgts' in form:
         update_dict['neg_ctrl_eng_tgts'] = json.loads(form['neg_ctrl_eng_tgts'])
 
-    if 'contributing_strain_ids' in form or 'sex' in form:
+    if 'contributing_strains' in form or 'sex' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
         chr_ids = platform['chromosomes']
 
-        if 'contributing_strain_ids' in form:
-            new_strain_ids = json.loads(form['contributing_strain_ids'])
-            new_strain_ids = [ObjectId(x) for x in new_strain_ids[:MAX_CONTRIB_STRAIN_COUNT]]
-
-            # we need to abort if not all contributing stains have the same platform
-            for new_strain_id in new_strain_ids:
-                new_strain = _find_one_and_anno_samples({'_id': new_strain_id}, {'platform_id': 1}, db=db)
-                if new_strain is None or 'platform_id' not in new_strain or new_strain['platform_id'] != sample['platform_id']:
-                    flask.abort(403)
-            update_dict['contributing_strains'] = new_strain_ids
+        if 'contributing_strains' in form:
+            update_dict['contributing_strains'] = json.loads(form['contributing_strains'])
 
         # we invalidate any existing haplotypes before calculating new haplotypes
         haplotype_inference_uuid = str(uuid.uuid4())
         update_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
         for chr_id in chr_ids:
             update_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {
-                #'results_pending': bool(new_strain_ids)
                 'results_pending': True
             }
         update_dict['viterbi_haplotypes.informative_count'] = 0
@@ -1170,7 +1114,7 @@ def update_samples():
     sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
     tags = json.loads(form['tags'])
     tags_action = form['tags_action']
-    contributing_strain_ids = [ObjectId(x) for x in json.loads(form['contributing_strain_ids'])]
+    contributing_strains = json.loads(form['contributing_strains'])
     contributing_strains_action = form['contributing_strains_action']
     sample_visibility_action = form['sample_visibility']
 
@@ -1209,31 +1153,22 @@ def update_samples():
         elif tags_action == 'set':
             set_dict['tags'] = tags
 
-    common_platform_id = None
-    chr_ids = []
-    if contributing_strains_action in ('add', 'set'):
-        # we need to abort if not all stains have the same platform
-        for strain_id in sample_ids_to_update + contributing_strain_ids:
-            strain = _find_one_and_anno_samples({'_id': strain_id}, {'platform_id': 1}, db=db)
-            if common_platform_id is None:
-                common_platform_id = strain['platform_id']
-            elif strain is None or 'platform_id' not in strain or strain['platform_id'] != common_platform_id:
-                flask.abort(403)
-    if common_platform_id:
-        common_platform = db.platforms.find_one({'platform_id': common_platform_id})
-        chr_ids = common_platform['chromosomes']
+    chr_ids = set()
+    platform_ids = db.samples.distinct('platform_id', {'_id': {'$in': sample_ids_to_update}})
+    for curr_platform in db.platforms.find({'platform_id': {'$in': platform_ids}}):
+        chr_ids += set(curr_platform['chromosomes'])
 
     task_ids = []
-    contributing_strains_change = contributing_strain_ids or contributing_strains_action == 'set'
+    contributing_strains_change = contributing_strains or contributing_strains_action == 'set'
     if contributing_strains_change:
         if contributing_strains_action == 'add':
             add_to_set_dict['contributing_strains'] = {
-                '$each': contributing_strain_ids
+                '$each': contributing_strains
             }
         elif contributing_strains_action == 'remove':
-            remove_dict['contributing_strains'] = contributing_strain_ids
+            remove_dict['contributing_strains'] = contributing_strains
         elif contributing_strains_action == 'set':
-            set_dict['contributing_strains'] = contributing_strain_ids
+            set_dict['contributing_strains'] = contributing_strains
 
         haplotype_inference_uuid = str(uuid.uuid4())
         set_dict['haplotype_inference_uuid'] = haplotype_inference_uuid
@@ -1305,7 +1240,6 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
     snp_positions = [x['position_bp'] for x in snps]
     left_index = bisect_left(snp_positions, start_pos_bp)
     right_index = bisect_right(snp_positions, end_pos_bp, left_index)
-    #snp_limit = right_index - left_index
     snps = snps[left_index:right_index]
 
     def slice_snps(sample_to_slice):
@@ -1351,7 +1285,7 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
         haplotype_samples = list(_find_and_anno_samples(
             {
                 '_id': {'$ne': obj_id},
-                'tags': HAPLOTYPE_TAG,
+                'haplotype_candidate': True,
                 'platform_id': sample['platform_id']
             },
             {
@@ -1383,19 +1317,9 @@ def best_haplotype_candidates(sample_mongo_id_str, chr_id, start_pos_bp, end_pos
         haplo_likelihoods = haplo_likelihoods[:limit]
 
         for i, j, curr_loglikelihood in haplo_likelihoods:
-            hap1 = haplotype_samples[i]
-            hap2 = haplotype_samples[j]
             best_candidates.append({
-                'haplotype_1': {
-                    '_id': hap1['_id'],
-                    'sample_id': hap1['sample_id'],
-                    'standard_designation': hap1['standard_designation'],
-                },
-                'haplotype_2': {
-                    '_id': hap2['_id'],
-                    'sample_id': hap2['sample_id'],
-                    'standard_designation': hap2['standard_designation'],
-                },
+                'haplotype_1': haplotype_samples[i]['standard_designation'],
+                'haplotype_2': haplotype_samples[j]['standard_designation'],
                 'neg_log_likelihood': -curr_loglikelihood,
             })
 
@@ -1418,20 +1342,10 @@ def viterbi_haplotypes_json(mongo_id):
     sample = _find_one_and_anno_samples({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1}, db=db)
     if sample is None:
         flask.abort(400)
-    haplotype_samples = [
-        db.samples.find_one({'_id': x}, {'sample_id': 1, 'color': 1})
-        for x in sample['contributing_strains']
-    ]
-    for haplotype_sample in haplotype_samples:
-        _add_default_attributes(haplotype_sample)
-    haplotype_samples = [
-        {'obj_id': x['_id'], 'sample_id': x['sample_id']}
-        for x in haplotype_samples
-    ]
 
     return flask.jsonify(
         viterbi_haplotypes=sample['viterbi_haplotypes'],
-        haplotype_samples=haplotype_samples
+        contributing_strains=sample['contributing_strains'],
     )
 
 
@@ -1550,8 +1464,13 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         # nothing to do if we can't find the sample (or if the UUID has changed)
         return
 
-    if (chr_id == 'Y' and sample.get('sex', None) == 'female') or not sample['contributing_strains']:
-        # for females we just need to skip past the Y chromosome
+    platform_id = sample['platform_id']
+    platform_obj = db.platforms.find_one({'platform_id': platform_id})
+    platform_chrs = set(platform_obj['chromosomes'])
+    if ((chr_id == 'Y' and sample.get('sex', None) == 'female')
+                or not sample['contributing_strains']
+                or chr_id not in platform_chrs):
+        # if the above condition is met we're just going to delete and skip past this chromosome
         db.samples.update_one(
             {
                 # TODO add an index for this
@@ -1564,70 +1483,89 @@ def infer_haplotype_structure_task(sample_obj_id_str, chr_id, haplotype_inferenc
         )
 
     else:
-        snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+        snps = list(mds.get_snps(platform_id, chr_id, db))
         contrib_strains = [
-            db.samples.find_one({'_id': obj_id}, {'sample_id': 1, 'chromosome_data.' + chr_id: 1})
-            for obj_id in sample['contributing_strains']
+            db.samples.find_one(
+                {
+                    'haplotype_candidate': True,
+                    'standard_designation': strain_name,
+                    'platform_id': platform_id,
+                },
+                {'sample_id': 1, 'chromosome_data.' + chr_id: 1})
+            for strain_name in sample['contributing_strains']
         ]
-        contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)
-        sample_ab_codes = hhmm.samples_to_ab_codes([sample], chr_id, snps)[:, 0]
+        if None in contrib_strains:
+            for i, strain in enumerate(contrib_strains):
+                if strain is None:
+                    strain_name = sample['contributing_strains'][i]
+                    print(
+                        'Calculating diplotypes for sample "{}", chr "{}". '
+                        'Failed to find candidate haplotype strain "{}" for platform "{}".'.format(
+                            sample['sample_id'],
+                            chr_id,
+                            strain_name,
+                            platform_id),
+                        file=sys.stderr)
+        else:
+            contrib_ab_codes = hhmm.samples_to_ab_codes(contrib_strains, chr_id, snps)
+            sample_ab_codes = hhmm.samples_to_ab_codes([sample], chr_id, snps)[:, 0]
 
-        hmm = _make_hmm()
+            hmm = _make_hmm()
 
-        # run viterbi to get maximum likelihood path
-        max_likelihood_states, max_final_likelihood = hmm.viterbi(
-            haplotype_ab_codes=contrib_ab_codes,
-            observation_ab_codes=sample_ab_codes)
-        haplotype_dict = _call_concordance(
-            max_likelihood_states,
-            sample_ab_codes,
-            contrib_ab_codes,
-            snps,
-        )
+            # run viterbi to get maximum likelihood path
+            max_likelihood_states, max_final_likelihood = hmm.viterbi(
+                haplotype_ab_codes=contrib_ab_codes,
+                observation_ab_codes=sample_ab_codes)
+            haplotype_dict = _call_concordance(
+                max_likelihood_states,
+                sample_ab_codes,
+                contrib_ab_codes,
+                snps,
+            )
 
-        # convert haplotypes into coordinates representation
-        num_snps = len(snps)
-        haplotype_blocks = []
-        start_state = max_likelihood_states[0]
-        start_pos_bp = snps[0]['position_bp']
-        curr_state = None
-        for curr_index in range(1, num_snps):
-            curr_state = max_likelihood_states[curr_index]
-            if curr_state != start_state:
-                haplotype_blocks.append({
-                    'start_position_bp': start_pos_bp,
-                    'end_position_bp': snps[curr_index]['position_bp'] - 1,
-                    'haplotype_index_1': start_state[0],
-                    'haplotype_index_2': start_state[1],
-                })
+            # convert haplotypes into coordinates representation
+            num_snps = len(snps)
+            haplotype_blocks = []
+            start_state = max_likelihood_states[0]
+            start_pos_bp = snps[0]['position_bp']
+            curr_state = None
+            for curr_index in range(1, num_snps):
+                curr_state = max_likelihood_states[curr_index]
+                if curr_state != start_state:
+                    haplotype_blocks.append({
+                        'start_position_bp': start_pos_bp,
+                        'end_position_bp': snps[curr_index]['position_bp'] - 1,
+                        'haplotype_index_1': start_state[0],
+                        'haplotype_index_2': start_state[1],
+                    })
 
-                start_state = curr_state
-                start_pos_bp = snps[curr_index]['position_bp']
+                    start_state = curr_state
+                    start_pos_bp = snps[curr_index]['position_bp']
 
-        haplotype_blocks.append({
-            'start_position_bp': start_pos_bp,
-            'end_position_bp': snps[num_snps - 1]['position_bp'],
-            'haplotype_index_1': curr_state[0],
-            'haplotype_index_2': curr_state[1],
-        })
-        _extend_haplotype_blocks(haplotype_blocks)
-        haplotype_dict['haplotype_blocks'] = haplotype_blocks
-        haplotype_dict['results_pending'] = False
+            haplotype_blocks.append({
+                'start_position_bp': start_pos_bp,
+                'end_position_bp': snps[num_snps - 1]['position_bp'],
+                'haplotype_index_1': curr_state[0],
+                'haplotype_index_2': curr_state[1],
+            })
+            _extend_haplotype_blocks(haplotype_blocks)
+            haplotype_dict['haplotype_blocks'] = haplotype_blocks
+            haplotype_dict['results_pending'] = False
 
-        db.samples.update_one(
-            {
-                # TODO add an index for this
-                '_id': sample_obj_id,
-                'haplotype_inference_uuid': haplotype_inference_uuid,
-            },
-            {
-                '$set': {'viterbi_haplotypes.chromosome_data.' + chr_id: haplotype_dict},
-                '$inc': {
-                    'viterbi_haplotypes.informative_count': haplotype_dict['informative_count'],
-                    'viterbi_haplotypes.concordant_count': haplotype_dict['concordant_count'],
-                }
-            },
-        )
+            db.samples.update_one(
+                {
+                    # TODO add an index for this
+                    '_id': sample_obj_id,
+                    'haplotype_inference_uuid': haplotype_inference_uuid,
+                },
+                {
+                    '$set': {'viterbi_haplotypes.chromosome_data.' + chr_id: haplotype_dict},
+                    '$inc': {
+                        'viterbi_haplotypes.informative_count': haplotype_dict['informative_count'],
+                        'viterbi_haplotypes.concordant_count': haplotype_dict['concordant_count'],
+                    }
+                },
+            )
 
 
 CONCORDANCE_BIN_SIZE = 50

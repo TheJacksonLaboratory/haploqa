@@ -17,19 +17,14 @@
             }
         }
 
-        var haplotypeSamples = [
-            {% for haplotype_sample in haplotype_samples %}
-            {
-                label: {% if haplotype_sample.standard_designation %}{{ haplotype_sample.standard_designation|tojson }}{% else %}{{ haplotype_sample.sample_id|tojson }}{% endif %},
-                value: {{ haplotype_sample._id|tojson }}
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ];
-        var haplotypeColors = {
-            {% for haplotype_sample in haplotype_samples %}
-                {{ haplotype_sample._id|tojson }}: {{ haplotype_sample.color|tojson }}{% if not loop.last %},{% endif %}
-            {% endfor %}
-        };
+        var strainColorMap = {{ strain_colors|tojson }};
+        var strainNames = $.map(strainColorMap, function(color, strainName) {return strainName});
+        strainNames.sort();
+        var strainIndexMap = {};
+        strainNames.forEach(function(strainName, i) {
+            strainIndexMap[strainName] = i;
+        });
+
         var sampleID = {{ sample.sample_id|tojson }};
         var sex = {{ sample.sex|tojson }};
         if(sex === null) {
@@ -38,7 +33,6 @@
         var allTags = {{ all_tags|tojson }};
         var sample = {{ sample|tojson }};
         var allEngTgts = {{ all_eng_tgts|tojson }};
-        var contribStrainTokens = {{ contrib_strain_tokens|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
 
         $(function() {
@@ -77,11 +71,12 @@
                         $.getJSON(candHapURL, function(data) {
                             candidateHaplotypeTableBody.empty();
                             data.best_candidates.forEach(function(currCandidate) {
-                                function makeHapLink(hap) {
+                                function makeHapLink(strainName) {
+                                    var strainIdx = strainNames.indexOf(strainName);
                                     var haploLink = $(
-                                            '<a href="' + encURIComp(hap._id) + '.html" class="hap hap' + hap._id + '">'
-                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[hap._id] + ';"></span>'
-                                            + escapeHtml(hap.standard_designation ? hap.standard_designation : hap.sample_id)
+                                            '<a href="' + encURIComp(strainName) + '.html" class="hap hap' + strainIdx + '">'
+                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainColorMap[strainName] + ';"></span>'
+                                            + escapeHtml(strainName)
                                             + '</a>');
                                     return haploLink;
                                 }
@@ -90,7 +85,7 @@
 
                                 var labelsTD = $(document.createElement('td'));
                                 labelsTD.append(makeHapLink(currCandidate.haplotype_1));
-                                if(currCandidate.haplotype_1._id !== currCandidate.haplotype_2._id) {
+                                if(currCandidate.haplotype_1 !== currCandidate.haplotype_2) {
                                     labelsTD.append($(document.createTextNode(' | ')));
                                     labelsTD.append(makeHapLink(currCandidate.haplotype_2));
                                 }
@@ -299,6 +294,8 @@
                 });
                 sample.tags = newSampleTags;
                 tagLinksPanel.empty();
+                // TODO replace the haplotype-strain check
+                console.error('TODO replace the haplotype-strain check');
                 var haplotypeStrainTagPresent = false;
                 newSampleTags.forEach(function(tag, i) {
                     if(tag === 'haplotype-strain') {
@@ -418,7 +415,7 @@
             var contribStrainTokensInput = $('#contrib-strains-tokens');
             contribStrainTokensInput.tokenfield({
                 autocomplete: {
-                    source: haplotypeSamples,
+                    source: strainNames,
                     delay: 100,
                     autoFocus: true
                 },
@@ -427,43 +424,37 @@
                 limit: {{ maximum_contributing_strain_count() }}
             });
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
-                var value = e.attrs.value;
-
-                return haplotypeSamples.some(function(samp) {
-                    return samp.value === value;
-                });
+                return strainNames.indexOf(e.attrs.value) >= 0;
             });
-            function updateHaplotypeStrains(newContribStrainTokens) {
-                newContribStrainTokens.sort(function(tok1, tok2) {
-                    var initCmp = tok1.label.localeCompare(tok2.label);
-                    if(initCmp !== 0) {
-                        return initCmp;
-                    } else {
-                        return tok1.value.localeCompare(tok2.value);
-                    }
-                });
-
-                contribStrainTokens = newContribStrainTokens;
+            function updateHaplotypeStrains(newContribStrains) {
+                sample['contributing_strains'] = discardDupElems(newContribStrains);
+                sample['contributing_strains'].sort();
                 readonlyHaplotypesPanel.empty();
-                newContribStrainTokens.forEach(function(strain, i) {
+                sample['contributing_strains'].forEach(function(strain, i) {
                     if(i >= 1) {
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
+                    var strainIdx = strainNames.indexOf(strain);
                     var haploLink = $(
-                            '<a href="' + encURIComp(strain.value) + '.html" class="hap hap' + strain.value + '">'
-                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + haplotypeColors[strain.value] + ';"></span>'
-                            + strain.label
+                            '<a href="' + encURIComp(strain) + '.html" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainColorMap[strain] + ';"></span>'
+                            + escapeHtml(strain)
                             + '</a>');
                     readonlyHaplotypesPanel.append(haploLink);
                 });
                 updateHaplotypeLinkHoverListeners();
-                contribStrainTokensInput.tokenfield('setTokens', newContribStrainTokens);
+                contribStrainTokensInput.tokenfield('setTokens', sample['contributing_strains']);
             }
 
             function updateSampleID(newSampleID) {
                 sampleID = newSampleID;
 
-                $('[data-sampleid]').text(newSampleID);
+                var readonlySampleIDText = newSampleID;
+                if(sample.other_ids) {
+                    readonlySampleIDText += ' (' + sample.other_ids.join(', ') + ')';
+                }
+
+                $('[data-sampleid]').text(readonlySampleIDText);
                 editSampleIDInput.val(newSampleID);
             }
 
@@ -486,7 +477,7 @@
                 // won't be presented with the values that they just cancelled.
                 updateSampleTags(sample.tags);
                 updateStandardDesignation(sample.standard_designation);
-                updateHaplotypeStrains(contribStrainTokens);
+                updateHaplotypeStrains(sample.contributing_strains);
                 updateSampleID(sampleID);
                 updateSampleColor(sample.color);
                 updateNotes(sample.notes);
@@ -536,21 +527,11 @@
                 }
 
                 var newContribStrainTokens = contribStrainTokensInput.tokenfield('getTokens');
-                newContribStrainTokens = discardDupElems(
-                    newContribStrainTokens,
-                    function(tok) {
-                        return tok.value;
-                    }
-                );
-                var newContribStrainIds = newContribStrainTokens.map(function(x) {
-                    return x.value;
-                });
-                var oldContribStrainIds = contribStrainTokens.map(function(x) {
-                    return x.value;
-                });
-                var contribStrainsChanged = !arraysEq(newContribStrainIds, oldContribStrainIds);
+                var newContribStrains = discardDupElems(newContribStrainTokens.map(function(tok) {return tok.value}));
+                newContribStrains.sort();
+                var contribStrainsChanged = !arraysEq(newContribStrains, sample.contributing_strains);
                 if(contribStrainsChanged) {
-                    postData['contributing_strain_ids'] = JSON.stringify(newContribStrainIds)
+                    postData['contributing_strains'] = JSON.stringify(newContribStrains);
                 }
 
                 var newSampleID = editSampleIDInput.val();
@@ -605,7 +586,7 @@
                             updateCtrlEngTgts(newNegCtrlEngTgts, false);
                         }
                         if(contribStrainsChanged) {
-                            updateHaplotypeStrains(newContribStrainTokens);
+                            updateHaplotypeStrains(newContribStrains);
                             updateHaplotypeSVG();
                         }
                         if(sampleIDChanged) {
@@ -657,21 +638,22 @@
             });
             hapIntervalPlot.zoomIntervalChange = updateInterval;
 
-            function highlightHaplotype(haploID) {
+            function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
+                var strainIdx = strainNames.indexOf(strainName);
 
                 svg.selectAll('rect.hap').style('fill-opacity', 0.25);
-                svg.selectAll('rect.hap' + haploID).style({
+                svg.selectAll('rect.hap' + strainIdx).style({
                     'fill-opacity': null,
                     'stroke': '#000000'
                 });
                 intervalSVG.selectAll('rect.hap').style('fill-opacity', 0.25);
-                intervalSVG.selectAll('rect.hap' + haploID).style({
+                intervalSVG.selectAll('rect.hap' + strainIdx).style({
                     'fill-opacity': null,
                     'stroke': '#000000'
                 });
-                $('a.hap' + haploID).css({
-                    'box-shadow': '0px 0px 15px 2px ' + haplotypeColors[haploID]
+                $('a.hap' + strainIdx).css({
+                    'box-shadow': '0px 0px 15px 2px ' + strainColorMap[strainName]
                 });
             }
             function clearHaplotypeHightlight(haploID) {
@@ -688,33 +670,27 @@
                 });
             }
             function updateHaplotypeLinkHoverListeners() {
-                haplotypeSamples.forEach(function(hapSamp) {
-                    $('a.hap' + hapSamp.value).hover(
+                strainNames.forEach(function(strainName, i) {
+                    $('a.hap' + i).hover(
                         function() {
-                            highlightHaplotype(hapSamp.value);
+                            highlightHaplotype(strainName);
                         },
                         function() {
-                            clearHaplotypeHightlight(hapSamp.value);
+                            clearHaplotypeHightlight(strainName);
                         }
                     );
                 });
             }
 
-            hapKaryoPlot.mouseOverHaplotype = function(haploIndex, haploData) {
-                var currHapID = haploData.haplotype_samples[haploIndex].obj_id;
-                highlightHaplotype(currHapID);
-            };
-            hapKaryoPlot.mouseOutHaplotype = function(haploIndex, haploData) {
-                var currHapID = haploData.haplotype_samples[haploIndex].obj_id;
-                clearHaplotypeHightlight(currHapID);
-            };
+            hapKaryoPlot.mouseOverHaplotype = highlightHaplotype;
+            hapKaryoPlot.mouseOutHaplotype = clearHaplotypeHightlight;
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
             var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
-                    hapKaryoPlot.updateHaplotypes(data, haplotypeColors);
-                    hapIntervalPlot.updateHaplotypes(data, haplotypeColors);
+                    hapKaryoPlot.updateHaplotypes(data, strainColorMap, strainNames);
+                    hapIntervalPlot.updateHaplotypes(data, strainColorMap, strainNames);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
@@ -794,7 +770,12 @@
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
                                 <input id="edit-sampleid-input" type="text" class="form-control"/>
                             </span>
-                            <span data-sampleid data-display-when="sample-readonly">{{ sample.sample_id }}</span>
+                            <span data-sampleid data-display-when="sample-readonly">
+                                {{ sample.sample_id }}
+                                {% if sample.other_ids %}
+                                    ({% for other_id in sample.other_ids %}{{ other_id }}{% if not loop.last %}, {% endif %}{% endfor %})
+                                {% endif %}
+                            </span>
                         </td>
                     </tr>
                     <tr>

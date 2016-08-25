@@ -46,9 +46,95 @@ def upgrade_from_0_0_1(db):
     )
 
 
+def upgrade_from_0_0_2(db):
+    upgrade_to_schema_version = 0, 0, 3
+
+    # before we start this update we should make sure that all haplotype strains have a standard designation assigned
+    # and that colors match
+    hap_strain_samples = db.samples.find(
+        {'tags': 'haplotype-strain'},
+        {
+            'sample_id': 1,
+            'standard_designation': 1,
+            'color': 1,
+        },
+    )
+
+    strain_colors = {}
+    for hap_strain_sample in hap_strain_samples:
+        if 'standard_designation' in hap_strain_sample:
+            std_desig = hap_strain_sample['standard_designation']
+            if 'color' in hap_strain_sample and hap_strain_sample['color']:
+                color = hap_strain_sample['color']
+                if std_desig not in strain_colors:
+                    strain_colors[std_desig] = color
+                else:
+                    if strain_colors[std_desig] != color:
+                        raise Exception(
+                            'Found samples with standard designation "{}" that have mismatching color. '
+                            'All samples with matching standard designations must also have matching colors '
+                            'before the upgrade can proceed. Once this has been addressed you can restart '
+                            'the upgrade process.'.format(std_desig)
+                        )
+            else:
+                raise Exception(
+                    'Every strain tagged with "haplotype-strain" must be assigned a color before upgrade can '
+                    'proceed. Once this has been addressed you can restart the upgrade process.'
+                )
+        else:
+            raise Exception(
+                'sample "{}" is marked as a "haplotype-strain" but has not been assigned a '
+                'standard designation. It is required that all haplotype strains be assigned '
+                'a standard designation before the upgrade can proceed. Once this has been '
+                'addressed you can restart the upgrade process.'.format(hap_strain_sample['sample_id'])
+            )
+
+    db.standard_designations.create_index('standard_designation')
+    db.standard_designations.create_index('contributing_strains')
+    for std_desig, color in strain_colors.items():
+        db.standard_designations.insert_one({
+            'standard_designation': std_desig,
+            'color': color,
+        })
+
+    db.samples.update_many(
+        {'tags': 'haplotype-strain'},
+        {'$set': {'haplotype_candidate': True}},
+    )
+    db.samples.update_many({}, {'$unset': {'color': ''}})
+
+    for sample in db.samples.find({'contributing_strains': {'$gt': []}}, {'contributing_strains': 1, 'sample_id': 1}):
+        strain_names = []
+        for strain_objid in sample['contributing_strains']:
+            strain_sample = db.samples.find_one({'_id': strain_objid}, {'standard_designation': 1})
+            strain_name = None
+            if strain_sample is None:
+                print(
+                    'in contributing strains sample {} refers to missing object: {}',
+                    sample['sample_id'],
+                    strain_objid,
+                )
+            else:
+                strain_name = strain_sample['standard_designation']
+
+            strain_names.append(strain_name)
+
+        db.samples.update_one(
+            {'_id': sample['_id']},
+            {'$set': {'contributing_strains': strain_names}},
+        )
+
+    # no errors occured. let's make the upgrade official
+    db.meta.update_one(
+        {},
+        {'$set': {'schema_version': upgrade_to_schema_version}},
+    )
+
+
 SCHEMA_UPGRADE_FUNCTIONS = [
     ((0, 0, 0), upgrade_from_0_0_0),
     ((0, 0, 1), upgrade_from_0_0_1),
+    ((0, 0, 2), upgrade_from_0_0_2),
 ]
 
 

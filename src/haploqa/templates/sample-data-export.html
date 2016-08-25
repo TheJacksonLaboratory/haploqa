@@ -9,7 +9,6 @@
         var allSamples = {{ samples|tojson }};
         var allTags = {{ all_tags|tojson }};
         var selectedTags = allTags.slice(0);
-        var platformIDs = {{ platform_ids | tojson }};
         $(function() {
             var sampleTableBody = $('#sample-table-body');
 
