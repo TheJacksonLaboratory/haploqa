@@ -109,7 +109,7 @@
                 var newTags = discardDupElems(editTagsInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
                 }));
-                var newContribStrainIds = discardDupElems(contribStrainTokensInput.tokenfield('getTokens').map(function(x) {
+                var newContribStrainNames = discardDupElems(contribStrainTokensInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
                 }));
                 var selectedCheckboxes = $('input:checked[type=checkbox][data-sample-id]');
@@ -124,7 +124,7 @@
                         samples_to_update: JSON.stringify(selectedSampleIDs),
                         tags: JSON.stringify(newTags),
                         tags_action: tagActionDropdown.getValue(),
-                        contributing_strain_ids: JSON.stringify(newContribStrainIds),
+                        contributing_strains: JSON.stringify(newContribStrainNames),
                         contributing_strains_action: contribStrainsActionDropdown.getValue(),
                         sample_visibility: sampleVisibilityDropdown.getValue()
                     },

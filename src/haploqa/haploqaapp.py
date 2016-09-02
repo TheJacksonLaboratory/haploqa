@@ -429,6 +429,7 @@ def sample_data_export_html():
             platform_ids=platform_ids,
     )
 
+
 @app.route('/sample-data-export.txt', methods=['POST'])
 def sample_data_export_file():
     db = mds.get_db()
@@ -1156,7 +1157,7 @@ def update_samples():
     chr_ids = set()
     platform_ids = db.samples.distinct('platform_id', {'_id': {'$in': sample_ids_to_update}})
     for curr_platform in db.platforms.find({'platform_id': {'$in': platform_ids}}):
-        chr_ids += set(curr_platform['chromosomes'])
+        chr_ids |= set(curr_platform['chromosomes'])
 
     task_ids = []
     contributing_strains_change = contributing_strains or contributing_strains_action == 'set'
