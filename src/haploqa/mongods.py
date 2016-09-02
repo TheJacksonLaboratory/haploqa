@@ -104,6 +104,19 @@ def init_db(db=None):
     db.samples.create_index('sex')
     db.samples.create_index('pos_ctrl_eng_tgts')
     db.samples.create_index('neg_ctrl_eng_tgts')
+    db.samples.create_index([
+            ('investigator',            pymongo.TEXT),
+            ('notes',                   pymongo.TEXT),
+            ('other_ids',               pymongo.TEXT),
+            ('platform_id',             pymongo.TEXT),
+            ('project',                 pymongo.TEXT),
+            ('sample_id',               pymongo.TEXT),
+            ('sex',                     pymongo.TEXT),
+            ('standard_designation',    pymongo.TEXT),
+            ('tags',                    pymongo.TEXT),
+        ],
+        name='sample_text_idx',
+    )
     db.platforms.create_index('platform_id')
     db.snps.create_index([
         ('platform_id', pymongo.ASCENDING),

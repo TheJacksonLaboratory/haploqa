@@ -124,6 +124,20 @@ def upgrade_from_0_0_2(db):
             {'$set': {'contributing_strains': strain_names}},
         )
 
+    db.samples.create_index([
+            ('investigator',            pymongo.TEXT),
+            ('notes',                   pymongo.TEXT),
+            ('other_ids',               pymongo.TEXT),
+            ('platform_id',             pymongo.TEXT),
+            ('project',                 pymongo.TEXT),
+            ('sample_id',               pymongo.TEXT),
+            ('sex',                     pymongo.TEXT),
+            ('standard_designation',    pymongo.TEXT),
+            ('tags',                    pymongo.TEXT),
+        ],
+        name='sample_text_idx',
+    )
+
     # no errors occured. let's make the upgrade official
     db.meta.update_one(
         {},

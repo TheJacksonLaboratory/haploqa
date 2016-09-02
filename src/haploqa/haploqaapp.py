@@ -645,6 +645,35 @@ def standard_designation_html(standard_designation):
             standard_designation=standard_designation)
 
 
+@app.route('/search')
+def search_html():
+
+    search_text = flask.request.args['search-text']
+
+    # look up all samples with this search term. Only return top level information though
+    # (snp-level data is too much)
+    db = mds.get_db()
+    matching_samples = _find_and_anno_samples(
+        {'$text': {'$search': search_text}},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+    )
+    matching_samples = list(matching_samples)
+    all_tags = db.samples.distinct('tags')
+
+    return flask.render_template(
+            'search.html',
+            samples=matching_samples,
+            strain_colors=_get_strain_colors(db),
+            all_tags=all_tags,
+            search_text=search_text)
+
+
 #####################################################################
 # index.html AND SEVERAL OTHER GENERAL INFORMATIVE TEMPLATES
 #####################################################################

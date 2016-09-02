@@ -152,6 +152,16 @@
                         Help &amp; About
                     </a>
                 </li>
+                <li>
+                    <form class="navbar-form navbar-right" action="{{ url_for('search_html') }}">
+                        <div class="input-group">
+                            <input type="text" name="search-text" placeholder="Search Text" class="form-control">
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-success"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></button>
+                            </span>
+                        </div>
+                    </form>
+                </li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
                 {% if g.user %}
