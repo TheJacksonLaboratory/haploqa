@@ -883,23 +883,6 @@ def _iter_to_row(iterable):
     return '\t'.join(iterable) + '\n'
 
 
-def _contrib_strain_sample_id_list(sample, db):
-    raise Exception('TODO fix how this function works')
-
-    contributing_strains = db.samples.find(
-            {'_id': {'$in': sample['contributing_strains']}},
-            {'sample_id': 1, 'standard_designation': 1}
-    )
-    cs_obj_id_strs = [str(cs_obj_id) for cs_obj_id in sample['contributing_strains']]
-    cs_sample_id_map = {
-        str(cs['_id']): cs['standard_designation'] if cs.get('standard_designation', None) else cs['sample_id']
-        for cs in contributing_strains
-    }
-    cs_sample_id_list = [cs_sample_id_map.get(cs_obj_id_str, cs_obj_id_str) for cs_obj_id_str in cs_obj_id_strs]
-
-    return cs_sample_id_list
-
-
 @app.route('/sample/<mongo_id>-snp-report.txt')
 def sample_snp_report(mongo_id):
     """
@@ -917,7 +900,7 @@ def sample_snp_report(mongo_id):
     for chr_val in sample['chromosome_data'].values():
         sample_uses_snp_format = 'snps' in chr_val
 
-    cs_sample_id_list = _contrib_strain_sample_id_list(sample, db)
+    contributing_strains = sample['contributing_strains']
 
     def tsv_generator():
         # generate a header 1st
@@ -970,8 +953,8 @@ def sample_snp_report(mongo_id):
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
                             sample['chromosome_data'][chr_id]['snps'][snp_index],
-                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_1']],
-                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
+                            '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_1']],
+                            '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_2']],
                         ))
                     else:
                         yield _iter_to_row((
@@ -981,8 +964,8 @@ def sample_snp_report(mongo_id):
                             str(curr_snp['position_bp']),
                             sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index],
                             sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index],
-                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_1']],
-                            '' if snp_hap_block is None else cs_sample_id_list[snp_hap_block['haplotype_index_2']],
+                            '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_1']],
+                            '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_2']],
                         ))
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
@@ -1002,13 +985,13 @@ def sample_summary_report(mongo_id):
     if sample is None:
         flask.abort(400)
 
-    cs_sample_id_list = _contrib_strain_sample_id_list(sample, db)
+    contributing_strains = sample['contributing_strains']
 
     # get every possible sample ID combination (where order doesn't matter) and initialize distances to 0
     total_distance = 0
     cumulative_distance_dict = dict()
-    for hap_index_lte in range(len(cs_sample_id_list)):
-        for hap_index_gte in range(hap_index_lte, len(cs_sample_id_list)):
+    for hap_index_lte in range(len(contributing_strains)):
+        for hap_index_gte in range(hap_index_lte, len(contributing_strains)):
             cumulative_distance_dict[(hap_index_lte, hap_index_gte)] = 0
 
     # iterate through all of the haplotype blocks and accumulate distances
@@ -1035,14 +1018,14 @@ def sample_summary_report(mongo_id):
 
     def tsv_generator():
         yield _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
-        for hap_index_lte in range(len(cs_sample_id_list)):
-            for hap_index_gte in range(hap_index_lte, len(cs_sample_id_list)):
+        for hap_index_lte in range(len(contributing_strains)):
+            for hap_index_gte in range(hap_index_lte, len(contributing_strains)):
                 curr_hap_distance = cumulative_distance_dict[(hap_index_lte, hap_index_gte)]
                 if curr_hap_distance:
                     yield _iter_to_row((
                         sample['sample_id'],
-                        cs_sample_id_list[hap_index_lte],
-                        cs_sample_id_list[hap_index_gte],
+                        contributing_strains[hap_index_lte],
+                        contributing_strains[hap_index_gte],
                         str(100 * curr_hap_distance / total_distance),
                     ))
 
