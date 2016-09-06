@@ -17,8 +17,8 @@
             }
         }
 
-        var strainColorMap = {{ strain_colors|tojson }};
-        var strainNames = $.map(strainColorMap, function(color, strainName) {return strainName});
+        var strainMap = {{ strain_map|tojson }};
+        var strainNames = $.map(strainMap, function(_, strainName) {return strainName});
         strainNames.sort();
         var strainIndexMap = {};
         strainNames.forEach(function(strainName, i) {
@@ -75,7 +75,7 @@
                                     var strainIdx = strainNames.indexOf(strainName);
                                     var haploLink = $(
                                             '<a href="' + encURIComp(strainName) + '.html" class="hap hap' + strainIdx + '">'
-                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainColorMap[strainName] + ';"></span>'
+                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strainName].color + ';"></span>'
                                             + escapeHtml(strainName)
                                             + '</a>');
                                     return haploLink;
@@ -436,8 +436,8 @@
                     }
                     var strainIdx = strainNames.indexOf(strain);
                     var haploLink = $(
-                            '<a href="' + encURIComp(strain) + '.html" class="hap hap' + strainIdx + '">'
-                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainColorMap[strain] + ';"></span>'
+                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
                             + escapeHtml(strain)
                             + '</a>');
                     readonlyHaplotypesPanel.append(haploLink);
@@ -653,7 +653,7 @@
                     'stroke': '#000000'
                 });
                 $('a.hap' + strainIdx).css({
-                    'box-shadow': '0px 0px 15px 2px ' + strainColorMap[strainName]
+                    'box-shadow': '0px 0px 15px 2px ' + strainMap[strainName].color
                 });
             }
             function clearHaplotypeHightlight(haploID) {
@@ -689,8 +689,8 @@
             var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
-                    hapKaryoPlot.updateHaplotypes(data, strainColorMap, strainNames);
-                    hapIntervalPlot.updateHaplotypes(data, strainColorMap, strainNames);
+                    hapKaryoPlot.updateHaplotypes(data, strainMap, strainNames);
+                    hapIntervalPlot.updateHaplotypes(data, strainMap, strainNames);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');

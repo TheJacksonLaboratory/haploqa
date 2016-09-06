@@ -559,8 +559,14 @@ def sample_data_import_task(generate_ids, on_duplicate, final_report_filename, s
 # SAMPLE LISTING PAGES
 #####################################################################
 
-def _get_strain_colors(db):
-    return {x['standard_designation']: x['color'] for x in db.standard_designations.find({})}
+def _get_strain_map(db):
+    return {
+        x['standard_designation']: {
+            'color': x['color'],
+            'url': flask.url_for('standard_designation_html', standard_designation=x['standard_designation']),
+        }
+        for x in db.standard_designations.find({})
+    }
 
 
 @app.route('/all-samples.html')
@@ -584,7 +590,7 @@ def all_samples_html():
     return flask.render_template(
             'samples.html',
             samples=samples,
-            strain_colors=_get_strain_colors(db),
+            strain_colors=_get_strain_map(db),
             all_tags=all_tags,
     )
 
@@ -612,7 +618,7 @@ def sample_tag_html(tag_id):
     return flask.render_template(
             'sample-tag.html',
             samples=matching_samples,
-            strain_colors=_get_strain_colors(db),
+            strain_colors=_get_strain_map(db),
             all_tags=all_tags,
             tag_id=tag_id)
 
@@ -640,7 +646,7 @@ def standard_designation_html(standard_designation):
     return flask.render_template(
             'standard-designation.html',
             samples=matching_samples,
-            strain_colors=_get_strain_colors(db),
+            strain_colors=_get_strain_map(db),
             all_tags=all_tags,
             standard_designation=standard_designation)
 
@@ -669,7 +675,7 @@ def search_html():
     return flask.render_template(
             'search.html',
             samples=matching_samples,
-            strain_colors=_get_strain_colors(db),
+            strain_colors=_get_strain_map(db),
             all_tags=all_tags,
             search_text=search_text)
 
@@ -869,7 +875,7 @@ def sample_html(mongo_id):
         sample=sample,
         all_tags=all_tags,
         all_eng_tgts=all_eng_tgts,
-        strain_colors=_get_strain_colors(db),
+        strain_map=_get_strain_map(db),
     )
 
 

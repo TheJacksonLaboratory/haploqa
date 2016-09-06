@@ -423,20 +423,20 @@ function HaploKaryoPlot(params) {
     this.zoomIntervalChange = null;
 
     var cachedHaplotypeData = null;
-    var cachedHaplotypeColors = {};
+    var cachedHaplotypeMap = {};
     var cachedStrainNames = null;
     var plotContentsGroup = svg.append("g").attr("class", "plot-contents");
-    this.updateHaplotypes = function(haploData, haplotypeColors, strainNames) {
+    this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
             cachedHaplotypeData = haploData;
         }
 
-        if(typeof haplotypeColors === 'undefined') {
-            haplotypeColors = cachedHaplotypeColors;
+        if(typeof haplotypeMap === 'undefined') {
+            haplotypeMap = cachedHaplotypeMap;
         } else {
-            cachedHaplotypeColors = haplotypeColors;
+            cachedHaplotypeMap = haplotypeMap;
         }
 
         if(typeof strainNames == 'undefined') {
@@ -523,8 +523,8 @@ function HaploKaryoPlot(params) {
                                     self.mouseOutHaplotype(currStrain1);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currStrain1)) {
-                            currRect.style('fill', haplotypeColors[currStrain1]);
+                        if(haplotypeMap.hasOwnProperty(currStrain1)) {
+                            currRect.style('fill', haplotypeMap[currStrain1].color);
                         }
                     } else {
                         // TODO these bars may be flipped!
@@ -546,8 +546,8 @@ function HaploKaryoPlot(params) {
                                     self.mouseOutHaplotype(currStrain1);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currStrain1)) {
-                            currRect.style('fill', haplotypeColors[currStrain1]);
+                        if(haplotypeMap.hasOwnProperty(currStrain1)) {
+                            currRect.style('fill', haplotypeMap[currStrain1].color);
                         }
 
                         currRect = plotContentsGroup.append("rect")
@@ -568,8 +568,8 @@ function HaploKaryoPlot(params) {
                                     self.mouseOutHaplotype(currStrain2);
                                 }
                             });
-                        if(haplotypeColors.hasOwnProperty(currStrain2)) {
-                            currRect.style('fill', haplotypeColors[currStrain2]);
+                        if(haplotypeMap.hasOwnProperty(currStrain2)) {
+                            currRect.style('fill', haplotypeMap[currStrain2].color);
                         }
                     }
                 });
