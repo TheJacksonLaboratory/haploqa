@@ -4,11 +4,7 @@ TODO description of what this app does
 
 ## Installation
 
-HaploQA requires Python 3.  Begin by installing that.
-
-In order to install HaploQA you must first install and configure MongoDB, RabbitMQ, Celery and apache with mod_wsgi.
-
-Assuming for a development installation you are working on a mac you can use the following instructions.  For CENTOS there will be simalar commands using yum.
+HaploQA requires Python 3.  Begin by installing that. In order to install HaploQA you must first install and configure MongoDB, RabbitMQ, Celery and apache with mod_wsgi. Assuming for a development installation you are working on a mac you can use the following instructions.  For CENTOS there will be simalar commands using yum.
 
 I prefer to work from a VirtualEnv.  If you don't already have virtualenv you'll want to install it:
 
