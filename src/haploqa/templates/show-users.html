@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block title %}HaploQA{% endblock %}
+
+{% block content %}
+    {% if session['admin'] != True %}
+    <div>you are not authorized to view this page</div>
+    {% else %}
+    <div class="page-header">
+        <h1>HaploQA Users</h1>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            Current Users in System:
+
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Admin?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.email_address }}</td>
+                        <td>{{ user.administrator }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
