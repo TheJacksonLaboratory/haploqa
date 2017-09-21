@@ -1843,4 +1843,4 @@ def max_likelihood_chr_genoprobs(sample_id, chrom, db):
 if __name__ == '__main__':
     # start server (for development use only)
     app.debug = True
-    app.run(host='0.0.0.0',port=3000)
+    app.run(host='0.0.0.0')

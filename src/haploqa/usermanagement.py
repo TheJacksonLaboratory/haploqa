@@ -108,10 +108,9 @@ def invite_user(email_address, db=None):
 
         # Send the message via our own SMTP server, but don't include the
         # envelope header.
-        '''s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
+        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
         s.sendmail(from_addr, [email_address], msg.as_string())
-        s.quit()'''
-        print(msg)
+        s.quit()
         return True
     else:
         return None
@@ -123,7 +122,6 @@ def get_all_users(db=None):
     return db.users.find()
 
 
-#TODO: should probably change this method to allow user type to invite
 def invite_admin(email_address, db=None):
     """
     invite a new user with the given email address (sends out an invite email via an SMTP server)
@@ -209,9 +207,9 @@ def reset_password(email_address, db=None):
 
         # Send the message via our own SMTP server, but don't include the
         # envelope header.
-        '''s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
+        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
         s.sendmail(from_addr, [user['email_address']], msg.as_string())
-        s.quit()'''
+        s.quit()
         return True
 
 
