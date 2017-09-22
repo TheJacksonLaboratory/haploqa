@@ -195,10 +195,8 @@ def invite_user_html():
     """
 
     user = flask.g.user
-    if user is None:
+    if user is None or not user['administrator']:
         return flask.render_template('login-required.html')
-    elif not user['administrator']:
-        flask.abort(403)
     else:
         if flask.request.method == 'GET':
             return flask.render_template('invite-user.html')
@@ -882,7 +880,7 @@ def sample_html(mongo_id):
         db
     )
     if sample is None:
-        flask.abort(400)
+        return flask.render_template('login-required.html')
 
     all_tags = db.samples.distinct('tags')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
