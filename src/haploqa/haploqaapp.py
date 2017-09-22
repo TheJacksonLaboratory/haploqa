@@ -222,7 +222,7 @@ def reset_password_html():
         if usrmgmt.reset_password(form['email']) is not None:
             return flask.render_template(
                 'reset-password.html',
-                msg='An email has been sent to you with instructions for resettting your password')
+                msg='An email has been sent to you with instructions for resetting your password')
         else:
             return flask.render_template('reset-password.html', msg="That email does not exist in the system")
 
