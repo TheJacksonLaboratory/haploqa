@@ -5,6 +5,7 @@
 {% block head %}
     {{ super() }}
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/saveSvgAsPng.js') }}"></script>
     <script>
 
         function arraysEq(arr1, arr2) {
@@ -36,6 +37,13 @@
         var haplotypePollingIntervalMillisecs = 2500;
 
         $(function() {
+
+            //export karyotype plot to png
+            $('#export-png').click(function () {
+                var svgElement = document.getElementById('hapkaryoplot-svg');
+                saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
+            });
+
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
                     candidateHaplotypeTable,
@@ -1047,6 +1055,9 @@
             </a>
             <a class="btn btn-default" href="{{ url_for('sample_summary_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_summary_report.txt">
                 <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Haplotype Composition Summary
+            </a>
+            <a class="btn btn-default" id="export-png">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Export Haplotype Plot to .PNG image
             </a>
         </div>
     </div>
