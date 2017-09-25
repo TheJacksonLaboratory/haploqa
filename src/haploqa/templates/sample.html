@@ -701,8 +701,12 @@
                 });
             }
 
+            //looks like this is where the hover events for the highlight haplotype plot
+            // are being registered
+            {% if session['user_email_address'] %}
             hapKaryoPlot.mouseOverHaplotype = highlightHaplotype;
             hapKaryoPlot.mouseOutHaplotype = clearHaplotypeHightlight;
+            {% endif %}
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
             var updateHaplotypeSVGTimeoutID = null;
@@ -978,7 +982,7 @@
                     {% endif %}
                     <tr>
                         <th>
-                            Visibility {{ sample.is_public }}
+                            Visibility
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -1148,6 +1152,4 @@
         </p>
         {% endif %}
     {% endif %}
-    Owner: {{ sample.owner }}<br>
-    Session: {{ session }}
 {% endblock %}
