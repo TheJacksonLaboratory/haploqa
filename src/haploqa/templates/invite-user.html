@@ -10,7 +10,7 @@
 </div>
 
 <p>
-    After entering the invitee's email and submiting this form they will receive a link allowing them to
+    After entering the invitee's email and submitting this form they will receive a link allowing them to
     validate their account and choose a password. Some SPAM filters may mistakenly mark this email as SPAM
     so the invitee should check their SPAM filter if they have not received an invitation.
 </p>
@@ -21,6 +21,7 @@
 
         <div class="col-md-6">
             <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com">
+            {% if msg %}<b>{{ msg }}</b>{% endif %}
         </div>
     </div>
     <div class="form-group">

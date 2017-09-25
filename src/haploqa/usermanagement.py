@@ -66,6 +66,61 @@ def authenticate_user(email_address, password, db):
     else:
         return None
 
+def invite_user(email_address, db=None):
+    '''
+    invite regular user
+    :param email_address:
+    :param db:
+    :return:
+    '''
+    if db is None:
+        db = mds.get_db()
+
+    email_address = email_address.strip()
+
+    #check and see if user already exists first
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    })
+
+    if user is None:
+        password_reset_id = str(uuid4())
+        db.users.insert({
+            'email_address': email_address,
+            'email_address_lowercase': email_address.lower(),
+            'administrator': False,
+            'password_reset_hash': hash_str(password_reset_id),
+        })
+
+        msg_template = \
+            '''You have been invited to create a HaploQA account. ''' \
+            '''To validate your account and create a password, visit this link: {} ''' \
+            '''Please ignore this message if it was sent in error.'''
+        msg = MIMEText(msg_template.format(flask.url_for(
+            'validate_reset',
+            password_reset_id=password_reset_id,
+            _external=True)))
+
+        from_addr = noreply_address()
+        msg['Subject'] = 'Confirm HaploQA Account'
+        msg['From'] = from_addr
+        msg['To'] = email_address
+
+        # Send the message via our own SMTP server, but don't include the
+        # envelope header.
+        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
+        s.sendmail(from_addr, [email_address], msg.as_string())
+        s.quit()
+        return True
+    else:
+        return None
+
+def get_all_users(db=None):
+    if db is None:
+        db = mds.get_db()
+    #check for admin here
+    return db.users.find()
+
 
 def invite_admin(email_address, db=None):
     """
@@ -79,33 +134,40 @@ def invite_admin(email_address, db=None):
 
     email_address = email_address.strip()
 
-    password_reset_id = str(uuid4())
-    db.users.insert({
-        'email_address': email_address,
-        'email_address_lowercase': email_address.lower(),
-        'administrator': True,
-        'password_reset_hash': hash_str(password_reset_id),
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
     })
 
-    msg_template = \
-        '''You have been invited to create a HaploQA account. ''' \
-        '''To validate your account and create a password, visit this link: {} ''' \
-        '''Please ignore this message if it was sent in error.'''
-    msg = MIMEText(msg_template.format(flask.url_for(
-        'validate_reset',
-        password_reset_id=password_reset_id,
-        _external=True)))
+    if user is None:
+        password_reset_id = str(uuid4())
+        db.users.insert({
+            'email_address': email_address,
+            'email_address_lowercase': email_address.lower(),
+            'administrator': True,
+            'password_reset_hash': hash_str(password_reset_id),
+        })
 
-    from_addr = noreply_address()
-    msg['Subject'] = 'Confirm HaploQA Account'
-    msg['From'] = from_addr
-    msg['To'] = email_address
+        msg_template = \
+            '''You have been invited to create a HaploQA account. ''' \
+            '''To validate your account and create a password, visit this link: {} ''' \
+            '''Please ignore this message if it was sent in error.'''
+        msg = MIMEText(msg_template.format(flask.url_for(
+            'validate_reset',
+            password_reset_id=password_reset_id,
+            _external=True)))
 
-    # Send the message via our own SMTP server, but don't include the
-    # envelope header.
-    s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
-    s.sendmail(from_addr, [email_address], msg.as_string())
-    s.quit()
+        from_addr = noreply_address()
+        msg['Subject'] = 'Confirm HaploQA Account'
+        msg['From'] = from_addr
+        msg['To'] = email_address
+
+        # Send the message via our own SMTP server, but don't include the
+        # envelope header.
+        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
+        s.sendmail(from_addr, [email_address], msg.as_string())
+        s.quit()
+    else:
+        return None
 
 
 def reset_password(email_address, db=None):
@@ -126,27 +188,29 @@ def reset_password(email_address, db=None):
         {'$set': {'password_reset_hash': hash_str(password_reset_id)}}
     )
     if user is None:
-        raise Exception('no such user exists')
+        return None
 
-    msg_template = \
-        '''Someone has attempted to reset your password for the HaploQA application. ''' \
-        '''To validate this request follow this link: {} ''' \
-        '''Please ignore this message if it was sent in error.'''
-    msg = MIMEText(msg_template.format(flask.url_for(
-        'validate_reset',
-        password_reset_id=password_reset_id,
-        _external=True)))
+    else:
+        msg_template = \
+            '''Someone has attempted to reset your password for the HaploQA application. ''' \
+            '''To validate this request follow this link: {} ''' \
+            '''Please ignore this message if it was sent in error.'''
+        msg = MIMEText(msg_template.format(flask.url_for(
+            'validate_reset',
+            password_reset_id=password_reset_id,
+            _external=True)))
 
-    from_addr = noreply_address()
-    msg['Subject'] = 'Reset password request for HaploQA'
-    msg['From'] = from_addr
-    msg['To'] = user['email_address']
+        from_addr = noreply_address()
+        msg['Subject'] = 'Reset password request for HaploQA'
+        msg['From'] = from_addr
+        msg['To'] = user['email_address']
 
-    # Send the message via our own SMTP server, but don't include the
-    # envelope header.
-    s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
-    s.sendmail(from_addr, [user['email_address']], msg.as_string())
-    s.quit()
+        # Send the message via our own SMTP server, but don't include the
+        # envelope header.
+        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
+        s.sendmail(from_addr, [user['email_address']], msg.as_string())
+        s.quit()
+        return True
 
 
 def _create_admin(email_address, password, db=None):

@@ -98,7 +98,7 @@
                 url: "{{ url_for('logout_json') }}",
                 dataType: 'json',
                 success: function(data) {
-                    document.location.reload(true);
+                    document.location.href = "/";
                 }
             }).fail(function() {
                 showErrorMessage('logout attempt failed');
@@ -172,8 +172,11 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li><a id="logout-banner" href="#">logout</a></li>
-                        <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
+                        {% if session['admin'] == True %}
+                        <li><a href="{{ url_for('show_users') }}">show all users</a></li>
                         <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
+                        {% endif %}
+                        <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
                     </ul>
                 </li>
                 {% else %}

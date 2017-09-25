@@ -165,6 +165,7 @@ def lookup_user_from_session():
             if flask.request.remote_addr == flask.session.get('remote_addr'):
                 user = usrmgmt.lookup_user(user_email_address, mds.get_db())
                 flask.g.user = user
+                flask.session['admin'] = user['administrator']
             else:
                 # If IP addresses don't match we're going to reset the session for
                 # a bit of extra safety. Unfortunately this also means that we're
@@ -173,6 +174,17 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
+@app.route('/show-users.html')
+def show_users():
+    '''
+    show all users
+    :return:
+    '''
+    users = usrmgmt.get_all_users()
+    return flask.render_template(
+        'show-users.html',
+        users=users,
+    )
 
 @app.route('/invite-user.html', methods=['GET', 'POST'])
 def invite_user_html():
@@ -183,21 +195,21 @@ def invite_user_html():
     """
 
     user = flask.g.user
-    if user is None:
+    if user is None or not user['administrator']:
         return flask.render_template('login-required.html')
-    elif not user['administrator']:
-        flask.abort(403)
     else:
         if flask.request.method == 'GET':
             return flask.render_template('invite-user.html')
         elif flask.request.method == 'POST':
             form = flask.request.form
-            usrmgmt.invite_admin(form['email'])
-
-            # TODO flash a success message
-
-            return flask.redirect(flask.url_for('index_html'), 303)
-
+            if (usrmgmt.invite_user(form['email'])) is not None:
+                return flask.render_template(
+                    'invite-user.html',
+                    msg='Your invite has been sent')
+            else:
+                return flask.render_template(
+                    'invite-user.html',
+                    msg='That user already exists, please try again')
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])
 def reset_password_html():
@@ -205,10 +217,12 @@ def reset_password_html():
         return flask.render_template('reset-password.html')
     elif flask.request.method == 'POST':
         form = flask.request.form
-        usrmgmt.reset_password(form['email'])
-
-        return flask.redirect(flask.url_for('index_html'), 303)
-
+        if usrmgmt.reset_password(form['email']) is not None:
+            return flask.render_template(
+                'reset-password.html',
+                msg='An email has been sent to you with instructions for resetting your password')
+        else:
+            return flask.render_template('reset-password.html', msg="That email does not exist in the system")
 
 @app.route('/login.json', methods=['POST'])
 def login_json():
@@ -228,6 +242,7 @@ def _set_session_user(user):
     flask.session.pop('remote_addr', None)
     if user is None:
         flask.g.user = None
+        flask.session['admin'] = None
     else:
         flask.session['user_email_address'] = user['email_address']
         remote_addr = flask.request.remote_addr
@@ -865,7 +880,7 @@ def sample_html(mongo_id):
         db
     )
     if sample is None:
-        flask.abort(400)
+        return flask.render_template('login-required.html')
 
     all_tags = db.samples.distinct('tags')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
