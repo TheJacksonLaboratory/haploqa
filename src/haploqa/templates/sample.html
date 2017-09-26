@@ -5,6 +5,7 @@
 {% block head %}
     {{ super() }}
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <!-- script to save a D3 plot (svg) as a png. MIT license - author Eric Shull (github.com/exupero/saveSvgAsPng) -->
     <script type="text/javascript" src="{{ url_for('static', filename='js/saveSvgAsPng.js') }}"></script>
     <script>
 
@@ -128,7 +129,7 @@
                     gemmTable,
                     $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Calculating GEMM Probabilities</span>'));
             var gemmTableBody = $('#gemm-table-body');
-            //this doesn't appear to be necessary. leaving in for now in case its needed later
+            //TODO: this doesn't appear to be necessary. leaving in for now in case its needed later
             //gemmTableOverlay.overlayActive(true);
 
             $.getJSON("{{ url_for('gemm_probs_json', mongo_id=sample._id) }}", function (data) {
@@ -449,7 +450,7 @@
                     var strainIdx = strainNames.indexOf(strain);
                     //only show links in the haplotype strains if user is admin
                     //TODO: need to get the plots rendering if sample is public
-                    {% if session['user_email_address'] %}
+                    {% if g.user %}
                     var haploLink = $(
                             '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
@@ -703,7 +704,7 @@
 
             //looks like this is where the hover events for the highlight haplotype plot
             // are being registered
-            {% if session['user_email_address'] %}
+            {% if g.user %}
             hapKaryoPlot.mouseOverHaplotype = highlightHaplotype;
             hapKaryoPlot.mouseOutHaplotype = clearHaplotypeHightlight;
             {% endif %}
@@ -757,7 +758,7 @@
 
     {% if g.user %}
     <div style="margin-bottom: 10px;">
-        {% if session['user_email_address'] %}
+        {% if g.user %}
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
@@ -905,7 +906,7 @@
                             {% endif %}
                         </td>
                     </tr>
-                    {% if user %}
+                    {% if g.user %}
                     <tr>
                         <th>
                             Tags
@@ -944,7 +945,7 @@
                             </span>
                         </td>
                     </tr>
-                    {% if session['user_email_address'] %}
+                    {% if g.user %}
                     <tr>
                         <th>
                             Engineered Target Positive Controls
@@ -1065,7 +1066,7 @@
             </a>
         </div>
     </div>
-    {% if session['user_email_address'] %}
+    {% if g.user %}
     <div class="page-header">
         <h2>Genome Interval Plot</h2>
     </div>
