@@ -984,12 +984,6 @@ def sample_snp_report(mongo_id):
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
 
-def _iterRows(generatorObject):
-    out = ""
-    for row in generatorObject:
-        out += row
-    return out
-
 @app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
 def combined_report(sdid):
     '''
@@ -1017,13 +1011,12 @@ def combined_report(sdid):
 
     samples = list(matching_samples)
     #header
-    out = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+    report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
     for sample in samples:
         id = str(sample['_id'])
-        report = _summary_report_data(id)
-        #composition summary data for sample
-        out += _iterRows(report)
-    return flask.Response(out, mimetype='text/tab-separated-values')
+        report += _summary_report_data(id)
+
+    return flask.Response(report, mimetype='text/tab-separated-values')
 
 
 def _summary_report_data(mongo_id):
@@ -1082,7 +1075,12 @@ def _summary_report_data(mongo_id):
                         str(100 * curr_hap_distance / total_distance),
                     ))
 
-    return tsv_generator()
+    data = tsv_generator()
+
+    report = ""
+    for row in data:
+        report += row
+    return report
 
 @app.route('/sample/<mongo_id>-summary-report.txt')
 def sample_summary_report(mongo_id):
