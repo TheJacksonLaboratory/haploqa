@@ -2,6 +2,13 @@
 
 {% block title %}Samples with Standard Designation: {{ standard_designation }}{% endblock %}
 
-{% block header %}{{ standard_designation }}{% endblock %}
-
+{% block header %}{{ standard_designation }}
+    <div class="row">
+        <div class="col-md-12">
+            <a class="btn btn-default" href="{{ url_for('combined_report', sdid=standard_designation) }}" download="{{ standard_designation|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_summary_report.txt">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Combined Haplotype Composition Summary Report
+            </a>
+        </div>
+    </div>
+{% endblock %}
 {% block nosamples %}No samples found for standard designation: {{ standard_designation }}{% endblock %}
