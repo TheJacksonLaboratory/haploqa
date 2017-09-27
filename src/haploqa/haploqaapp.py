@@ -994,8 +994,8 @@ def combined_report(sdid):
     '''
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)
-    #TODO: this runs very quickly, but we only really need the sample ids returned ideally.
-    #would need a new function
+    # TODO: this runs very quickly, but we only really need the sample ids returned ideally.
+    # would need a new function
     db = mds.get_db()
     matching_samples = _find_and_anno_samples(
         {'standard_designation': sdid},
@@ -1010,7 +1010,7 @@ def combined_report(sdid):
     )
 
     samples = list(matching_samples)
-    #header
+    # header
     report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
     for sample in samples:
         id = str(sample['_id'])
