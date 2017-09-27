@@ -5,6 +5,8 @@
 {% block head %}
     {{ super() }}
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
+    <!-- script to save a D3 plot (svg) as a png. MIT license - author Eric Shull (github.com/exupero/saveSvgAsPng) -->
+    <script type="text/javascript" src="{{ url_for('static', filename='js/saveSvgAsPng.js') }}"></script>
     <script>
 
         function arraysEq(arr1, arr2) {
@@ -36,6 +38,13 @@
         var haplotypePollingIntervalMillisecs = 2500;
 
         $(function() {
+
+            //export karyotype plot to png
+            $('#export-png').click(function () {
+                var svgElement = document.getElementById('hapkaryoplot-svg');
+                saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
+            });
+
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
                     candidateHaplotypeTable,
@@ -97,6 +106,7 @@
 
                                 candidateHaplotypeTableBody.append(tr);
                             });
+
                             updateHaplotypeLinkHoverListeners();
 
                             // see if we have a pending find
@@ -119,9 +129,10 @@
                     gemmTable,
                     $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"></span> Calculating GEMM Probabilities</span>'));
             var gemmTableBody = $('#gemm-table-body');
-            gemmTableOverlay.overlayActive(true);
-            if(user !== null) {
-                $.getJSON("{{ url_for('gemm_probs_json', mongo_id=sample._id) }}", function (data) {
+            //TODO: this doesn't appear to be necessary. leaving in for now in case its needed later
+            //gemmTableOverlay.overlayActive(true);
+
+            $.getJSON("{{ url_for('gemm_probs_json', mongo_id=sample._id) }}", function (data) {
                     if (data.gemm_probs.length) {
                         gemmTableBody.empty();
                         data.gemm_probs.forEach(function (gemProbPair) {
@@ -145,11 +156,13 @@
                         });
                     }
                 }).fail(function () {
-                    showErrorMessage('An error occurred while calculating GEMM probabilities.');
+                    //TODO: need to know what's going on when this fails for a non-logged in user
+                    //letting this fail for now as the plot still gets rendered
+                    //showErrorMessage('An error occurred while calculating GEMM probabilities.');
+                    console.log('An error occurred while calculating GEMM probabilities.');
                 }).always(function () {
                     gemmTableOverlay.overlayActive(false);
                 });
-            }
 
             var interval = null;
             var updateIntervalButton = $('#update-interval-button');
@@ -435,11 +448,18 @@
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
                     var strainIdx = strainNames.indexOf(strain);
+                    //only show links in the haplotype strains if user is admin
+                    //TODO: need to get the plots rendering if sample is public
+                    {% if g.user %}
                     var haploLink = $(
                             '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
                             + escapeHtml(strain)
                             + '</a>');
+                    {% else %}
+                    var haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain) + '</span>');
+                    {% endif %}
                     readonlyHaplotypesPanel.append(haploLink);
                 });
                 updateHaplotypeLinkHoverListeners();
@@ -682,8 +702,12 @@
                 });
             }
 
+            //looks like this is where the hover events for the highlight haplotype plot
+            // are being registered
+            {% if g.user %}
             hapKaryoPlot.mouseOverHaplotype = highlightHaplotype;
             hapKaryoPlot.mouseOutHaplotype = clearHaplotypeHightlight;
+            {% endif %}
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
             var updateHaplotypeSVGTimeoutID = null;
@@ -734,13 +758,14 @@
 
     {% if g.user %}
     <div style="margin-bottom: 10px;">
+        {% if g.user %}
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
             </button>
             <span id="sample-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
         </span>
-
+        {% endif %}
         <span data-display-when="sample-edit" style="display: none;">
             <button id="save-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Save Edits
@@ -764,7 +789,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -803,7 +828,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -824,7 +849,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>{{ sample.platform_id }}</td>
                     </tr>
@@ -836,7 +861,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td></tr>
                     <tr>
@@ -847,7 +872,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
                     </tr>
@@ -859,7 +884,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
                     </tr>
@@ -871,7 +896,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td id="haplo-snp-concordance">
                             {% if sample.viterbi_haplotypes.concordant_percent == None %}
@@ -881,6 +906,7 @@
                             {% endif %}
                         </td>
                     </tr>
+                    {% if g.user %}
                     <tr>
                         <th>
                             Tags
@@ -889,7 +915,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -898,6 +924,7 @@
                             <span id="tag-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
+                    {% endif %}
                     <tr id="color-table-row">
                         <th>
                             Haplotype Color
@@ -906,7 +933,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span data-display-when="sample-edit" style="display: none;">
@@ -918,6 +945,7 @@
                             </span>
                         </td>
                     </tr>
+                    {% if g.user %}
                     <tr>
                         <th>
                             Engineered Target Positive Controls
@@ -926,7 +954,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -943,7 +971,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -952,6 +980,7 @@
                             <span id="neg-eng-tgt-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
+                    {% endif %}
                     <tr>
                         <th>
                             Visibility
@@ -960,7 +989,7 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="TODO: add help text"></span>
+                                    title="add help text"></span>
                         </th>
                         <td>
                             <span data-display-when="sample-edit" style="display: none;">
@@ -1032,9 +1061,12 @@
             <a class="btn btn-default" href="{{ url_for('sample_summary_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_summary_report.txt">
                 <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Haplotype Composition Summary
             </a>
+            <a class="btn btn-default" id="export-png">
+                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Export Haplotype Plot to .PNG image
+            </a>
         </div>
     </div>
-
+    {% if g.user %}
     <div class="page-header">
         <h2>Genome Interval Plot</h2>
     </div>
@@ -1085,40 +1117,40 @@
     </div>
     #}
 
-    {% if g.user %}
-    <div class="row">
-        <div class="col-md-12">
-            <table id="candidate-haplotype-table" class="table table-striped" style="margin-top: 10px;">
-                <thead><tr><th>Candidate Haplotype</th><th>Negative Log Likelihood</th></tr></thead>
-                <tbody id="candidate-haplotype-table-body" style="height: 100px;">
-                <tr>
-                    <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>Select an interval to view Candidate Haplotypes</strong></td>
-                </tr>
-                </tbody>
-            </table>
+        {% if g.user %}
+        <div class="row">
+            <div class="col-md-12">
+                <table id="candidate-haplotype-table" class="table table-striped" style="margin-top: 10px;">
+                    <thead><tr><th>Candidate Haplotype</th><th>Negative Log Likelihood</th></tr></thead>
+                    <tbody id="candidate-haplotype-table-body" style="height: 100px;">
+                    <tr>
+                        <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>Select an interval to view Candidate Haplotypes</strong></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
 
-    <div class="page-header">
-        <h2>GEMM Probabilities</h2>
-    </div>
-
-    <div class="row">
-        <div class="col-md-12">
-            <table id="gemm-table" class="table table-striped" style="margin-top: 10px;">
-                <thead><tr><th>GEMM Target</th><th>Probability of Presence</th></tr></thead>
-                <tbody id="gemm-table-body" style="height: 100px;">
-                <tr>
-                    <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>No GEMM Probabilities Available</strong></td>
-                </tr>
-                </tbody>
-            </table>
+        <div class="page-header">
+            <h2>GEMM Probabilities</h2>
         </div>
-    </div>
 
-    <p>
-    See the <a href="{{ url_for('gemm_intens_html', mongo_id=sample._id) }}">GEMM Intensities plot</a> for a more detailed view of the distribution of GEMM probe intensities.
-    </p>
+        <div class="row">
+            <div class="col-md-12">
+                <table id="gemm-table" class="table table-striped" style="margin-top: 10px;">
+                    <thead><tr><th>GEMM Target</th><th>Probability of Presence</th></tr></thead>
+                    <tbody id="gemm-table-body" style="height: 100px;">
+                    <tr>
+                        <td colspan="2" style="text-align: center; vertical-align: middle;"><strong>No GEMM Probabilities Available</strong></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <p>
+        See the <a href="{{ url_for('gemm_intens_html', mongo_id=sample._id) }}">GEMM Intensities plot</a> for a more detailed view of the distribution of GEMM probe intensities.
+        </p>
+        {% endif %}
     {% endif %}
-
 {% endblock %}
