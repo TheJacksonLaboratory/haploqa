@@ -83,7 +83,7 @@
                                 function makeHapLink(strainName) {
                                     var strainIdx = strainNames.indexOf(strainName);
                                     var haploLink = $(
-                                            '<a href="' + encURIComp(strainName) + '.html" class="hap hap' + strainIdx + '">'
+                                            '<a href="/standard-designation/' + encURIComp(strainName) + '.html" class="hap hap' + strainIdx + '">'
                                             + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strainName].color + ';"></span>'
                                             + escapeHtml(strainName)
                                             + '</a>');
@@ -980,7 +980,6 @@
                             <span id="neg-eng-tgt-links" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
-                    {% endif %}
                     <tr>
                         <th>
                             Visibility
@@ -998,6 +997,7 @@
                             <span id="readonly-sample-visibility" data-display-when="sample-readonly"></span>
                         </td>
                     </tr>
+                    {% endif %}
                     <tr>
                         <th>
                             Notes:
