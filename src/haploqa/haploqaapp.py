@@ -640,7 +640,6 @@ def sample_tag_html(tag_id):
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
 def standard_designation_html(standard_designation):
-
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
@@ -985,6 +984,103 @@ def sample_snp_report(mongo_id):
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
 
+@app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
+def combined_report(sdid):
+    '''
+    generate an aggregated composition report based on all samples
+    under a standard designation.
+    :param sdid: standard designation id
+    :return: summary report in .txt format
+    '''
+    # look up all samples with this standard_designation. Only return top level information though
+    # (snp-level data is too much)
+    # TODO: this runs very quickly, but we only really need the sample ids returned ideally.
+    # would need a new function
+    db = mds.get_db()
+    matching_samples = _find_and_anno_samples(
+        {'standard_designation': sdid},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+
+    samples = list(matching_samples)
+    # header
+    report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+    for sample in samples:
+        id = str(sample['_id'])
+        report += _summary_report_data(id)
+
+    return flask.Response(report, mimetype='text/tab-separated-values')
+
+
+def _summary_report_data(mongo_id):
+    """
+    tab-delimited report for the sample showing parental strain composition (by percent)
+    :param mongo_id: the mongo ID string for the sample we're interested in
+    :return: the Flask response
+    """
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    # TODO: do a clean error here
+    if sample is None:
+        flask.abort(400)
+
+    contributing_strains = sample['contributing_strains']
+    # get every possible sample ID combination (where order doesn't matter) and initialize distances to 0
+    total_distance = 0
+    cumulative_distance_dict = dict()
+    for hap_index_lte in range(len(contributing_strains)):
+        for hap_index_gte in range(hap_index_lte, len(contributing_strains)):
+            cumulative_distance_dict[(hap_index_lte, hap_index_gte)] = 0
+
+    # iterate through all of the haplotype blocks and accumulate distances
+    try:
+        chr_ids = sample['viterbi_haplotypes']['chromosome_data'].keys()
+    except KeyError:
+        chr_ids = []
+
+    for chr_id in chr_ids:
+        try:
+            haplotype_blocks = sample['viterbi_haplotypes']['chromosome_data'][chr_id]['haplotype_blocks']
+        except KeyError:
+            haplotype_blocks = []
+
+        for curr_block in haplotype_blocks:
+            curr_dist = 1 + curr_block['end_position_bp'] - curr_block['start_position_bp']
+            total_distance += curr_dist
+
+            hap_index_1 = curr_block['haplotype_index_1']
+            hap_index_2 = curr_block['haplotype_index_2']
+            hap_index_lte = min(hap_index_1, hap_index_2)
+            hap_index_gte = max(hap_index_1, hap_index_2)
+            cumulative_distance_dict[(hap_index_lte, hap_index_gte)] += curr_dist
+
+    def tsv_generator():
+        for hap_index_lte in range(len(contributing_strains)):
+            for hap_index_gte in range(hap_index_lte, len(contributing_strains)):
+                curr_hap_distance = cumulative_distance_dict[(hap_index_lte, hap_index_gte)]
+                if curr_hap_distance:
+                    yield _iter_to_row((
+                        sample['sample_id'],
+                        contributing_strains[hap_index_lte],
+                        contributing_strains[hap_index_gte],
+                        str(100 * curr_hap_distance / total_distance),
+                    ))
+
+    data = tsv_generator()
+
+    report = ""
+    for row in data:
+        report += row
+    return report
 
 @app.route('/sample/<mongo_id>-summary-report.txt')
 def sample_summary_report(mongo_id):
