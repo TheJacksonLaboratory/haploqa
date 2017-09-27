@@ -1029,7 +1029,7 @@ def _summary_report_data(mongo_id):
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
     sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
-    #TODO: do a clean error here
+    # TODO: do a clean error here
     if sample is None:
         flask.abort(400)
 
