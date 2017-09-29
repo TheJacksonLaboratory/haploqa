@@ -57,14 +57,14 @@
                     style="padding-top: 7px;">
         </div>
     </div>
-
+    <!-- TODO: is this needed? -->
     <input type="hidden" name="joe" value="hi">
-
     <div class="form-group">
         <div class="col-md-offset-3 col-md-9">
             <button id="sample-upload-submit" class="btn btn-primary" type="submit">
                 <span class="glyphicon glyphicon-upload" aria-hidden="true"></span> Import Samples
             </button>
+            {% if msg %}<br><br><b style="color:red;">{{ msg }}</b>{% endif %}
         </div>
     </div>
 </form>

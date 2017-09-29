@@ -516,34 +516,38 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
+            print('filename: {}'.format(files['sample-map-file'].filename))
+            if (files['sample-map-file'].filename == '') or (files['final-report-file'].filename == ''):
+                return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
+                                             msg='Error: you must provide both files in order to process your request')
+            else:
+                # sample map is optional
+                sample_map_filename = None
+                if 'sample-map-file' in files:
+                    sample_map_filename = _unique_temp_filename()
+                    files['sample-map-file'].save(sample_map_filename)
 
-            # sample map is optional
-            sample_map_filename = None
-            if 'sample-map-file' in files:
-                sample_map_filename = _unique_temp_filename()
-                files['sample-map-file'].save(sample_map_filename)
+                # the final report is required
+                final_report_filename = _unique_temp_filename()
+                final_report_file = files['final-report-file']
+                final_report_file.save(final_report_filename)
 
-            # the final report is required
-            final_report_filename = _unique_temp_filename()
-            final_report_file = files['final-report-file']
-            final_report_file.save(final_report_filename)
+                generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
+                on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
 
-            generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
-            on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
+                sample_group_name = os.path.splitext(final_report_file.filename)[0]
+                import_task = sample_data_import_task.delay(
+                    generate_ids,
+                    on_duplicate,
+                    final_report_filename,
+                    sample_map_filename,
+                    platform_id,
+                    sample_group_name,
+                )
 
-            sample_group_name = os.path.splitext(final_report_file.filename)[0]
-            import_task = sample_data_import_task.delay(
-                generate_ids,
-                on_duplicate,
-                final_report_filename,
-                sample_map_filename,
-                platform_id,
-                sample_group_name,
-            )
-
-            # perform a 303 redirect to the URL that uniquely identifies this run
-            new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
-            return flask.redirect(new_location, 303)
+                # perform a 303 redirect to the URL that uniquely identifies this run
+                new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
+                return flask.redirect(new_location, 303)
         else:
             return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
 
