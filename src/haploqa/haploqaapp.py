@@ -497,7 +497,7 @@ def sample_data_export_file():
 
     return resp
 
-
+# TODO: needs error handling
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
     """
@@ -1014,6 +1014,7 @@ def combined_report(sdid):
     report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
     for sample in samples:
         id = str(sample['_id'])
+        # TODO: check if the report is empty and add a message
         report += _summary_report_data(id)
 
     return flask.Response(report, mimetype='text/tab-separated-values')
