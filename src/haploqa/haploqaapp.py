@@ -12,6 +12,7 @@ import sys
 import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
+import datetime
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -186,6 +187,39 @@ def show_users():
         users=users,
     )
 
+@app.route('/switch-admin.json', methods=['POST'])
+def switch_admin():
+    """
+    Promote a user to admin
+    :return: True / False
+    """
+    user = flask.g.user
+    if user['administrator'] is not True:
+        flask.abort(400)
+
+    form = flask.request.form
+    if usrmgmt.switch_admin(form['email'], form['administrator']) is not None:
+        return flask.jsonify({'success': True})
+    else:
+        return flask.jsonify({'success': False})
+
+@app.route('/remove-user.json', methods=['POST'])
+def remove_user():
+    """
+    remove a user
+    :return: True / False
+    """
+    user = flask.g.user
+    if user['administrator'] is not True:
+        flask.abort(400)
+
+    form = flask.request.form
+    if usrmgmt.remove_user(form['email']) is not None:
+        return flask.jsonify({'success': True})
+    else:
+        return flask.jsonify({'success': False})
+
+
 @app.route('/invite-user.html', methods=['GET', 'POST'])
 def invite_user_html():
     """
@@ -202,7 +236,7 @@ def invite_user_html():
             return flask.render_template('invite-user.html')
         elif flask.request.method == 'POST':
             form = flask.request.form
-            if (usrmgmt.invite_user(form['email'])) is not None:
+            if (usrmgmt.invite_user(form['email'], form['affiliation'])) is not None:
                 return flask.render_template(
                     'invite-user.html',
                     msg='Your invite has been sent')
@@ -497,7 +531,6 @@ def sample_data_export_file():
 
     return resp
 
-# TODO: needs error handling
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
     """
@@ -1172,8 +1205,16 @@ def update_sample(mongo_id):
 
     form = flask.request.form
     update_dict = dict()
+
+    ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+    update_dict['last_update'] = ts
+    update_dict['updated_by'] = flask.g.user['email_address']
+
     if 'sample_id' in form:
         update_dict['sample_id'] = form['sample_id'].strip()
+
+    if 'owner' in form:
+        update_dict['owner'] = form['owner'].strip()
 
     if 'tags' in form:
         update_dict['tags'] = json.loads(form['tags'])
@@ -1213,6 +1254,7 @@ def update_sample(mongo_id):
             update_dict['viterbi_haplotypes.chromosome_data.' + chr_id] = {
                 'results_pending': True
             }
+
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})

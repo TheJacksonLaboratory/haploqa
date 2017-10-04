@@ -7,6 +7,7 @@ from os import EX_USAGE
 import smtplib
 import socket
 from uuid import uuid4
+import datetime
 
 
 def hash_str(s):
@@ -40,6 +41,46 @@ def lookup_salt(email_address, db):
     else:
         return None
 
+def switch_admin(email_address, admin_flag):
+    """
+    updates a users administrative status
+    :param email_address: the email address of the user to update
+    :param admin_flag: admin status (boolean)
+    :param db: the database
+    :return: true on success, None upon failure
+    """
+
+    db = mds.get_db()
+
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    })
+
+    if user is not None:
+        db.users.update_one({'_id': user['_id']}, {'$set': {'administrator': admin_flag}})
+        return True
+    else:
+        return None
+
+def remove_user(email_address):
+    """
+    remove a user from the system
+    :param email_address: the email address of the user to remove
+    :param db: the database
+    :return: true on success, None upon failure
+    """
+
+    db = mds.get_db()
+
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    })
+
+    if user is not None:
+        db.users.delete_one({'_id': user['_id']})
+        return True
+    else:
+        return None
 
 def authenticate_user(email_address, password, db):
     """
@@ -55,18 +96,22 @@ def authenticate_user(email_address, password, db):
         'password_reset_hash': 0,
     })
     if user is not None:
+        print(user['_id'])
         password_hash = hash_str(password + user['salt'])
         if password_hash == user['password_hash']:
             # remove the password_hash to prevent it from leaking out
             user.pop('password_hash', None)
             user.pop('salt', None)
+            # record login timestamp
+            ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login' : ts}})
             return user
         else:
             return None
     else:
         return None
 
-def invite_user(email_address, db=None):
+def invite_user(email_address, affiliation, db=None):
     '''
     invite regular user
     :param email_address:
@@ -84,10 +129,13 @@ def invite_user(email_address, db=None):
     })
 
     if user is None:
+        ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
         password_reset_id = str(uuid4())
         db.users.insert({
+            'created': ts,
             'email_address': email_address,
             'email_address_lowercase': email_address.lower(),
+            'affiliation': affiliation,
             'administrator': False,
             'password_reset_hash': hash_str(password_reset_id),
         })
@@ -118,7 +166,6 @@ def invite_user(email_address, db=None):
 def get_all_users(db=None):
     if db is None:
         db = mds.get_db()
-    #check for admin here
     return db.users.find()
 
 
