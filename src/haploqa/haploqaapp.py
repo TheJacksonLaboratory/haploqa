@@ -181,6 +181,7 @@ def show_users():
     show all users
     :return:
     '''
+
     users = usrmgmt.get_all_users()
     return flask.render_template(
         'show-users.html',
@@ -549,18 +550,13 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
-            print('filename: {}'.format(files['sample-map-file'].filename))
             if (files['sample-map-file'].filename == '') or (files['final-report-file'].filename == ''):
                 return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
                                              msg='Error: you must provide both files in order to process your request')
             else:
-                # sample map is optional
-                sample_map_filename = None
-                if 'sample-map-file' in files:
-                    sample_map_filename = _unique_temp_filename()
-                    files['sample-map-file'].save(sample_map_filename)
+                sample_map_filename = _unique_temp_filename()
+                files['sample-map-file'].save(sample_map_filename)
 
-                # the final report is required
                 final_report_filename = _unique_temp_filename()
                 final_report_file = files['final-report-file']
                 final_report_file.save(final_report_filename)
@@ -568,8 +564,11 @@ def sample_data_import_html():
                 generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
                 on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
 
+                user_email = flask.g.user['email_address'].strip().lower()
+
                 sample_group_name = os.path.splitext(final_report_file.filename)[0]
                 import_task = sample_data_import_task.delay(
+                    user_email,
                     generate_ids,
                     on_duplicate,
                     final_report_filename,
@@ -586,7 +585,7 @@ def sample_data_import_html():
 
 
 @celery.task(name='sample_data_import_task')
-def sample_data_import_task(generate_ids, on_duplicate, final_report_filename, sample_map_filename, platform_id, sample_group_name):
+def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report_filename, sample_map_filename, platform_id, sample_group_name):
     """
     Our long-running import task, triggered from the import page of the app
     """
@@ -594,7 +593,7 @@ def sample_data_import_task(generate_ids, on_duplicate, final_report_filename, s
         db = mds.get_db()
         tags = [sample_group_name, platform_id]
         sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
-        finalin.import_final_report(generate_ids, on_duplicate, final_report_filename, sample_anno_dicts, platform_id, tags, db)
+        finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename, sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
         try:
