@@ -41,33 +41,28 @@
     </div>
      <script>
 
-    $(function() {
-        $('#make-admin').click(function () {
-          alert('you clicked make admin');
-        });
-    });
-
     function showConfirmMessage(msg) {
-    var modalDialog = $('#confirm-modal');
-    modalDialog.modal();
-    $('#confirm-modal-message').text(msg);
-    }
+        var modalDialog = $('#confirm-modal');
+        modalDialog.modal();
+        $('#confirm-modal-message').text(msg);
+        }
 
     function switch_admin(email, status) {
         if (status == 'True') {
             //demote
             var msg = 'This will demote the user with email address  \
-        ' + email + ' to a regular user. Are you sure you wish to perform this action?';
+            ' + email + ' to a regular user. Are you sure you wish to perform this action?';
             status = 'False';
         } else {
             //promote
             var msg = 'This will promote the user with email address  \
-        ' + email + ' to administrator. Are you sure you wish to perform this action?';
+            ' + email + ' to administrator. Are you sure you wish to perform this action?';
             status = 'True';
         }
+
         showConfirmMessage(msg);
         $('#confirm').click(function () {
-            makeAdminRequest = $.ajax({
+                makeAdminRequest = $.ajax({
                 type: "POST",
                 url: "{{ url_for('switch_admin') }}",
                 data: {
@@ -78,7 +73,7 @@
                 success: function () {
                     document.location.reload(true);
                 }
-            }).fail(function () {
+                }).fail(function () {
                 showErrorMessage('update failed');
             });
         });
@@ -86,9 +81,10 @@
 
     function remove_user(email) {
         showConfirmMessage('This will remove the user with email address  \
-        ' + email + ' from the system, but not remove their samples. \
-        You can always re-invite the user at a later date. \
-        Are you sure you wish to perform this action?');
+            ' + email + ' from the system, but not remove their samples. \
+            You can always re-invite the user at a later date. \
+            Are you sure you wish to perform this action?');
+
         $('#confirm').click(function () {
             makeAdminRequest = $.ajax({
                 type: "POST",

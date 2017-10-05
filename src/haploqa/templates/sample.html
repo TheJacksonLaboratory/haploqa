@@ -647,15 +647,18 @@
             });
 
             var svg = d3.select('#hapkaryoplot-svg');
+
             var hapKaryoPlot = new HaploKaryoPlot({
                 svg: svg,
                 width: 900,
                 height: 900,
                 chrSizes: mm10ChrSizes
             });
+
             hapKaryoPlot.zoomIntervalChange = updateInterval;
 
             var intervalSVG = d3.select("#hapintervalplot-svg");
+
             var hapIntervalPlot = new HaploKaryoPlot({
                 svg: intervalSVG,
                 width: 900,
@@ -663,6 +666,7 @@
                 chrSizes: mm10ChrSizes,
                 intervalMode: true
             });
+
             hapIntervalPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(strainName) {
@@ -765,7 +769,7 @@
 
     {% if g.user %}
     <div style="margin-bottom: 10px;">
-    <!-- TODO: only allow admin or owner to edit -->
+        <!-- only allow admin or owner to edit a sample -->
         {% if (g.user.email_address == sample.owner) or (g.user.administrator == True) %}
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
