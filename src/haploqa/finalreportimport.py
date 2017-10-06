@@ -26,7 +26,7 @@ data_col_hdrs = {
 }
 
 
-def import_final_report(generate_ids, on_duplicate, final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
+def import_final_report(user_email, generate_ids, on_duplicate, final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
 
     def save_sample(samp):
         if samp is not None:
@@ -43,6 +43,8 @@ def import_final_report(generate_ids, on_duplicate, final_report_file, sample_an
                 samp['other_ids'] = []
 
             mds.post_proc_sample(samp)
+
+            samp['owner'] = user_email
 
             if on_duplicate == 'replace':
                 update_res = db.samples.replace_one(

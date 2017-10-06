@@ -495,6 +495,7 @@
             function resetEdits() {
                 // restore old values to inputs so that if the user clicks edit again they
                 // won't be presented with the values that they just cancelled.
+                $('#edit-owner-input').val('{{ sample.owner }}');
                 updateSampleTags(sample.tags);
                 updateStandardDesignation(sample.standard_designation);
                 updateHaplotypeStrains(sample.contributing_strains);
@@ -560,6 +561,9 @@
                     postData['sample_id'] = newSampleID;
                 }
 
+                var owner = $('#edit-owner-input').val();
+                postData['owner'] = owner;
+
                 var newColor = editColorComponent.minicolors('value');
                 var colorChanged = newColor !== sample.color;
                 if(colorChanged) {
@@ -596,6 +600,9 @@
                     data: postData,
                     dataType: 'json',
                     success: function(data) {
+
+                        $('#readonly-owner').text(owner);
+
                         if(tagsChanged) {
                             updateSampleTags(newTags);
                         }
@@ -640,15 +647,18 @@
             });
 
             var svg = d3.select('#hapkaryoplot-svg');
+
             var hapKaryoPlot = new HaploKaryoPlot({
                 svg: svg,
                 width: 900,
                 height: 900,
                 chrSizes: mm10ChrSizes
             });
+
             hapKaryoPlot.zoomIntervalChange = updateInterval;
 
             var intervalSVG = d3.select("#hapintervalplot-svg");
+
             var hapIntervalPlot = new HaploKaryoPlot({
                 svg: intervalSVG,
                 width: 900,
@@ -656,6 +666,7 @@
                 chrSizes: mm10ChrSizes,
                 intervalMode: true
             });
+
             hapIntervalPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(strainName) {
@@ -758,7 +769,8 @@
 
     {% if g.user %}
     <div style="margin-bottom: 10px;">
-        {% if g.user %}
+        <!-- only allow admin or owner to edit a sample -->
+        {% if (g.user.email_address == sample.owner) or (g.user.administrator == True) %}
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
@@ -789,7 +801,8 @@
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="add help text"></span>
+                                    title="add help text">
+                            </span>
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
@@ -803,6 +816,34 @@
                             </span>
                         </td>
                     </tr>
+                    <tr>
+                        <th>Owner
+                            <span class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="TODO: add pulldown menu from list of regular users during edit operation">
+                            </span>
+                        </th>
+                        <td>
+                            {% if g.user.administrator == True %}
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}"/>
+                            </span>
+                            {% endif %}
+                            <span id="readonly-owner" data-display-when="sample-readonly">{{ sample.owner }}</span>
+                        </td>
+                    </tr>
+                    {% if g.user %}
+                    <tr>
+                        <th>
+                            Last Update
+                        </th>
+                        <td>
+                            {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
                     <tr>
                         <th>
                             Standard Designation

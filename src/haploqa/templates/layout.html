@@ -172,8 +172,8 @@
                     </a>
                     <ul class="dropdown-menu">
                         <li><a id="logout-banner" href="#">logout</a></li>
-                        {% if session['admin'] == True %}
-                        <li><a href="{{ url_for('show_users') }}">show all users</a></li>
+                        {% if g.user.administrator == True %}
+                        <li><a href="{{ url_for('show_users') }}">user admin</a></li>
                         <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
                         {% endif %}
                         <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
@@ -223,6 +223,23 @@
                 <div id="error-modal-message" class="modal-body"></div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+     <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span
+                            aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                    <h4 class="modal-title" id="myModalLabel">Confirm Action</h4>
+                </div>
+                <div id="confirm-modal-message" class="modal-body"></div>
+                <div class="modal-footer">
+                    <button type="button" id="confirm" class="btn btn-default" data-dismiss="modal">Confirm</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>

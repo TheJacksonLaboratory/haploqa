@@ -1,10 +1,9 @@
 {% extends "layout.html" %}
 
 {% block title %}HaploQA{% endblock %}
-
 {% block content %}
     {% if session['admin'] != True %}
-    <div>you are not authorized to view this page</div>
+    <div>You are not authorized to view this page</div>
     {% else %}
     <div class="page-header">
         <h1>HaploQA Users</h1>
@@ -17,7 +16,11 @@
                 <thead>
                     <tr>
                         <th>Email</th>
+                        <th>Affilation</th>
+                        <th>Created</th>
+                        <th>Last Accessed</th>
                         <th>Admin?</th>
+                        <th>Remove</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -25,12 +28,80 @@
                     {% for user in users %}
                     <tr>
                         <td>{{ user.email_address }}</td>
-                        <td>{{ user.administrator }}</td>
+                        <td>{{ user.affiliation }}</td>
+                        <td>{{ user.created }}</td>
+                        <td>{{ user.last_login }}</td>
+                        <td><a id="make-admin" style="cursor: pointer" onclick="switch_admin('{{ user.email_address }}', '{{ user.administrator }}')">{{ user.administrator }}</a></td>
+                        <td><a id="remove-user" style="cursor: pointer" onclick="remove_user('{{ user.email_address }}')">Remove</a> </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
+     <script>
+
+    function showConfirmMessage(msg) {
+        var modalDialog = $('#confirm-modal');
+        modalDialog.modal();
+        $('#confirm-modal-message').text(msg);
+        }
+
+    function switch_admin(email, status) {
+        if (status == 'True') {
+            //demote
+            var msg = 'This will demote the user with email address  \
+            ' + email + ' to a regular user. Are you sure you wish to perform this action?';
+            status = 'False';
+        } else {
+            //promote
+            var msg = 'This will promote the user with email address  \
+            ' + email + ' to administrator. Are you sure you wish to perform this action?';
+            status = 'True';
+        }
+
+        showConfirmMessage(msg);
+        $('#confirm').click(function () {
+                makeAdminRequest = $.ajax({
+                type: "POST",
+                url: "{{ url_for('switch_admin') }}",
+                data: {
+                    email: email,
+                    administrator: status
+                },
+                dataType: 'json',
+                success: function () {
+                    document.location.reload(true);
+                }
+                }).fail(function () {
+                showErrorMessage('update failed');
+            });
+        });
+    }
+
+    function remove_user(email) {
+        showConfirmMessage('This will remove the user with email address  \
+            ' + email + ' from the system, but not remove their samples. \
+            You can always re-invite the user at a later date. \
+            Are you sure you wish to perform this action?');
+
+        $('#confirm').click(function () {
+            makeAdminRequest = $.ajax({
+                type: "POST",
+                url: "{{ url_for('remove_user') }}",
+                data: {
+                    email: email,
+                },
+                dataType: 'json',
+                success: function () {
+                    document.location.reload(true);
+                }
+            }).fail(function () {
+                showErrorMessage('update failed');
+            });
+        });
+    }
+
+    </script>
     {% endif %}
 {% endblock %}
