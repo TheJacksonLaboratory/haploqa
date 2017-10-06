@@ -11,7 +11,6 @@
     <div class="row">
         <div class="col-md-12">
             Current Users in System:
-
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -27,7 +26,7 @@
                     <tr>
                     {% for user in users %}
                     <tr>
-                        <td>{{ user.email_address }}</td>
+                        <td><a href="{{ url_for('user_samples', user_id=user._id) }}" title="view all samples owned by this user">{{ user.email_address }}</a></td>
                         <td>{{ user.affiliation }}</td>
                         <td>{{ user.created }}</td>
                         <td>{{ user.last_login }}</td>

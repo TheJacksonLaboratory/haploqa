@@ -144,12 +144,11 @@
 
 {% block content %}
     <div class="page-header">
-        <h1>{% block header %}All Samples{% endblock %}</h1>
+        <h1>{% block header %}All Samples{% if email %} owned by user {{ email }}{% endif %}{% endblock %}</h1>
     </div>
 
     <p>Select any of the samples below to view or edit details.</p>
-
-    {% if g.user %}
+    {% if g.user.administrator == True or edit == True %}
     <div style="margin-bottom: 10px;">
         <div class="row" data-display-when="sample-readonly">
             <div class="col-md-12">

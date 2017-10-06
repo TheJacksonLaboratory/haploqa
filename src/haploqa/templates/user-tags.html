@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}HaploQA - My Samples{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>My Samples</h1>
+    </div>
+
+    <div class="row">
+        {% if tags %}
+        <div class="col-md-12">
+            Select any of the following tags to view or edit samples:
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Sample Tag</th>
+                        <th>Sample Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tag in tags %}
+                    <tr>
+                        <td><a href="{{ url_for('owner_tags', tag_id=tag.name) }}">{{ tag.name }}</a></td>
+                        <td>{{ tag.sample_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        You do not have any samples
+        {% endif %}
+    </div>
+{% endblock %}
