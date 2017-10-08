@@ -175,6 +175,7 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
+# TODO: deprecated
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -637,11 +638,13 @@ def all_samples_html():
     )
     samples = list(samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'samples.html',
             samples=samples,
             strain_colors=_get_strain_map(db),
+            all_owners=all_owners,
             all_tags=all_tags,
     )
 
@@ -649,6 +652,10 @@ def all_samples_html():
 def user_samples(user_id):
     # look up all samples by user id.
     # Only return top level information though (snp-level data is too much)
+
+    if flask.g.user['administrator'] is False:
+        return flask.render_template('login-required.html')
+
     db = mds.get_db()
 
     user = db.users.find_one({
@@ -670,12 +677,14 @@ def user_samples(user_id):
     )
     samples = list(samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'samples.html',
             samples=samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             email=user_email,
     )
 
@@ -699,12 +708,14 @@ def sample_tag_html(tag_id):
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'sample-tag.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             tag_id=tag_id)
 
 @app.route('/owner-tags/<escfwd:tag_id>.html')
@@ -730,12 +741,14 @@ def owner_tags(tag_id):
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'sample-tag.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             tag_id=tag_id,
             edit=True)
 
@@ -787,12 +800,14 @@ def search_html():
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'search.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             search_text=search_text)
 
 
@@ -1009,12 +1024,14 @@ def sample_html(mongo_id):
         return flask.render_template('login-required.html')
 
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
 
     return flask.render_template(
         'sample.html',
         sample=sample,
         all_tags=all_tags,
+        all_owners=all_owners,
         all_eng_tgts=all_eng_tgts,
         strain_map=_get_strain_map(db),
     )
@@ -1379,6 +1396,7 @@ def update_samples():
     # extract form parameters
     form = flask.request.form
     sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
+    owner = form['owner']
     tags = json.loads(form['tags'])
     tags_action = form['tags_action']
     contributing_strains = json.loads(form['contributing_strains'])
@@ -1392,6 +1410,8 @@ def update_samples():
     add_to_set_dict = dict()
     remove_dict = dict()
     set_dict = dict()
+
+    set_dict['owner'] = str(owner).strip('"')
 
     def save_updates():
         update_dict = dict()

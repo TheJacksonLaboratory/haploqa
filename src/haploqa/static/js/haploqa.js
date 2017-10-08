@@ -33,6 +33,12 @@ function deepCopyObj(obj) {
     return $.extend(true, {}, obj);
 }
 
+function showConfirmMessage(msg) {
+        var modalDialog = $('#confirm-modal');
+        modalDialog.modal();
+        $('#confirm-modal-message').text(msg);
+        }
+
 function showErrorMessage(msg) {
     var modalDialog = $('#error-modal');
     var errorModalMessage = $('#error-modal-message');

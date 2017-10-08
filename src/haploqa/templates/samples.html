@@ -7,14 +7,37 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/mm10-data.js') }}"></script>
     <script>
         var allTags = {{ all_tags|tojson }};
+        {% if all_owners %}
+        var allOwners = {{ all_owners|tojson }}
+        {% endif %}
         var strainColors = {{ strain_colors|tojson }};
         var strainNames = $.map(strainColors, function(color, strainName) {return strainName});
+
         $(function() {
             var tagActionDropdown = new BootstrapDropdown($('#tag-action-dropdown'));
             var contribStrainsActionDropdown = new BootstrapDropdown($('#contrib-strains-action-dropdown'));
             var sampleVisibilityDropdown = new BootstrapDropdown($('#sample-visibility-dropdown'));
+            var editOwnerInput = $('#edit-owner-input');
+
+            editOwnerInput.tokenfield({
+                autocomplete: {
+                    source: allOwners.map(function(owner) {
+                        return {
+                            label: owner,
+                            value: owner
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            });
+
 
             var editTagsInput = $('#edit-tags-input');
+
             editTagsInput.tokenfield({
                 autocomplete: {
                     source: allTags.map(function(tag) {
@@ -32,6 +55,7 @@
             });
 
             var contribStrainTokensInput = $('#contributing-strains');
+
             contribStrainTokensInput.tokenfield({
                 autocomplete: {
                     source: strainNames,
@@ -42,6 +66,7 @@
                 createTokensOnBlur: true,
                 limit: {{ maximum_contributing_strain_count() }}
             });
+
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
                 var value = e.attrs.value;
 
@@ -91,20 +116,29 @@
                 $('[data-display-when="sample-edit"]').css('display', isEdit ? '' : 'none');
                 $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
             }
+
             editSamplesButton.click(function() {switchEditSampleView(true);});
+
             cancelSamplesButton.click(function() {
                 // reset all of the edit inputs before we hide them
                 editTagsInput.tokenfield('setTokens', []);
+                editOwnerInput.tokenfield('setTokens', []);
                 tagActionDropdown.setValue('add');
                 contribStrainTokensInput.tokenfield('setTokens', []);
                 contribStrainsActionDropdown.setValue('add');
                 sampleVisibilityDropdown.setValue('no-change');
-
                 switchEditSampleView(false);
             });
+
             saveSamplesButton.click(function() {
                 saveSamplesButton.prop('disabled', true);
                 sampleUpdateSpinner.css('display', '');
+
+                /** TODO: saving this when i can save multiple owners properly, if decided necessary
+                var newOwners = discardDupElems(editOwnerInput.tokenfield('getTokens').map(function(x) {
+                    return x.value;
+                }));
+                 */
 
                 var newTags = discardDupElems(editTagsInput.tokenfield('getTokens').map(function(x) {
                     return x.value;
@@ -122,6 +156,7 @@
                     url: "{{ url_for('update_samples') }}",
                     data: {
                         samples_to_update: JSON.stringify(selectedSampleIDs),
+                        owner:  editOwnerInput.val(),
                         tags: JSON.stringify(newTags),
                         tags_action: tagActionDropdown.getValue(),
                         contributing_strains: JSON.stringify(newContribStrainNames),
@@ -159,6 +194,12 @@
         </div>
 
         <form data-display-when="sample-edit" style="display: none;">
+            <div class="form-group">
+                <label for="edit-owner-input">Owner</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" style="width: 400px;" id="edit-owner-input" placeholder="please enter only one owner">
+                </div><!-- /input-group -->
+            </div>
             <div class="form-group">
                 <label for="edit-tags-input">Tags</label>
                 <div class="input-group">

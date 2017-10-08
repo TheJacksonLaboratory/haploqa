@@ -30,7 +30,7 @@
                         <td>{{ user.affiliation }}</td>
                         <td>{{ user.created }}</td>
                         <td>{{ user.last_login }}</td>
-                        <td><a id="make-admin" style="cursor: pointer" onclick="switch_admin('{{ user.email_address }}', '{{ user.administrator }}')">{{ user.administrator }}</a></td>
+                        <td><a id="make-admin" title="click to toggle user privileges" style="cursor: pointer" onclick="switch_admin('{{ user.email_address }}', '{{ user.administrator }}')">{{ user.administrator }}</a></td>
                         <td><a id="remove-user" style="cursor: pointer" onclick="remove_user('{{ user.email_address }}')">Remove</a> </td>
                     </tr>
                     {% endfor %}
@@ -39,12 +39,6 @@
         </div>
     </div>
      <script>
-
-    function showConfirmMessage(msg) {
-        var modalDialog = $('#confirm-modal');
-        modalDialog.modal();
-        $('#confirm-modal-message').text(msg);
-        }
 
     function switch_admin(email, status) {
         if (status == 'True') {

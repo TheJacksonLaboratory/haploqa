@@ -33,11 +33,32 @@
             sex = 'unknown';
         }
         var allTags = {{ all_tags|tojson }};
+        var allOwners = {{ all_owners|tojson }}
         var sample = {{ sample|tojson }};
         var allEngTgts = {{ all_eng_tgts|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
 
         $(function() {
+
+            var editOwnerInput = $('#edit-owner-input');
+
+            editOwnerInput.tokenfield({
+                autocomplete: {
+                    source: allOwners.map(function(owner) {
+                        return {
+                            label: owner,
+                            value: owner
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    //minWidth isn't working so setting inline style
+                    minWidth: 300,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            });
 
             //export karyotype plot to png
             $('#export-png').click(function () {
@@ -817,18 +838,11 @@
                         </td>
                     </tr>
                     <tr>
-                        <th>Owner
-                            <span class="glyphicon glyphicon-question-sign help-icon"
-                                    aria-hidden="true"
-                                    data-toggle="tooltip"
-                                    data-placement="top"
-                                    title="TODO: add pulldown menu from list of regular users during edit operation">
-                            </span>
-                        </th>
+                        <th>Owner</th>
                         <td>
                             {% if g.user.administrator == True %}
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}"/>
+                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}" placeholder="1 owner only"/>
                             </span>
                             {% endif %}
                             <span id="readonly-owner" data-display-when="sample-readonly">{{ sample.owner }}</span>
