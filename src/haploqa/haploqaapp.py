@@ -457,9 +457,14 @@ def sample_import_status_json(task_id):
 
 @app.route('/sample-data-export.html')
 def sample_data_export_html():
+
+    user = flask.g.user
+    if user['administrator'] is not True:
+        return flask.render_template('login-required.html')
+
     db = mds.get_db()
     samples = _find_and_anno_samples(
-        {},
+        {'owner': flask.g.user['email_address_lowercase']},
         {
             'chromosome_data': 0,
             'unannotated_snps': 0,
