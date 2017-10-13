@@ -175,6 +175,7 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
+# TODO: deprecated
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -191,7 +192,7 @@ def show_users():
 @app.route('/switch-admin.json', methods=['POST'])
 def switch_admin():
     """
-    Promote a user to admin
+    Promote / Demote a user's status
     :return: True / False
     """
     user = flask.g.user
@@ -456,9 +457,14 @@ def sample_import_status_json(task_id):
 
 @app.route('/sample-data-export.html')
 def sample_data_export_html():
+
+    user = flask.g.user
+    if user['administrator'] is not True:
+        return flask.render_template('login-required.html')
+
     db = mds.get_db()
     samples = _find_and_anno_samples(
-        {},
+        {'owner': flask.g.user['email_address_lowercase']},
         {
             'chromosome_data': 0,
             'unannotated_snps': 0,
@@ -637,12 +643,54 @@ def all_samples_html():
     )
     samples = list(samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
+
+    return flask.render_template(
+            'samples.html',
+            samples=samples,
+            strain_colors=_get_strain_map(db),
+            all_owners=all_owners,
+            all_tags=all_tags,
+    )
+
+@app.route('/user-samples/<user_id>')
+def user_samples(user_id):
+    # look up all samples by user id.
+    # Only return top level information though (snp-level data is too much)
+
+    if flask.g.user['administrator'] is False:
+        return flask.render_template('login-required.html')
+
+    db = mds.get_db()
+
+    user = db.users.find_one({
+        '_id': ObjectId(user_id),
+    })
+
+    user_email = user['email_address_lowercase']
+
+    samples = _find_and_anno_samples(
+        {'owner': user_email},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+    samples = list(samples)
+    all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'samples.html',
             samples=samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
+            email=user_email,
     )
 
 
@@ -665,13 +713,49 @@ def sample_tag_html(tag_id):
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'sample-tag.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             tag_id=tag_id)
+
+@app.route('/owner-tags/<escfwd:tag_id>.html')
+def owner_tags(tag_id):
+
+    # look up all samples with this tag ID and associated with current logged in user.
+    # Only return top level information though
+    # (snp-level data is too much)
+
+    db = mds.get_db()
+    matching_samples = _find_and_anno_samples(
+        {'tags': tag_id,
+         'owner': flask.g.user['email_address'],
+        },
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+    matching_samples = list(matching_samples)
+    all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
+
+    return flask.render_template(
+            'sample-tag.html',
+            samples=matching_samples,
+            strain_colors=_get_strain_map(db),
+            all_tags=all_tags,
+            all_owners=all_owners,
+            tag_id=tag_id,
+            edit=True)
 
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
@@ -721,12 +805,14 @@ def search_html():
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'search.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             search_text=search_text)
 
 
@@ -758,6 +844,31 @@ def index_html():
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
 
     return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
+
+@app.route('/user-tags.html')
+def user_tags():
+    """
+    get all tags associated with the current logged in user
+    :return:
+    """
+    user = flask.g.user
+    db = mds.get_db()
+
+    # this pipeline should get us all tags along with their sample counts
+    pipeline = [
+        {'$unwind': '$tags'},
+        {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
+        {'$sort': SON([('count', -1), ('_id', -1)])},
+    ]
+    if user is None:
+        return flask.render_template('login-required.html')
+    else:
+        # filter by current logged in user
+        pipeline.insert(0, {'$match': {'owner': flask.g.user['email_address']}})
+        tags = db.samples.aggregate(pipeline)
+        tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+
+        return flask.render_template('user-tags.html', tags=tags)
 
 
 @app.route('/contact.html')
@@ -918,12 +1029,14 @@ def sample_html(mongo_id):
         return flask.render_template('login-required.html')
 
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
 
     return flask.render_template(
         'sample.html',
         sample=sample,
         all_tags=all_tags,
+        all_owners=all_owners,
         all_eng_tgts=all_eng_tgts,
         strain_map=_get_strain_map(db),
     )
@@ -1288,6 +1401,7 @@ def update_samples():
     # extract form parameters
     form = flask.request.form
     sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
+    owner = form['owner']
     tags = json.loads(form['tags'])
     tags_action = form['tags_action']
     contributing_strains = json.loads(form['contributing_strains'])
@@ -1301,6 +1415,8 @@ def update_samples():
     add_to_set_dict = dict()
     remove_dict = dict()
     set_dict = dict()
+
+    set_dict['owner'] = str(owner).strip('"')
 
     def save_updates():
         update_dict = dict()
