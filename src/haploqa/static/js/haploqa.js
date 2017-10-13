@@ -34,10 +34,10 @@ function deepCopyObj(obj) {
 }
 
 function showConfirmMessage(msg) {
-        var modalDialog = $('#confirm-modal');
-        modalDialog.modal();
-        $('#confirm-modal-message').text(msg);
-        }
+    var modalDialog = $('#confirm-modal');
+    modalDialog.modal();
+    $('#confirm-modal-message').text(msg);
+}
 
 function showErrorMessage(msg) {
     var modalDialog = $('#error-modal');
