@@ -622,9 +622,6 @@ function HaploKaryoPlot(params) {
             .attr("class", "plot-legend")
             .attr("transform", "translate(30, 900)");
 
-        //console.log(contributingStrains);
-        //console.log(strainMap);
-
         var translateX = 0;
         contributingStrains.forEach(function(e) {
             var name = e;
