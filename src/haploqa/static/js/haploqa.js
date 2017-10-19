@@ -617,6 +617,40 @@ function HaploKaryoPlot(params) {
         });
     };
 
+    this.drawLegend = function(strainMap, contributingStrains) {
+        var legend = svg.append("g")
+            .attr("class", "plot-legend")
+            .attr("transform", "translate(30, 900)");
+
+        //console.log(contributingStrains);
+        //console.log(strainMap);
+
+        var translateX = 0;
+        contributingStrains.forEach(function(e) {
+            var name = e;
+            var color = strainMap[e].color;
+
+            var width = 13 + (name.length * 7) + 10;
+
+            var keyElement = legend.append("g")
+                .attr("id", "svg-" + name)
+                .attr("transform", "translate(" + translateX + ", 10)");
+
+            keyElement.append("rect")
+                .attr("width", 10)
+                .attr("height", 10)
+                .style("fill", color);
+
+            keyElement.append("text")
+                .attr("transform", "translate(13, 10)")
+                .style("font-size", 12)
+                .html(name);
+
+            translateX += width;
+
+        })
+    };
+
     var axesGroup = svg.append("g").attr("class", "axes");
     var genomeScale = null;
     var chrOrdinalScale = null;
@@ -681,6 +715,7 @@ function HaploKaryoPlot(params) {
         return {x: x, y: y};
     };
 }
+
 
 function StripPlot(svgNode) {
     // we define "self" here because the meaning of "this" can easily change with context

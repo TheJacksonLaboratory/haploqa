@@ -463,6 +463,9 @@
             function updateHaplotypeStrains(newContribStrains) {
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
                 sample['contributing_strains'].sort();
+
+                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains']);
+
                 readonlyHaplotypesPanel.empty();
                 sample['contributing_strains'].forEach(function(strain, i) {
                     if(i >= 1) {
@@ -1103,7 +1106,7 @@
         <div class="col-md-12">
             <svg
                     id="hapkaryoplot-svg"
-                    width="900" height="900"
+                    width="900" height="960"
                     class="haplotype-plot"></svg>
         </div>
     </div>
