@@ -516,6 +516,7 @@
             function resetEdits() {
                 // restore old values to inputs so that if the user clicks edit again they
                 // won't be presented with the values that they just cancelled.
+                //TODO: use js var
                 $('#edit-owner-input').val('{{ sample.owner }}');
                 updateSampleTags(sample.tags);
                 updateStandardDesignation(sample.standard_designation);
