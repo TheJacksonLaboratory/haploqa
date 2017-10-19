@@ -1416,7 +1416,12 @@ def update_samples():
     remove_dict = dict()
     set_dict = dict()
 
-    set_dict['owner'] = str(owner).strip('"')
+    if len(owner) > 0:
+        set_dict['owner'] = str(owner).strip('"')
+
+    ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+    set_dict['last_update'] = ts
+    set_dict['updated_by'] = flask.g.user['email_address']
 
     def save_updates():
         update_dict = dict()
