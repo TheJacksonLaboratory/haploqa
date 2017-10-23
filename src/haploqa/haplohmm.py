@@ -126,7 +126,6 @@ def samples_to_ab_codes(samples, chromosome, snps):
     ab_codes.fill(255)
 
     for i, curr_sample in enumerate(samples):
-        print("hi i'm on line 129 of hqmm... and my current value is... {}".format(curr_sample))
         if 'allele1_fwds' in curr_sample['chromosome_data'][chromosome]:
             allele1_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele1_fwds'])
             allele2_fwds = np.array(curr_sample['chromosome_data'][chromosome]['allele2_fwds'])

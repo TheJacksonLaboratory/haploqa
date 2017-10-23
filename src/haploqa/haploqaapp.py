@@ -759,11 +759,11 @@ def owner_tags(tag_id):
 
 @app.route('/standard-designation.json/<escfwd:standard_designation>')
 def standard_designation_json(standard_designation):
-    '''
+    """
     look up all samples by standard designation
     :param standard_designation:
     :return: JSON
-    '''
+    """
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)
     db = mds.get_db()
@@ -780,9 +780,6 @@ def standard_designation_json(standard_designation):
     )
 
     matching_samples = list(matching_samples)
-
-    '''for sample in matching_samples:
-        print sample'''
 
     return flask.jsonify(samples=matching_samples)
 
