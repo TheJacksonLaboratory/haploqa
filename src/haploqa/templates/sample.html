@@ -330,7 +330,7 @@
                 sample.tags = newSampleTags;
                 tagLinksPanel.empty();
                 // TODO replace the haplotype-strain check
-                console.error('TODO replace the haplotype-strain check');
+                //console.error('TODO replace the haplotype-strain check');
                 var haplotypeStrainTagPresent = false;
                 newSampleTags.forEach(function(tag, i) {
                     if(tag === 'haplotype-strain') {
@@ -1162,6 +1162,8 @@
                 </button>
             </span>
         </div>
+        <label for="comparison-sample" style="margin-left: 40px">Comparison Sample:</label>
+        <select id="comparison-sample" class="selectpicker"></select>
     </div>
 
     <div class="readonly-haplotypes-panel"></div>
