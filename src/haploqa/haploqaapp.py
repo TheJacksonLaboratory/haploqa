@@ -757,6 +757,32 @@ def owner_tags(tag_id):
             tag_id=tag_id,
             edit=True)
 
+@app.route('/standard-designation.json/<escfwd:standard_designation>')
+def standard_designation_json(standard_designation):
+    """
+    look up all samples by standard designation
+    :param standard_designation:
+    :return: JSON
+    """
+    # look up all samples with this standard_designation. Only return top level information though
+    # (snp-level data is too much)
+    db = mds.get_db()
+    matching_samples = _find_and_anno_samples(
+        {'standard_designation': standard_designation},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+
+    matching_samples = list(matching_samples)
+
+    return flask.jsonify(samples=matching_samples)
+
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
 def standard_designation_html(standard_designation):
@@ -776,12 +802,14 @@ def standard_designation_html(standard_designation):
     )
     matching_samples = list(matching_samples)
     all_tags = db.samples.distinct('tags')
+    all_owners = db.users.distinct('email_address_lowercase')
 
     return flask.render_template(
             'standard-designation.html',
             samples=matching_samples,
             strain_colors=_get_strain_map(db),
             all_tags=all_tags,
+            all_owners=all_owners,
             standard_designation=standard_designation)
 
 
@@ -1133,6 +1161,75 @@ def sample_snp_report(mongo_id):
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
 
+#TODO: needs to output JSON. currently only delivers a csv.
+@app.route('/snps.json/<mongo_id>/<chr_id>')
+def get_snps_json(mongo_id, chr_id):
+    '''
+    json endpoint for retrieving snp data by chromosome and region
+    for a specified sample
+    :param mongo_id:
+    :param chr_id:
+    :return: json snp data
+    '''
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
+    sample_uses_snp_format = False
+    for chr_val in sample['chromosome_data'].values():
+        sample_uses_snp_format = 'snps' in chr_val
+
+    contributing_strains = sample['contributing_strains']
+
+    def gen_outDict():
+
+        outDict = {}
+
+        snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+
+        try:
+            haplotype_blocks = sample['viterbi_haplotypes']['chromosome_data'][chr_id]['haplotype_blocks']
+        except KeyError:
+            haplotype_blocks = []
+        hap_block_index = 0
+
+        for snp_index, curr_snp in enumerate(snps):
+            snp_hap_block = None
+            for hap_block_index in range(hap_block_index, len(haplotype_blocks)):
+                curr_hap_block = haplotype_blocks[hap_block_index]
+                if curr_hap_block['end_position_bp'] >= curr_snp['position_bp']:
+                    if curr_hap_block['start_position_bp'] <= curr_snp['position_bp']:
+                        snp_hap_block = curr_hap_block
+                    break
+
+            position = str(curr_snp['position_bp'])
+            outDict[position] = {}
+            outDict[position]['sample_id'] = sample['sample_id']
+            outDict[position]['snp_id'] = curr_snp['snp_id']
+            outDict[position]['chromosome'] = curr_snp['chromosome']
+
+            if snp_hap_block is None:
+                hap1, hap2 = ""
+            else:
+                hap1 = contributing_strains[snp_hap_block['haplotype_index_1']]
+                hap2 = contributing_strains[snp_hap_block['haplotype_index_2']]
+
+            outDict[position]['haplotype1'] = hap1
+            outDict[position]['haplotype2'] = hap2
+
+            if sample_uses_snp_format:
+                outDict[position]['snp_call'] = sample['chromosome_data'][chr_id]['snps'][snp_index]
+
+            else:
+                outDict[position]['allele1_fwd'] = sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index]
+                outDict[position]['allele2_fwd'] = sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index]
+
+        return outDict
+
+    return flask.jsonify(gen_outDict())
+
 @app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
 def combined_report(sdid):
     '''
@@ -1318,7 +1415,7 @@ def update_sample(mongo_id):
     form = flask.request.form
     update_dict = dict()
 
-    ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+    ts = '{:%m/%d/%Y %H:%M %p} EST'.format(datetime.datetime.now())
     update_dict['last_update'] = ts
     update_dict['updated_by'] = flask.g.user['email_address']
 
@@ -1419,7 +1516,7 @@ def update_samples():
     if len(owner) > 0:
         set_dict['owner'] = str(owner).strip('"')
 
-    ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+    ts = '{:%m/%d/%Y %H:%M %p} EST'.format(datetime.datetime.now())
     set_dict['last_update'] = ts
     set_dict['updated_by'] = flask.g.user['email_address']
 
