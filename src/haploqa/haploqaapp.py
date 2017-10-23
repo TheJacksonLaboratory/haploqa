@@ -1186,29 +1186,9 @@ def get_snps_json(mongo_id, chr_id):
 
     contributing_strains = sample['contributing_strains']
 
-    def tsv_generator():
-        # generate a header 1st
-        if sample_uses_snp_format:
-            yield _iter_to_row((
-                'sample_id',
-                'snp_id',
-                'chromosome',
-                'position_bp',
-                'snp_call',
-                'haplotype1',
-                'haplotype2',
-            ))
-        else:
-            yield _iter_to_row((
-                'sample_id',
-                'snp_id',
-                'chromosome',
-                'position_bp',
-                'allele1_fwd',
-                'allele2_fwd',
-                'haplotype1',
-                'haplotype2',
-            ))
+    def gen_outDict():
+
+        outDict = {}
 
         snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
 
@@ -1227,29 +1207,31 @@ def get_snps_json(mongo_id, chr_id):
                         snp_hap_block = curr_hap_block
                     break
 
-            if sample_uses_snp_format:
-                yield _iter_to_row((
-                    sample['sample_id'],
-                    curr_snp['snp_id'],
-                    curr_snp['chromosome'],
-                    str(curr_snp['position_bp']),
-                    sample['chromosome_data'][chr_id]['snps'][snp_index],
-                    '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_1']],
-                    '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_2']],
-                ))
-            else:
-                yield _iter_to_row((
-                    sample['sample_id'],
-                    curr_snp['snp_id'],
-                    curr_snp['chromosome'],
-                    str(curr_snp['position_bp']),
-                    sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index],
-                    sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index],
-                    '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_1']],
-                    '' if snp_hap_block is None else contributing_strains[snp_hap_block['haplotype_index_2']],
-                ))
+            position = str(curr_snp['position_bp'])
+            outDict[position] = {}
+            outDict[position]['sample_id'] = sample['sample_id']
+            outDict[position]['snp_id'] = curr_snp['snp_id']
+            outDict[position]['chromosome'] = curr_snp['chromosome']
 
-    return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
+            if snp_hap_block is None:
+                hap1, hap2 = ""
+            else:
+                hap1 = contributing_strains[snp_hap_block['haplotype_index_1']]
+                hap2 = contributing_strains[snp_hap_block['haplotype_index_2']]
+
+            outDict[position]['haplotype1'] = hap1
+            outDict[position]['haplotype2'] = hap2
+
+            if sample_uses_snp_format:
+                outDict[position]['snp_call'] = sample['chromosome_data'][chr_id]['snps'][snp_index]
+
+            else:
+                outDict[position]['allele1_fwd'] = sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index]
+                outDict[position]['allele2_fwd'] = sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index]
+
+        return outDict
+
+    return flask.jsonify(gen_outDict())
 
 @app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
 def combined_report(sdid):
