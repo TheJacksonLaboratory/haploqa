@@ -238,6 +238,7 @@
 
                 hapKaryoPlot.zoomInterval(newInterval);
                 hapIntervalPlot.zoomInterval(newInterval);
+                hapIntervalCompPlot.zoomInterval(newInterval);
 
                 if(user !== null) {
                     // don't update haplotypes unless we have at least 1 sec of quiet time.
@@ -689,7 +690,18 @@
                 intervalMode: true
             });
 
+            var intervalCompSVG = d3.select("#hapintervalplot-comp-svg");
+
+            var hapIntervalCompPlot = new HaploKaryoPlot({
+                svg: intervalCompSVG,
+                width: 900,
+                height: 150,
+                chrSizes: mm10ChrSizes,
+                intervalMode: true
+            });
+
             hapIntervalPlot.zoomIntervalChange = updateInterval;
+            hapIntervalCompPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
@@ -705,6 +717,11 @@
                     'fill-opacity': null,
                     'stroke': '#000000'
                 });
+                intervalCompSVG.selectAll('rect.hap').style('fill-opacity', 0.25);
+                intervalCompSVG.selectAll('rect.hap' + strainIdx).style({
+                    'fill-opacity': null,
+                    'stroke': '#000000'
+                });
                 $('a.hap' + strainIdx).css({
                     'box-shadow': '0px 0px 15px 2px ' + strainMap[strainName].color
                 });
@@ -715,6 +732,10 @@
                     'stroke': null
                 });
                 intervalSVG.selectAll('rect.hap').style({
+                    'fill-opacity': null,
+                    'stroke': null
+                });
+                intervalCompSVG.selectAll('rect.hap').style({
                     'fill-opacity': null,
                     'stroke': null
                 });
@@ -748,6 +769,7 @@
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
                     hapKaryoPlot.updateHaplotypes(data, strainMap, strainNames);
                     hapIntervalPlot.updateHaplotypes(data, strainMap, strainNames);
+                    hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
@@ -1148,6 +1170,15 @@
         <div class="col-md-12">
             <svg
                     id="hapintervalplot-svg"
+                    width="900" height="150"
+                    class="haplotype-plot"></svg>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <svg
+                    id="hapintervalplot-comp-svg"
                     width="900" height="150"
                     class="haplotype-plot"></svg>
         </div>
