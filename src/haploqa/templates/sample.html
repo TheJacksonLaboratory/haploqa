@@ -66,6 +66,8 @@
                 saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
             });
 
+            // loads the comparison select with the other samples from the same
+            // standard_designation
             function getComparisonSamples () {
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
                 $.getJSON(samplesURL, function(data) {
@@ -74,20 +76,30 @@
                     var comparisonSelect = $("#comparison-sample");
 
                     sample.comp_samples.forEach(function(sample) {
-                        var option = new Option(sample.sample_id, sample._id);
-                        comparisonSelect.append(option);
+                        // only load samples that aren't the current
+                        if (sample.sample_id !== sampleID) {
+                            var option = new Option(sample.sample_id, sample._id);
+                            comparisonSelect.append(option);
+                        }
                     });
-
-                    sample.current_comp = comparisonSelect.val();
 
                 });
             }
 
             getComparisonSamples();
 
+            // load data when a comparison sample is chosen
             $("#comparison-sample").on("change", function() {
                 sample.current_comp = $(this).val();
-                updateComparisonSVG(sample.current_comp);
+
+                var labelText = $(this).children("option").filter(":selected").text();
+                $("#comp-label").text("Sample: " + labelText);
+
+                // if the previous chosen sample resulted in no data, remove the overlay
+                d3.select("[id=no-data-overlay]").remove();
+
+                // update the comparison svg and only attempt data retrieval twice
+                updateComparisonSVG(sample.current_comp, 2);
             });
 
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
@@ -454,7 +466,6 @@
                 editStandardDesignationInput.val(newStandardDesignation);
             }
             updateStandardDesignation(sample.standard_designation);
-            getComparisonSamples();
 
             function updateNotes(newNotes) {
                 if(!newNotes) {
@@ -795,7 +806,6 @@
             var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
-                    console.log(data);
                     hapKaryoPlot.updateHaplotypes(data, strainMap, strainNames);
                     hapIntervalPlot.updateHaplotypes(data, strainMap, strainNames);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
@@ -814,21 +824,44 @@
                 });
             }
 
-            function updateComparisonSVG(compId) {
+            // gather data for the comparison sample svg
+            // the compId is the sample id of the selected comparison sample to view
+            // attempt is the number of times to attempt data retrieval before it gives up
+            function updateComparisonSVG(compId, attempt) {
+                attempt--;
                 var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
                 $.getJSON(haplotypesURL, function(data) {
 
                     hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
 
-                    if(anyResultsPending(data)) {
+                    // if data is still pending and we still have attempts left,
+                    // try getting data again
+                    if(anyResultsPending(data) && attempt > 0) {
                         if(updateHaplotypeSVGTimeoutID !== null) {
                             // to prevent a pileup of timeout events clear any existing timeout
                             window.clearTimeout(updateHaplotypeSVGTimeoutID);
                         }
                         updateHaplotypeSVGTimeoutID = window.setTimeout(function() {
-                            updateComparisonSVG(compId)
+                            updateComparisonSVG(compId, attempt)
                             }, haplotypePollingIntervalMillisecs
                         );
+                    }
+                    // if no attempts left, inform user that no data turned up
+                    else if(anyResultsPending(data) && attempt === 0) {
+                        var block = d3.select("[id=hapintervalplot-comp-svg]");
+
+                        var overlayGroup = block.append("g")
+                            .attr("id", "no-data-overlay");
+
+                        overlayGroup.append("rect")
+                            .attr("id", "no-data-overlay-bg")
+                            .attr("width", 900)
+                            .attr("height", 150);
+                        overlayGroup.append("text")
+                            .attr("id", "no-data-overlay-text")
+                            .attr("transform", "translate(225, 90)")
+                            .html("NO DATA TO SHOW");
+
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
@@ -1221,6 +1254,7 @@
 
     <div class="row">
         <div class="col-md-12">
+            <label class="sample-label">Sample: {{ sample.sample_id }}</label>
             <svg
                     id="hapintervalplot-svg"
                     width="900" height="150"
@@ -1230,6 +1264,7 @@
 
     <div class="row">
         <div class="col-md-12">
+            <label id="comp-label" class="sample-label"></label>
             <svg
                     id="hapintervalplot-comp-svg"
                     width="900" height="150"
