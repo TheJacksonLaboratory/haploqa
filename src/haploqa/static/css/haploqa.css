@@ -2,6 +2,11 @@
     font-size: 25px;
 }
 
+select {
+    height: 30px;
+    width: 200px;
+}
+
 th {
     white-space: nowrap;
 }

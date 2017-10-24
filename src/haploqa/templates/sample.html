@@ -66,6 +66,30 @@
                 saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
             });
 
+            function getComparisonSamples () {
+                var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
+                $.getJSON(samplesURL, function(data) {
+                    sample.comp_samples = data.samples;
+
+                    var comparisonSelect = $("#comparison-sample");
+
+                    sample.comp_samples.forEach(function(sample) {
+                        var option = new Option(sample.sample_id, sample._id);
+                        comparisonSelect.append(option);
+                    });
+
+                    sample.current_comp = comparisonSelect.val();
+
+                });
+            }
+
+            getComparisonSamples();
+
+            $("#comparison-sample").on("change", function() {
+                sample.current_comp = $(this).val();
+                updateComparisonSVG(sample.current_comp);
+            });
+
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
                     candidateHaplotypeTable,
@@ -430,6 +454,7 @@
                 editStandardDesignationInput.val(newStandardDesignation);
             }
             updateStandardDesignation(sample.standard_designation);
+            getComparisonSamples();
 
             function updateNotes(newNotes) {
                 if(!newNotes) {
@@ -770,9 +795,9 @@
             var updateHaplotypeSVGTimeoutID = null;
             function updateHaplotypeSVG() {
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
+                    console.log(data);
                     hapKaryoPlot.updateHaplotypes(data, strainMap, strainNames);
                     hapIntervalPlot.updateHaplotypes(data, strainMap, strainNames);
-                    hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
                     var concordantPercent = data.viterbi_haplotypes.concordant_percent;
                     haploSnpConcordance.text(
                             concordantPercent === null ? 'N/A' : concordantPercent.toFixed(2) + '%');
@@ -783,6 +808,27 @@
                             window.clearTimeout(updateHaplotypeSVGTimeoutID);
                         }
                         updateHaplotypeSVGTimeoutID = window.setTimeout(updateHaplotypeSVG, haplotypePollingIntervalMillisecs);
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while updating haplotypes.');
+                });
+            }
+
+            function updateComparisonSVG(compId) {
+                var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
+                $.getJSON(haplotypesURL, function(data) {
+
+                    hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
+
+                    if(anyResultsPending(data)) {
+                        if(updateHaplotypeSVGTimeoutID !== null) {
+                            // to prevent a pileup of timeout events clear any existing timeout
+                            window.clearTimeout(updateHaplotypeSVGTimeoutID);
+                        }
+                        updateHaplotypeSVGTimeoutID = window.setTimeout(function() {
+                            updateComparisonSVG(compId)
+                            }, haplotypePollingIntervalMillisecs
+                        );
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
@@ -1166,7 +1212,9 @@
             </span>
         </div>
         <label for="comparison-sample" style="margin-left: 40px">Comparison Sample:</label>
-        <select id="comparison-sample" class="selectpicker"></select>
+        <select id="comparison-sample">
+            <option value="">Select Comparison Sample</option>
+        </select>
     </div>
 
     <div class="readonly-haplotypes-panel"></div>
