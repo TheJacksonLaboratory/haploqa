@@ -431,7 +431,8 @@ function HaploKaryoPlot(params) {
     var cachedHaplotypeData = null;
     var cachedHaplotypeMap = {};
     var cachedStrainNames = null;
-    var plotContentsGroup = svg.append("g").attr("class", "plot-contents");
+    var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
+    var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
@@ -648,7 +649,7 @@ function HaploKaryoPlot(params) {
         })
     };
 
-    var axesGroup = svg.append("g").attr("class", "axes");
+    var axesGroup = plot.append("g").attr("class", "axes");
     var genomeScale = null;
     var chrOrdinalScale = null;
     var yAxisIDs;
