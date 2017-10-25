@@ -1203,13 +1203,11 @@ def get_snps_grouped_json(mongo_id, chr_id):
         except KeyError:
             haplotype_blocks = []
 
-        #I dont think you need to initialize this, the iterator should take care of that
         hap_block_index = 0
 
         for snp_index, curr_snp in enumerate(snps):
             snp_hap_block = None
 
-            #why does this need to be done inside the loop
             for hap_block_index in range(hap_block_index, len(haplotype_blocks)):
                 curr_hap_block = haplotype_blocks[hap_block_index]
                 if curr_hap_block['end_position_bp'] >= curr_snp['position_bp']:
@@ -1218,7 +1216,8 @@ def get_snps_grouped_json(mongo_id, chr_id):
                     break
 
             position = str(curr_snp['position_bp'])
-            #print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
+            # for debugging
+            # print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
             data_set[position] = {}
             data_set[position]['snp_id'] = curr_snp['snp_id']
             data_set[position]['x_probe_call'] = curr_snp['x_probe_call']
@@ -1244,7 +1243,7 @@ def get_snps_grouped_json(mongo_id, chr_id):
                 # add the current set of data points to a new element and reset the dictionary
                 outDict[set_counter] = data_set
                 data_set = {}
-                #increment the set counter, reset the data set counter counter
+                #increment the set counter, reset the data set counter
                 set_counter += 1
                 data_set_counter = 1
             else:
