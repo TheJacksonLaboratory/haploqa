@@ -37,6 +37,7 @@
         var sample = {{ sample|tojson }};
         var allEngTgts = {{ all_eng_tgts|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
+        var snpData = null;
 
         $(function() {
 
@@ -225,6 +226,7 @@
                 });
 
             var interval = null;
+            var lastChr = null;
             var updateIntervalButton = $('#update-interval-button');
             var clearIntervalButton = $('#clear-interval-button');
             var intervalText = $('#interval-edit');
@@ -236,6 +238,12 @@
             var updateIntervalDP = new DelayedPreemptable();
 
             function updateInterval(newInterval) {
+
+                if(interval === null || lastChr !== newInterval.chr) {
+                    getSNPData(sample._id, newInterval.chr);
+                    lastChr = newInterval.chr;
+                }
+
                 interval = newInterval;
 
                 if(newInterval === null) {
@@ -918,6 +926,16 @@
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
+                });
+            }
+
+            function getSNPData(sampleId, chr) {
+                var snpsURL = "/snps.json/" + sampleId + "/" + chr;
+                $.getJSON(snpsURL, function(data) {
+                    hapIntervalPlot.updateSNPBar(data);
+                    return data;
+                }).fail(function() {
+                    showErrorMessage('An error occurred while gathering SNP data.');
                 });
             }
 

@@ -708,6 +708,16 @@ function HaploKaryoPlot(params) {
     }
     updateAxes();
 
+
+    this.updateSNPBar = function(snpData) {
+        for (var key in snpData) {
+            console.log(key);
+            //if (snpData.hasOwnProperty(key)) {
+            //    console.log(snpData[key]);
+            //}
+        }
+    };
+
     var zoomOverlayGroup = svg.append("g").attr("class", "zoom-overlay");
 
     this.mouseOverHaplotype = null;
