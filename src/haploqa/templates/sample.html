@@ -73,6 +73,7 @@
             var candidateHaplotypeTableBody = $('#candidate-haplotype-table-body');
             var findCandidateHapsReq = null;
             var findCandidateHapsWaiting = false;
+
             function findCandidateHaps() {
                 if(interval === null) {
                     if(findCandidateHapsReq !== null) {
@@ -195,6 +196,7 @@
             gotoUCSCLink.addClass('disabled');
 
             var updateIntervalDP = new DelayedPreemptable();
+
             function updateInterval(newInterval) {
                 interval = newInterval;
 
@@ -322,6 +324,7 @@
                 showAutocompleteOnFocus: true,
                 createTokensOnBlur: true
             });
+
             function updateSampleTags(newSampleTags) {
                 newSampleTags.sort(function(x, y) {
                     return x.localeCompare(y);
@@ -366,16 +369,19 @@
                 showAutocompleteOnFocus: true,
                 createTokensOnBlur: true
             };
+
             function createEngTgtToken(e) {
                 // before a target is generated make sure it is valid (i.e. it should be
                 // in the allEngTgts list
                 var value = e.attrs.value;
                 return allEngTgts.indexOf(value) >= 0;
             }
+
             editPosEngTgtsInput.tokenfield(engTgtsTokenfieldParams);
             editPosEngTgtsInput.on('tokenfield:createtoken', createEngTgtToken);
             editNegEngTgtsInput.tokenfield(engTgtsTokenfieldParams);
             editNegEngTgtsInput.on('tokenfield:createtoken', createEngTgtToken);
+
             function updateCtrlEngTgts(newEngTgts, isPosCtrl) {
                 newEngTgts.sort(function(x, y) {
                     return x.localeCompare(y);
@@ -428,6 +434,7 @@
 
                 editStandardDesignationInput.val(newStandardDesignation);
             }
+
             updateStandardDesignation(sample.standard_designation);
 
             function updateNotes(newNotes) {
@@ -444,9 +451,11 @@
 
                 editNotesInput.val(newNotes);
             }
+
             updateNotes(sample.notes);
 
             var contribStrainTokensInput = $('#contrib-strains-tokens');
+
             contribStrainTokensInput.tokenfield({
                 autocomplete: {
                     source: strainNames,
@@ -457,9 +466,11 @@
                 createTokensOnBlur: true,
                 limit: {{ maximum_contributing_strain_count() }}
             });
+
             contribStrainTokensInput.on('tokenfield:createtoken', function(e) {
                 return strainNames.indexOf(e.attrs.value) >= 0;
             });
+
             function updateHaplotypeStrains(newContribStrains) {
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
                 sample['contributing_strains'].sort();
@@ -712,6 +723,7 @@
                     'box-shadow': '0px 0px 15px 2px ' + strainMap[strainName].color
                 });
             }
+
             function clearHaplotypeHightlight(haploID) {
                 svg.selectAll('rect.hap').style({
                     'fill-opacity': null,
@@ -725,6 +737,7 @@
                     'box-shadow': ''
                 });
             }
+
             function updateHaplotypeLinkHoverListeners() {
                 strainNames.forEach(function(strainName, i) {
                     $('a.hap' + i).hover(
@@ -747,7 +760,12 @@
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
             var updateHaplotypeSVGTimeoutID = null;
+            var hkPlot = $('#hapkaryoplot');
+            var hkpOverlay = new ElemOverlay(hkPlot, $('<span><span class="fa fa-refresh fa-spin" aria-hidden="true"> \
+                </span> Generating Genome Karyotype Plot</span>'));
+
             function updateHaplotypeSVG() {
+                hkpOverlay.overlayActive(true);
                 $.getJSON("{{ url_for('viterbi_haplotypes_json', mongo_id=sample._id) }}", function(data) {
                     hapKaryoPlot.updateHaplotypes(data, strainMap, strainNames);
                     hapIntervalPlot.updateHaplotypes(data, strainMap, strainNames);
@@ -764,6 +782,8 @@
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
+                }).always(function () {
+                    hkpOverlay.overlayActive(false);
                 });
             }
 
@@ -1102,8 +1122,7 @@
             <input type="text" class="form-control" id="contrib-strains-tokens"/>
         </div>
     </form>
-
-    <div class="row">
+    <div class="row" id="hapkaryoplot">
         <div class="col-md-12">
             <svg
                     id="hapkaryoplot-svg"
@@ -1111,7 +1130,6 @@
                     class="haplotype-plot"></svg>
         </div>
     </div>
-
     <div class="row">
         <div class="col-md-12">
             <a class="btn btn-default" href="{{ url_for('sample_snp_report', mongo_id=sample._id) }}" download="{{ sample.sample_id|replace('/', '_')|replace('\\', '_')|replace(':', '_')|replace(';', '_') }}_snp_report.txt">
