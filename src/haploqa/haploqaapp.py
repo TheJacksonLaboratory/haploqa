@@ -1161,16 +1161,115 @@ def sample_snp_report(mongo_id):
 
     return flask.Response(tsv_generator(), mimetype='text/tab-separated-values')
 
-#TODO: needs to output JSON. currently only delivers a csv.
+
+@app.route('/snps-grouped.json/<mongo_id>/<chr_id>')
+def get_snps_grouped_json(mongo_id, chr_id):
+    """
+    json endpoint for retrieving snp data by chromosome
+    for a specified sample. chunks the data points in sets of X size (chunk size)
+    :param mongo_id:
+    :param chr_id:
+    :return: json snp data
+    """
+
+    # time the request
+    ts = datetime.datetime.now()
+    print("request initiated at {}".format(ts))
+
+    db = mds.get_db()
+    obj_id = ObjectId(mongo_id)
+    sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
+    if sample is None:
+        flask.abort(400)
+    sample_uses_snp_format = False
+    for chr_val in sample['chromosome_data'].values():
+        sample_uses_snp_format = 'snps' in chr_val
+
+    contributing_strains = sample['contributing_strains']
+
+    def gen_outDict():
+
+        chunk_size = 20
+        set_counter = 1
+        data_set_counter = 1
+        outDict = {}
+        data_set = {}
+
+        snps = list(mds.get_snps(sample['platform_id'], chr_id, db))
+        print(snps)
+
+        try:
+            haplotype_blocks = sample['viterbi_haplotypes']['chromosome_data'][chr_id]['haplotype_blocks']
+        except KeyError:
+            haplotype_blocks = []
+
+        #I dont think you need to initialize this, the iterator should take care of that
+        hap_block_index = 0
+
+        for snp_index, curr_snp in enumerate(snps):
+            snp_hap_block = None
+
+            #why does this need to be done inside the loop
+            for hap_block_index in range(hap_block_index, len(haplotype_blocks)):
+                curr_hap_block = haplotype_blocks[hap_block_index]
+                if curr_hap_block['end_position_bp'] >= curr_snp['position_bp']:
+                    if curr_hap_block['start_position_bp'] <= curr_snp['position_bp']:
+                        snp_hap_block = curr_hap_block
+                    break
+
+            position = str(curr_snp['position_bp'])
+            #print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
+            data_set[position] = {}
+            data_set[position]['snp_id'] = curr_snp['snp_id']
+            data_set[position]['x_probe_call'] = curr_snp['x_probe_call']
+            data_set[position]['y_probe_call'] = curr_snp['y_probe_call']
+
+            if snp_hap_block is None:
+                hap1, hap2 = ""
+            else:
+                hap1 = contributing_strains[snp_hap_block['haplotype_index_1']]
+                hap2 = contributing_strains[snp_hap_block['haplotype_index_2']]
+
+            data_set[position]['haplotype1'] = hap1
+            data_set[position]['haplotype2'] = hap2
+
+            if sample_uses_snp_format:
+                data_set[position]['snp_call'] = sample['chromosome_data'][chr_id]['snps'][snp_index]
+
+            else:
+                data_set[position]['allele1_fwd'] = sample['chromosome_data'][chr_id]['allele1_fwds'][snp_index]
+                data_set[position]['allele2_fwd'] = sample['chromosome_data'][chr_id]['allele2_fwds'][snp_index]
+
+            if data_set_counter == chunk_size:
+                # add the current set of data points to a new element and reset the dictionary
+                outDict[set_counter] = data_set
+                data_set = {}
+                #increment the set counter, reset the data set counter counter
+                set_counter += 1
+                data_set_counter = 1
+            else:
+                data_set_counter += 1
+
+        # put any remaining pieces onto the outDict
+        outDict[set_counter] = data_set
+
+        # for debugging
+        tsf = datetime.datetime.now()
+        print("request completed at {} ({} total elapsed time) with {} data sets of 20 ({:,}) data points".format(tsf, (tsf-ts), set_counter, (set_counter*chunk_size)))
+
+        return outDict
+
+    return flask.jsonify(gen_outDict())
+
 @app.route('/snps.json/<mongo_id>/<chr_id>')
 def get_snps_json(mongo_id, chr_id):
-    '''
-    json endpoint for retrieving snp data by chromosome and region
+    """
+    json endpoint for retrieving snp data by chromosome
     for a specified sample
     :param mongo_id:
     :param chr_id:
     :return: json snp data
-    '''
+    """
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
@@ -1205,10 +1304,12 @@ def get_snps_json(mongo_id, chr_id):
                     break
 
             position = str(curr_snp['position_bp'])
+            # good for debugging
+            # print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
             outDict[position] = {}
-            outDict[position]['sample_id'] = sample['sample_id']
             outDict[position]['snp_id'] = curr_snp['snp_id']
-            outDict[position]['chromosome'] = curr_snp['chromosome']
+            outDict[position]['x_probe_call'] = curr_snp['x_probe_call']
+            outDict[position]['y_probe_call'] = curr_snp['y_probe_call']
 
             if snp_hap_block is None:
                 hap1, hap2 = ""
