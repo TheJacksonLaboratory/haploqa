@@ -390,7 +390,7 @@ function HaploKaryoPlot(params) {
         svg.on('click', function() {
             var mouseXY = d3.mouse(svg.node());
             var x = mouseXY[0];
-            var y = mouseXY[1];
+            var y = mouseXY[1] - 15;
             var bpPos = null;
             var chr = null;
 
@@ -431,7 +431,8 @@ function HaploKaryoPlot(params) {
     var cachedHaplotypeData = null;
     var cachedHaplotypeMap = {};
     var cachedStrainNames = null;
-    var plotContentsGroup = svg.append("g").attr("class", "plot-contents");
+    var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
+    var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
@@ -617,10 +618,21 @@ function HaploKaryoPlot(params) {
         });
     };
 
-    this.drawLegend = function(strainMap, contributingStrains) {
+    /**
+     * generate the color legend below the plot describing what strains are in the plot
+     *
+     * @param strainMap - mapping of strain names to data
+     * @param contributingStrains - list of all contributing strains
+     * @param yOffset - the y translation for the legend
+     */
+    this.drawLegend = function(strainMap, contributingStrains, yOffset) {
+        svg.selectAll("g")
+            .filter(function() {return (this.classList[0] === "plot-legend");})
+            .remove();
+        
         var legend = svg.append("g")
             .attr("class", "plot-legend")
-            .attr("transform", "translate(30, 900)");
+            .attr("transform", "translate(30, " + yOffset + ")");
 
         var translateX = 0;
         contributingStrains.forEach(function(e) {
@@ -648,7 +660,7 @@ function HaploKaryoPlot(params) {
         })
     };
 
-    var axesGroup = svg.append("g").attr("class", "axes");
+    var axesGroup = plot.append("g").attr("class", "axes");
     var genomeScale = null;
     var chrOrdinalScale = null;
     var yAxisIDs;

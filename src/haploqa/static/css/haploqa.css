@@ -2,6 +2,11 @@
     font-size: 25px;
 }
 
+select {
+    height: 30px;
+    width: 225px;
+}
+
 th {
     white-space: nowrap;
 }
@@ -13,10 +18,27 @@ th {
 .haplotype-plot {
     background: #e8e8e8;
     display: block;
+    margin: 2px auto 10px auto;
+}
+
+#no-data-overlay-bg {
+    fill: rgba(255, 255, 255, 0.5);
+}
+
+#no-data-overlay-text {
+    fill: #666;
+    font-size: 50px;
+}
+
+.sample-label {
+    font-size: 18px;
+    display: block;
+    width: 200px;
+    height: 25px;
     margin-left: auto;
     margin-right: auto;
     margin-top: 20px;
-    margin-bottom: 20px;
+    text-align: center;
 }
 
 .bar {

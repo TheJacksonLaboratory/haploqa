@@ -66,6 +66,44 @@
                 saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
             });
 
+            /**
+             * loads the comparison select with the other samples from the same
+             * standard_designation
+             */
+            function getComparisonSamples () {
+                var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
+                $.getJSON(samplesURL, function(data) {
+                    sample.comp_samples = data.samples;
+
+                    var comparisonSelect = $("#comparison-sample");
+
+                    sample.comp_samples.forEach(function(sample) {
+                        // only load samples that aren't the current
+                        if (sample.sample_id !== sampleID) {
+                            var option = new Option(sample.sample_id, sample._id);
+                            comparisonSelect.append(option);
+                        }
+                    });
+
+                });
+            }
+
+            getComparisonSamples();
+
+            // load data when a comparison sample is chosen
+            $("#comparison-sample").on("change", function() {
+                sample.current_comp = $(this).val();
+
+                var labelText = $(this).children("option").filter(":selected").text();
+                $("#comp-label").text("Sample: " + labelText);
+
+                // if the previous chosen sample resulted in no data, remove the overlay
+                d3.select("[id=no-data-overlay]").remove();
+
+                // update the comparison svg and only attempt data retrieval twice
+                updateComparisonSVG(sample.current_comp, 2);
+            });
+
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
                     candidateHaplotypeTable,
@@ -240,6 +278,7 @@
 
                 hapKaryoPlot.zoomInterval(newInterval);
                 hapIntervalPlot.zoomInterval(newInterval);
+                hapIntervalCompPlot.zoomInterval(newInterval);
 
                 if(user !== null) {
                     // don't update haplotypes unless we have at least 1 sec of quiet time.
@@ -269,6 +308,7 @@
             var cancelSampleButton = $('#cancel-sample-button');
 
             var readonlyHaplotypesPanel = $('.readonly-haplotypes-panel');
+            var readonlyCompHaplotypesPanel = $('.readonly-comp-haplotypes-panel');
 
             var editSampleIDInput = $('#edit-sampleid-input');
 
@@ -475,7 +515,8 @@
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
                 sample['contributing_strains'].sort();
 
-                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains']);
+                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains'], 900);
+                hapIntervalPlot.drawLegend(strainMap, sample['contributing_strains'], 150);
 
                 readonlyHaplotypesPanel.empty();
                 sample['contributing_strains'].forEach(function(strain, i) {
@@ -499,6 +540,33 @@
                 });
                 updateHaplotypeLinkHoverListeners();
                 contribStrainTokensInput.tokenfield('setTokens', sample['contributing_strains']);
+            }
+
+            function updateCompHaplotypeStrains(contribStrains) {
+                contribStrains.sort();
+                hapIntervalCompPlot.drawLegend(strainMap, contribStrains, 150);
+
+                readonlyCompHaplotypesPanel.empty();
+                contribStrains.forEach(function(strain, i) {
+                    if(i >= 1) {
+                        readonlyCompHaplotypesPanel.append(document.createTextNode(', '));
+                    }
+                    var strainIdx = strainNames.indexOf(strain);
+                    //only show links in the haplotype strains if user is admin
+                    //TODO: need to get the plots rendering if sample is public
+                    {% if g.user %}
+                    var haploLink = $(
+                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain)
+                            + '</a>');
+                    {% else %}
+                    var haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain) + '</span>');
+                    {% endif %}
+                    readonlyCompHaplotypesPanel.append(haploLink);
+                    updateHaplotypeLinkHoverListeners();
+                });
             }
 
             function updateSampleID(newSampleID) {
@@ -703,7 +771,18 @@
                 intervalMode: true
             });
 
+            var intervalCompSVG = d3.select("#hapintervalplot-comp-svg");
+
+            var hapIntervalCompPlot = new HaploKaryoPlot({
+                svg: intervalCompSVG,
+                width: 900,
+                height: 150,
+                chrSizes: mm10ChrSizes,
+                intervalMode: true
+            });
+
             hapIntervalPlot.zoomIntervalChange = updateInterval;
+            hapIntervalCompPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
@@ -719,6 +798,11 @@
                     'fill-opacity': null,
                     'stroke': '#000000'
                 });
+                intervalCompSVG.selectAll('rect.hap').style('fill-opacity', 0.25);
+                intervalCompSVG.selectAll('rect.hap' + strainIdx).style({
+                    'fill-opacity': null,
+                    'stroke': '#000000'
+                });
                 $('a.hap' + strainIdx).css({
                     'box-shadow': '0px 0px 15px 2px ' + strainMap[strainName].color
                 });
@@ -730,6 +814,10 @@
                     'stroke': null
                 });
                 intervalSVG.selectAll('rect.hap').style({
+                    'fill-opacity': null,
+                    'stroke': null
+                });
+                intervalCompSVG.selectAll('rect.hap').style({
                     'fill-opacity': null,
                     'stroke': null
                 });
@@ -784,6 +872,52 @@
                     showErrorMessage('An error occurred while updating haplotypes.');
                 }).always(function () {
                     hkpOverlay.overlayActive(false);
+                });
+            }
+
+            /**
+             * gathers data for the comparison sample svg
+             * @param compId - sample id of the selected comparison sample to view
+             * @param attempt - number of times to attempt data retrieval before it gives up
+             */
+            function updateComparisonSVG(compId, attempt) {
+                attempt--;
+                var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
+                $.getJSON(haplotypesURL, function(data) {
+                    hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
+                    updateCompHaplotypeStrains(data.contributing_strains);
+
+                    // if data is still pending and we still have attempts left,
+                    // try getting data again
+                    if(anyResultsPending(data) && attempt > 0) {
+                        if(updateHaplotypeSVGTimeoutID !== null) {
+                            // to prevent a pileup of timeout events clear any existing timeout
+                            window.clearTimeout(updateHaplotypeSVGTimeoutID);
+                        }
+                        updateHaplotypeSVGTimeoutID = window.setTimeout(function() {
+                            updateComparisonSVG(compId, attempt)
+                            }, haplotypePollingIntervalMillisecs
+                        );
+                    }
+                    // if no attempts left, inform user that no data turned up
+                    else if(anyResultsPending(data) && attempt === 0) {
+                        var block = d3.select("[id=hapintervalplot-comp-svg]");
+
+                        var overlayGroup = block.append("g")
+                            .attr("id", "no-data-overlay");
+
+                        overlayGroup.append("rect")
+                            .attr("id", "no-data-overlay-bg")
+                            .attr("width", 900)
+                            .attr("height", 200);
+                        overlayGroup.append("text")
+                            .attr("id", "no-data-overlay-text")
+                            .attr("transform", "translate(225, 90)")
+                            .html("NO DATA TO SHOW");
+
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while updating haplotypes.');
                 });
             }
 
@@ -1161,15 +1295,32 @@
                 </button>
             </span>
         </div>
+        <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
+        <select id="comparison-sample">
+            <option value="">Select Comparison Sample</option>
+        </select>
     </div>
 
-    <div class="readonly-haplotypes-panel"></div>
+
 
     <div class="row">
         <div class="col-md-12">
+            <label class="sample-label">Sample: {{ sample.sample_id }}</label>
+            <div class="readonly-haplotypes-panel"></div>
             <svg
                     id="hapintervalplot-svg"
-                    width="900" height="150"
+                    width="900" height="200"
+                    class="haplotype-plot"></svg>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <label id="comp-label" class="sample-label"></label>
+            <div class="readonly-comp-haplotypes-panel"></div>
+            <svg
+                    id="hapintervalplot-comp-svg"
+                    width="900" height="200"
                     class="haplotype-plot"></svg>
         </div>
     </div>
