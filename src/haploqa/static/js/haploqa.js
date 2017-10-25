@@ -618,10 +618,10 @@ function HaploKaryoPlot(params) {
         });
     };
 
-    this.drawLegend = function(strainMap, contributingStrains) {
+    this.drawLegend = function(strainMap, contributingStrains, yOffset) {
         var legend = svg.append("g")
             .attr("class", "plot-legend")
-            .attr("transform", "translate(30, 900)");
+            .attr("transform", "translate(30, " + yOffset + ")");
 
         var translateX = 0;
         contributingStrains.forEach(function(e) {

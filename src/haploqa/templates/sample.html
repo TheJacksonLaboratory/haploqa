@@ -66,8 +66,10 @@
                 saveSvgAsPng(svgElement, "{{ sample.sample_id | urlencode }}.png");
             });
 
-            // loads the comparison select with the other samples from the same
-            // standard_designation
+            /**
+             * loads the comparison select with the other samples from the same
+             * standard_designation
+             */
             function getComparisonSamples () {
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
                 $.getJSON(samplesURL, function(data) {
@@ -304,6 +306,7 @@
             var cancelSampleButton = $('#cancel-sample-button');
 
             var readonlyHaplotypesPanel = $('.readonly-haplotypes-panel');
+            var readonlyCompHaplotypesPanel = $('.readonly-comp-haplotypes-panel');
 
             var editSampleIDInput = $('#edit-sampleid-input');
 
@@ -501,7 +504,8 @@
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
                 sample['contributing_strains'].sort();
 
-                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains']);
+                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains'], 900);
+                hapIntervalPlot.drawLegend(strainMap, sample['contributing_strains'], 150);
 
                 readonlyHaplotypesPanel.empty();
                 sample['contributing_strains'].forEach(function(strain, i) {
@@ -525,6 +529,33 @@
                 });
                 updateHaplotypeLinkHoverListeners();
                 contribStrainTokensInput.tokenfield('setTokens', sample['contributing_strains']);
+            }
+
+            function updateCompHaplotypeStrains(contribStrains) {
+                contribStrains.sort();
+                hapIntervalCompPlot.drawLegend(strainMap, contribStrains, 150);
+
+                readonlyCompHaplotypesPanel.empty();
+                contribStrains.forEach(function(strain, i) {
+                    if(i >= 1) {
+                        readonlyCompHaplotypesPanel.append(document.createTextNode(', '));
+                    }
+                    var strainIdx = strainNames.indexOf(strain);
+                    //only show links in the haplotype strains if user is admin
+                    //TODO: need to get the plots rendering if sample is public
+                    {% if g.user %}
+                    var haploLink = $(
+                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain)
+                            + '</a>');
+                    {% else %}
+                    var haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain) + '</span>');
+                    {% endif %}
+                    readonlyCompHaplotypesPanel.append(haploLink);
+                    updateHaplotypeLinkHoverListeners();
+                });
             }
 
             function updateSampleID(newSampleID) {
@@ -824,15 +855,17 @@
                 });
             }
 
-            // gather data for the comparison sample svg
-            // the compId is the sample id of the selected comparison sample to view
-            // attempt is the number of times to attempt data retrieval before it gives up
+            /**
+             * gathers data for the comparison sample svg
+             * @param compId - sample id of the selected comparison sample to view
+             * @param attempt - number of times to attempt data retrieval before it gives up
+             */
             function updateComparisonSVG(compId, attempt) {
                 attempt--;
                 var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
                 $.getJSON(haplotypesURL, function(data) {
-
                     hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
+                    updateCompHaplotypeStrains(data.contributing_strains);
 
                     // if data is still pending and we still have attempts left,
                     // try getting data again
@@ -856,7 +889,7 @@
                         overlayGroup.append("rect")
                             .attr("id", "no-data-overlay-bg")
                             .attr("width", 900)
-                            .attr("height", 150);
+                            .attr("height", 200);
                         overlayGroup.append("text")
                             .attr("id", "no-data-overlay-text")
                             .attr("transform", "translate(225, 90)")
@@ -1250,14 +1283,15 @@
         </select>
     </div>
 
-    <div class="readonly-haplotypes-panel"></div>
+
 
     <div class="row">
         <div class="col-md-12">
             <label class="sample-label">Sample: {{ sample.sample_id }}</label>
+            <div class="readonly-haplotypes-panel"></div>
             <svg
                     id="hapintervalplot-svg"
-                    width="900" height="150"
+                    width="900" height="200"
                     class="haplotype-plot"></svg>
         </div>
     </div>
@@ -1265,9 +1299,10 @@
     <div class="row">
         <div class="col-md-12">
             <label id="comp-label" class="sample-label"></label>
+            <div class="readonly-comp-haplotypes-panel"></div>
             <svg
                     id="hapintervalplot-comp-svg"
-                    width="900" height="150"
+                    width="900" height="200"
                     class="haplotype-plot"></svg>
         </div>
     </div>
