@@ -390,7 +390,7 @@ function HaploKaryoPlot(params) {
         svg.on('click', function() {
             var mouseXY = d3.mouse(svg.node());
             var x = mouseXY[0];
-            var y = mouseXY[1];
+            var y = mouseXY[1] - 15;
             var bpPos = null;
             var chr = null;
 
@@ -618,6 +618,13 @@ function HaploKaryoPlot(params) {
         });
     };
 
+    /**
+     * generate the color legend below the plot describing what strains are in the plot
+     *
+     * @param strainMap - mapping of strain names to data
+     * @param contributingStrains - list of all contributing strains
+     * @param yOffset - the y translation for the legend
+     */
     this.drawLegend = function(strainMap, contributingStrains, yOffset) {
         var legend = svg.append("g")
             .attr("class", "plot-legend")
