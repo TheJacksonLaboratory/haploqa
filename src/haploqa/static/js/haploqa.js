@@ -626,6 +626,10 @@ function HaploKaryoPlot(params) {
      * @param yOffset - the y translation for the legend
      */
     this.drawLegend = function(strainMap, contributingStrains, yOffset) {
+        svg.selectAll("g")
+            .filter(function() {return (this.classList[0] === "plot-legend");})
+            .remove();
+        
         var legend = svg.append("g")
             .attr("class", "plot-legend")
             .attr("transform", "translate(30, " + yOffset + ")");
