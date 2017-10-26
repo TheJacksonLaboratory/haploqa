@@ -324,6 +324,7 @@ function HaploKaryoPlot(params) {
         // interval overlay used on the global karyotype view.
         if(intervalMode) {
             self.updateHaplotypes();
+            self.updateSNPBar();
         } else {
             zoomOverlayGroup.selectAll("*").remove();
         }
@@ -429,6 +430,7 @@ function HaploKaryoPlot(params) {
     this.zoomIntervalChange = null;
 
     var cachedHaplotypeData = null;
+    var cachedSnpData = null;
     var cachedHaplotypeMap = {};
     var cachedStrainNames = null;
     var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
@@ -533,7 +535,8 @@ function HaploKaryoPlot(params) {
                         if(haplotypeMap.hasOwnProperty(currStrain1)) {
                             currRect.style('fill', haplotypeMap[currStrain1].color);
                         }
-                    } else {
+                    }
+                    else {
                         // TODO these bars may be flipped!
                         currRect = plotContentsGroup.append("rect")
                             .attr("class", "bar")
@@ -616,6 +619,37 @@ function HaploKaryoPlot(params) {
                 });
             }
         });
+    };
+
+    var snpBar = plot.append("g")
+            .attr("class", "snps")
+            .attr("transform", "translate(50, 70)");
+    this.updateSNPBar = function(snpData) {
+        if(typeof snpData === 'undefined') {
+            snpData = cachedSnpData;
+        } else {
+            cachedSnpData = snpData;
+        }
+
+        snpBar.selectAll("*").remove();
+
+        var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
+
+        snpBar.append("rect")
+            .attr("height", 10)
+            .attr("width", intervalWidth)
+            .style("fill", "white");
+
+        for (var key in snpData) {
+            var position = genomeScale(key);
+            if(position <= genomeScale(_zoomInterval.endPos) &&
+                position >= genomeScale(_zoomInterval.startPos)) {
+                //console.log(key);
+            }
+            //if (snpData.hasOwnProperty(key)) {
+            //    console.log(snpData[key]);
+            //}
+        }
     };
 
     /**
@@ -707,16 +741,6 @@ function HaploKaryoPlot(params) {
             .call(yAxis);
     }
     updateAxes();
-
-
-    this.updateSNPBar = function(snpData) {
-        for (var key in snpData) {
-            console.log(key);
-            //if (snpData.hasOwnProperty(key)) {
-            //    console.log(snpData[key]);
-            //}
-        }
-    };
 
     var zoomOverlayGroup = svg.append("g").attr("class", "zoom-overlay");
 
