@@ -633,22 +633,54 @@ function HaploKaryoPlot(params) {
 
         snpBar.selectAll("*").remove();
 
-        var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
+        if (_zoomInterval.size < 10000000 && snpData !== null) {
+            var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
 
-        snpBar.append("rect")
-            .attr("height", 10)
-            .attr("width", intervalWidth)
-            .style("fill", "white");
+            var bpPerPixel = _zoomInterval.size/intervalWidth;
 
-        for (var key in snpData) {
-            var position = genomeScale(key);
-            if(position <= genomeScale(_zoomInterval.endPos) &&
-                position >= genomeScale(_zoomInterval.startPos)) {
-                //console.log(key);
+            snpBar.append("rect")
+                .attr("height", 10)
+                .attr("width", intervalWidth)
+                .style("fill", "white");
+
+            var snpBins = [];
+            for (var i = _zoomInterval.startPos; i < _zoomInterval.endPos; i+=bpPerPixel) {
+                var count = 0;
+                for (var key in snpData) {
+                    if (key >= i && key <= i+bpPerPixel) {
+                        count++;
+                    }
+                    //var position = genomeScale(key);
+                    //if (position <= genomeScale(_zoomInterval.endPos) &&
+                    //    position >= genomeScale(_zoomInterval.startPos)) {
+                        //console.log(key);
+                    //}
+                    //if (snpData.hasOwnProperty(key)) {
+                    //    console.log(snpData[key]);
+                    //}
+                }
+                snpBins.push(count);
             }
-            //if (snpData.hasOwnProperty(key)) {
-            //    console.log(snpData[key]);
-            //}
+
+            var max = 0;
+            for (var j = 0; j < snpBins.length; j++) {
+                if (snpBins[j] > max) {
+                    max = snpBins[j];
+                }
+            }
+
+            for(var k = 0; k < snpBins.length; k++) {
+                if (snpBins[k] !== 0) {
+                    var opacity = Math.round((snpBins[k] /max) * 100) / 100;
+                    snpBar.append("rect")
+                        .attr("width", 1)
+                        .attr("height", 10)
+                        .attr("transform", "translate(" + (k + 1) + ", 0)")
+                        .style("fill", function() {
+                            return "rgba(0, 0, 0, " + opacity + ")";
+                        });
+                }
+            }
         }
     };
 
