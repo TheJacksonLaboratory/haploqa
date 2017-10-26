@@ -634,8 +634,10 @@ function HaploKaryoPlot(params) {
         snpBar.selectAll("*").remove();
 
         if (_zoomInterval.size < 10000000 && snpData !== null) {
+            d3.select("body").selectAll(".d3-tip").remove();
+
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
-            var densityWidth = 3;
+            var densityWidth = 5;
 
             var bpPerPixel = (_zoomInterval.size/intervalWidth)*densityWidth;
 
@@ -670,22 +672,8 @@ function HaploKaryoPlot(params) {
                 }
             }
 
-            /*for(var k = 0; k < snpBins.length; k++) {
-                if (snpBins[k] !== 0) {
-                    var opacity = Math.round((snpBins[k] /max) * 100) / 100;
-                    snpBar.append("rect")
-                        .attr("width", densityWidth)
-                        .attr("height", 10)
-                        .attr("transform", "translate(" + (k*densityWidth) + ", 0)")
-                        .style("fill", function() {
-                            return "rgba(0, 0, 0, " + opacity + ")";
-                        });
-                }
-            }*/
-
             var snpTip = d3.tip()
                 .attr("class", "d3-tip")
-                .attr("id", "snp-tip")
                 .offset([-10, 0])
                 .html(function(d) {
                     if (d === 1) {
@@ -714,7 +702,7 @@ function HaploKaryoPlot(params) {
                 .on("mousemove", function() { // tooltip follows mouse
                     return snpTip.style("top",(d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");
                 })
-                .on("mouseout", snpTip.hide);;
+                .on("mouseout", snpTip.hide);
         }
     };
 
