@@ -637,9 +637,9 @@ function HaploKaryoPlot(params) {
             d3.select("body").selectAll(".d3-tip").remove();
 
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
-            var densityWidth = 5;
+            var snpBandWidth = 5;
 
-            var bpPerPixel = (_zoomInterval.size/intervalWidth)*densityWidth;
+            var bpPerPixel = (_zoomInterval.size/intervalWidth)*snpBandWidth;
 
             snpBar.append("rect")
                 .attr("height", 10)
@@ -649,9 +649,13 @@ function HaploKaryoPlot(params) {
             var snpBins = [];
             for (var i = _zoomInterval.startPos; i < _zoomInterval.endPos; i+=bpPerPixel) {
                 var count = 0;
+                var positions = [];
                 for (var key in snpData) {
                     if (key >= i && key <= i+bpPerPixel) {
                         count++;
+                        if (snpData.hasOwnProperty(key)) {
+                            positions.push(key);
+                        }
                     }
                     //var position = genomeScale(key);
                     //if (position <= genomeScale(_zoomInterval.endPos) &&
@@ -662,13 +666,13 @@ function HaploKaryoPlot(params) {
                     //    console.log(snpData[key]);
                     //}
                 }
-                snpBins.push(count);
+                snpBins.push({density: count, snps: positions});
             }
 
             var max = 0;
             for (var j = 0; j < snpBins.length; j++) {
-                if (snpBins[j] > max) {
-                    max = snpBins[j];
+                if (snpBins[j].density > max) {
+                    max = snpBins[j].density;
                 }
             }
 
@@ -676,11 +680,21 @@ function HaploKaryoPlot(params) {
                 .attr("class", "d3-tip")
                 .offset([-10, 0])
                 .html(function(d) {
-                    if (d === 1) {
-                        return d + " SNP"
+                    if (d.density === 1) {
+                        var snp = snpData[d.snps[0]];
+                        if (_zoomInterval.size < 2000000) {
+                            return "<b>SNP ID:</b> " + (snp.snp_id)
+                                + "<br><b>Allele 1:</b> " + (snp.allele1_fwd)
+                                + "<br><b>Allele 2:</b> " + (snp.allele2_fwd)
+                                + "<br><b>Haplotype 1:</b> " + (snp.haplotype1)
+                                + "<br><b>Haplotype 2:</b> " + (snp.haplotype2);
+                        }
+                        else {
+                            return "1 SNP"
+                        }
                     }
 
-                    return d + " SNPs"
+                    return d.density + " SNPs"
                 });
 
             snpBar.call(snpTip);
@@ -689,13 +703,13 @@ function HaploKaryoPlot(params) {
                 .data(snpBins)
                 .enter()
                 .append("rect")
-                .attr("width", densityWidth)
+                .attr("width", snpBandWidth)
                 .attr("height", 10)
                 .attr("transform", function(d, k) {
-                    return "translate(" + (k*densityWidth) + ", 0)"
+                    return "translate(" + (k*snpBandWidth) + ", 0)"
                 })
                 .style("fill", function(d, k) {
-                    var opacity = Math.round((snpBins[k] /max) * 100) / 100;
+                    var opacity = Math.round((snpBins[k].density /max) * 100) / 100;
                     return "rgba(0, 0, 0, " + opacity + ")";
                 })
                 .on("mouseover", snpTip.show)
