@@ -635,13 +635,14 @@ function HaploKaryoPlot(params) {
 
         if (_zoomInterval.size < 10000000 && snpData !== null) {
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
+            var densityWidth = 3;
 
-            var bpPerPixel = _zoomInterval.size/intervalWidth;
+            var bpPerPixel = (_zoomInterval.size/intervalWidth)*densityWidth;
 
             snpBar.append("rect")
                 .attr("height", 10)
                 .attr("width", intervalWidth)
-                .style("fill", "white");
+                .style("fill", "rgba(255, 255, 255, 0.7)");
 
             var snpBins = [];
             for (var i = _zoomInterval.startPos; i < _zoomInterval.endPos; i+=bpPerPixel) {
@@ -669,18 +670,51 @@ function HaploKaryoPlot(params) {
                 }
             }
 
-            for(var k = 0; k < snpBins.length; k++) {
+            /*for(var k = 0; k < snpBins.length; k++) {
                 if (snpBins[k] !== 0) {
                     var opacity = Math.round((snpBins[k] /max) * 100) / 100;
                     snpBar.append("rect")
-                        .attr("width", 1)
+                        .attr("width", densityWidth)
                         .attr("height", 10)
-                        .attr("transform", "translate(" + (k + 1) + ", 0)")
+                        .attr("transform", "translate(" + (k*densityWidth) + ", 0)")
                         .style("fill", function() {
                             return "rgba(0, 0, 0, " + opacity + ")";
                         });
                 }
-            }
+            }*/
+
+            var snpTip = d3.tip()
+                .attr("class", "d3-tip")
+                .attr("id", "snp-tip")
+                .offset([-10, 0])
+                .html(function(d) {
+                    if (d === 1) {
+                        return d + " SNP"
+                    }
+
+                    return d + " SNPs"
+                });
+
+            snpBar.call(snpTip);
+
+            snpBar.selectAll("rect")
+                .data(snpBins)
+                .enter()
+                .append("rect")
+                .attr("width", densityWidth)
+                .attr("height", 10)
+                .attr("transform", function(d, k) {
+                    return "translate(" + (k*densityWidth) + ", 0)"
+                })
+                .style("fill", function(d, k) {
+                    var opacity = Math.round((snpBins[k] /max) * 100) / 100;
+                    return "rgba(0, 0, 0, " + opacity + ")";
+                })
+                .on("mouseover", snpTip.show)
+                .on("mousemove", function() { // tooltip follows mouse
+                    return snpTip.style("top",(d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");
+                })
+                .on("mouseout", snpTip.hide);;
         }
     };
 
