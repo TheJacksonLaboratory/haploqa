@@ -637,17 +637,19 @@ function HaploKaryoPlot(params) {
             d3.select("body").selectAll(".d3-tip").remove();
 
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
-            var snpBandWidth = 5;
+            var snpBandWidth = intervalWidth/120;
 
             var bpPerPixel = (_zoomInterval.size/intervalWidth)*snpBandWidth;
 
             snpBar.append("rect")
                 .attr("height", 10)
                 .attr("width", intervalWidth)
-                .style("fill", "rgba(255, 255, 255, 0.7)");
+                .style("fill", "rgba(255, 255, 255, 0.5)");
 
             var snpBins = [];
-            for (var i = _zoomInterval.startPos; i < _zoomInterval.endPos; i+=bpPerPixel) {
+            snpBins.push({});
+            var bandCount = 0;
+            for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerPixel) {
                 var count = 0;
                 var positions = [];
                 for (var key in snpData) {
@@ -657,16 +659,11 @@ function HaploKaryoPlot(params) {
                             positions.push(key);
                         }
                     }
-                    //var position = genomeScale(key);
-                    //if (position <= genomeScale(_zoomInterval.endPos) &&
-                    //    position >= genomeScale(_zoomInterval.startPos)) {
-                        //console.log(key);
-                    //}
-                    //if (snpData.hasOwnProperty(key)) {
-                    //    console.log(snpData[key]);
-                    //}
                 }
-                snpBins.push({density: count, snps: positions});
+                if(count !== 0) {
+                    snpBins.push({band: bandCount, density: count, snps: positions});
+                }
+                bandCount++;
             }
 
             var max = 0;
@@ -705,11 +702,11 @@ function HaploKaryoPlot(params) {
                 .append("rect")
                 .attr("width", snpBandWidth)
                 .attr("height", 10)
-                .attr("transform", function(d, k) {
-                    return "translate(" + (k*snpBandWidth) + ", 0)"
+                .attr("transform", function(d) {
+                    return "translate(" + ((d.band)*snpBandWidth) + ", 0)"
                 })
-                .style("fill", function(d, k) {
-                    var opacity = Math.round((snpBins[k].density /max) * 100) / 100;
+                .style("fill", function(d) {
+                    var opacity = Math.round((d.density /max) * 100) / 100;
                     return "rgba(0, 0, 0, " + opacity + ")";
                 })
                 .on("mouseover", snpTip.show)
