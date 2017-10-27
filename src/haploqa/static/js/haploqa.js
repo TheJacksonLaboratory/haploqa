@@ -644,6 +644,7 @@ function HaploKaryoPlot(params) {
         if (snpData !== null) {
             // set number of bands to show over interval here; higher for thinner bands, lower for thicker
             var numBands = 120;
+            var format = d3.format(",");
 
             d3.select("body").selectAll("." + name).remove();
 
@@ -687,8 +688,8 @@ function HaploKaryoPlot(params) {
                 .html(function(d) {
                     if (d.density === 1) {
                         var snp = snpData[d.snps[0]];
-                        return "<b>SNP ID:</b> " + (snp.snp_id)
-                            + "<br><b>Position:</b> " + (d.snps[0])
+                        return "<b>SNP ID:</b> " + snp.snp_id
+                            + "<br><b>Position:</b> " + format(d.snps[0]) + "b"
                             + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
                             + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
                             + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
