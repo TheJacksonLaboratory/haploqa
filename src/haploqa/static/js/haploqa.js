@@ -536,8 +536,7 @@ function HaploKaryoPlot(params) {
                         if(haplotypeMap.hasOwnProperty(currStrain1)) {
                             currRect.style('fill', haplotypeMap[currStrain1].color);
                         }
-                    }
-                    else {
+                    } else {
                         // TODO these bars may be flipped!
                         currRect = plotContentsGroup.append("rect")
                             .attr("class", "bar")
