@@ -275,6 +275,7 @@ function ElemOverlay(targetElement, centerSpan) {
 function HaploKaryoPlot(params) {
     var self = this;
 
+    var name = params.name;
     var svg = params.svg;
     var width = params.width;
     var height = params.height;
@@ -623,7 +624,7 @@ function HaploKaryoPlot(params) {
 
 
     var snpBar = plot.append("g")
-            .attr("class", "snps")
+            .attr("class", "snps-" + name)
             .attr("transform", "translate(50, 70)");
 
     /**
@@ -641,25 +642,21 @@ function HaploKaryoPlot(params) {
         snpBar.selectAll("*").remove();
 
         if (_zoomInterval.size < 10000000 && snpData !== null) {
-            d3.select("body").selectAll(".d3-tip").remove();
+            d3.select("body").selectAll("." + name).remove();
 
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
             var snpBandWidth = intervalWidth/120;
 
-            var bpPerPixel = (_zoomInterval.size/intervalWidth)*snpBandWidth;
-
-            snpBar.append("rect")
-                .attr("height", 10)
-                .attr("width", intervalWidth)
-                .style("fill", "rgba(255, 255, 255, 0.8)");
+            // determine how many base pairs are in each band
+            var bpPerBand = (_zoomInterval.size/intervalWidth)*snpBandWidth;
 
             var snpBins = [];
             var bandCount = 0;
-            for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerPixel) {
+            for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerBand) {
                 var count = 0;
                 var positions = [];
                 for (var key in snpData) {
-                    if (key >= i && key <= i+bpPerPixel) {
+                    if (key >= i && key <= i+bpPerBand) {
                         count++;
                         if (snpData.hasOwnProperty(key)) {
                             positions.push(key);
@@ -672,6 +669,7 @@ function HaploKaryoPlot(params) {
                 bandCount++;
             }
 
+            // determine the max number of snps in a single band
             var max = 0;
             for (var j = 0; j < snpBins.length; j++) {
                 if (snpBins[j].density > max) {
@@ -679,14 +677,19 @@ function HaploKaryoPlot(params) {
                 }
             }
 
+            // make a tooltip that shows the data on the hovered snp
             var snpTip = d3.tip()
-                .attr("class", "d3-tip")
+                .attr("class", name)
+                .style("background", "rgba(250, 250, 250, 0.8)")
+                .style("padding", "8px")
+                .style("border-radius", "5px")
                 .offset([-10, 0])
                 .html(function(d) {
                     if (d.density === 1) {
                         var snp = snpData[d.snps[0]];
                         if (_zoomInterval.size < 2000000) {
                             return "<b>SNP ID:</b> " + (snp.snp_id)
+                                + "<br><b>Position:</b> " + (d.snps[0])
                                 + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
                                 + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
                                 + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
@@ -715,6 +718,8 @@ function HaploKaryoPlot(params) {
                     return "translate(" + ((d.band)*snpBandWidth) + ", 0)"
                 })
                 .style("fill", function(d) {
+                    // the max for density that was found earlier will be 100% opacity
+                    // calculate the opacity of all other bands based on the max
                     var opacity = Math.round((d.density /max) * 100) / 100;
                     return "rgba(0, 0, 0, " + opacity + ")";
                 })
