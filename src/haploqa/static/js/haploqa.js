@@ -613,6 +613,7 @@ function HaploKaryoPlot(params) {
                     plotContentsGroup.append("rect")
                         .style('fill', 'red')
                         .attr("x", genomeScale(currBinStart))
+                        // "- (height + 0.5)" : the concurrency bins need to be shifted up the 0.5 and the height of the haplotype bars
                         .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - (height + 0.5))
                         .attr("height", height)
                         .attr("width", genomeScale(currBinEnd) - genomeScale(currBinStart));
@@ -640,40 +641,40 @@ function HaploKaryoPlot(params) {
 
         snpBar.selectAll("*").remove();
 
-        if (_zoomInterval.size < 10000000 && snpData !== null) {
+        if (snpData !== null) {
+            // set number of bands to show over interval here; higher for thinner bands, lower for thicker
+            var numBands = 120;
+
             d3.select("body").selectAll("." + name).remove();
 
             var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
-            var snpBandWidth = intervalWidth/120;
+            var snpBandWidth = intervalWidth/numBands;
 
             // determine how many base pairs are in each band
             var bpPerBand = (_zoomInterval.size/intervalWidth)*snpBandWidth;
 
             var snpBins = [];
             var bandCount = 0;
+            var max = 0;
             for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerBand) {
                 var count = 0;
                 var positions = [];
-                for (var key in snpData) {
-                    if (key >= i && key <= i+bpPerBand) {
+                for (var position in snpData) {
+                    if (position >= i && position <= i+bpPerBand) {
                         count++;
-                        if (snpData.hasOwnProperty(key)) {
-                            positions.push(key);
+                        if (snpData.hasOwnProperty(position)) {
+                            positions.push(position);
                         }
                     }
                 }
                 if(count !== 0) {
+                    // check if max density
+                    if (count > max) {
+                        max = count;
+                    }
                     snpBins.push({band: bandCount, density: count, snps: positions});
                 }
                 bandCount++;
-            }
-
-            // determine the max number of snps in a single band
-            var max = 0;
-            for (var j = 0; j < snpBins.length; j++) {
-                if (snpBins[j].density > max) {
-                    max = snpBins[j].density;
-                }
             }
 
             // make a tooltip that shows the data on the hovered snp
@@ -686,19 +687,15 @@ function HaploKaryoPlot(params) {
                 .html(function(d) {
                     if (d.density === 1) {
                         var snp = snpData[d.snps[0]];
-                        if (_zoomInterval.size < 2000000) {
-                            return "<b>SNP ID:</b> " + (snp.snp_id)
-                                + "<br><b>Position:</b> " + (d.snps[0])
-                                + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
-                                + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
-                                + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
-                                + "<br><b>Y Probe Call:</b> " + (snp.y_probe_call)
-                                + "<br><b>Haplotype 1:</b> " + (snp.haplotype1)
-                                + "<br><b>Haplotype 2:</b> " + (snp.haplotype2);
-                        }
-                        else {
-                            return "1 SNP"
-                        }
+                        return "<b>SNP ID:</b> " + (snp.snp_id)
+                            + "<br><b>Position:</b> " + (d.snps[0])
+                            + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
+                            + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
+                            + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
+                            + "<br><b>Y Probe Call:</b> " + (snp.y_probe_call)
+                            + "<br><b>Haplotype 1:</b> " + (snp.haplotype1)
+                            + "<br><b>Haplotype 2:</b> " + (snp.haplotype2);
+
                     }
 
                     return d.density + " SNPs"
