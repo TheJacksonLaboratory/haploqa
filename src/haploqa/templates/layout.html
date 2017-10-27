@@ -29,7 +29,7 @@
     <!-- D3 -->
     <script type="text/javascript" src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
 
-    <!-- By Caged, source - http://labratrevenge.com/d3-tip/ -->
+    <!-- http://labratrevenge.com/d3-tip/ -->
     <script type="text/javascript" src="{{ url_for('static', filename='js/d3.tip.v0.6.3.js') }}"></script>
 
     <!-- application specific -->
@@ -115,7 +115,7 @@
     {% endblock %}
 </head>
 <body>
-
+<div id="alertDiv" style="width: 100%; height: 50px; position: fixed; z-index: 10000; font-size: 20px;"></div>
 <nav class="navbar navbar-default">
     <div class="container">
         <div class="navbar-header">

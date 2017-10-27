@@ -953,7 +953,10 @@
                 $.getJSON(snpsURL, function(data) {
                     plotToUpdate.updateSNPBar(data);
                 }).fail(function() {
-                    console.log('An error occurred while gathering SNP data.');
+                    d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                    $("#alertDiv").html('<div class="alert alert-danger fade in"> ' +
+                         '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">x' +
+                         '</button>An error occurred while gathering SNP data.</div>');
                 });
             }
 
