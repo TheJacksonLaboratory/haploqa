@@ -621,9 +621,16 @@ function HaploKaryoPlot(params) {
         });
     };
 
+
     var snpBar = plot.append("g")
             .attr("class", "snps")
             .attr("transform", "translate(50, 70)");
+
+    /**
+     * updates/draws the bar showing SNP data
+     *
+     * @param snpData - data on snps in the current chromosome
+     */
     this.updateSNPBar = function(snpData) {
         if(typeof snpData === 'undefined') {
             snpData = cachedSnpData;
@@ -644,10 +651,9 @@ function HaploKaryoPlot(params) {
             snpBar.append("rect")
                 .attr("height", 10)
                 .attr("width", intervalWidth)
-                .style("fill", "rgba(255, 255, 255, 0.5)");
+                .style("fill", "rgba(255, 255, 255, 0.8)");
 
             var snpBins = [];
-            snpBins.push({});
             var bandCount = 0;
             for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerPixel) {
                 var count = 0;
@@ -681,8 +687,10 @@ function HaploKaryoPlot(params) {
                         var snp = snpData[d.snps[0]];
                         if (_zoomInterval.size < 2000000) {
                             return "<b>SNP ID:</b> " + (snp.snp_id)
-                                + "<br><b>Allele 1:</b> " + (snp.allele1_fwd)
-                                + "<br><b>Allele 2:</b> " + (snp.allele2_fwd)
+                                + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
+                                + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
+                                + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
+                                + "<br><b>Y Probe Call:</b> " + (snp.y_probe_call)
                                 + "<br><b>Haplotype 1:</b> " + (snp.haplotype1)
                                 + "<br><b>Haplotype 2:</b> " + (snp.haplotype2);
                         }
@@ -696,10 +704,11 @@ function HaploKaryoPlot(params) {
 
             snpBar.call(snpTip);
 
-            snpBar.selectAll("rect")
+            snpBar.selectAll(".density-band")
                 .data(snpBins)
                 .enter()
                 .append("rect")
+                .attr("class", "density-band")
                 .attr("width", snpBandWidth)
                 .attr("height", 10)
                 .attr("transform", function(d) {
