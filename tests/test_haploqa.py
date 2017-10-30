@@ -10,7 +10,6 @@ class TestHaploQA(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        pass
         tester_email = 'tester@testers.dk'
         cls._tester_email = tester_email
         db = mdb.get_db()
@@ -58,10 +57,19 @@ class TestHaploQA(unittest.TestCase):
         cls._db.users.delete_one({"email_address_lowercase": cls._tester_email})
         print("Teardown: removed test user")
 
-    # utility functions
+    def setUp(self):
+        # clear the session
+        self._set_session()
+
+    def tearDown(self):
+        #clear the session and reset test user priviliges
+        self._set_session()
+        self._switch_admin()
+
+    ### Utility Functions ###
     def _set_session(self, admin=False, email=None):
         """
-        set the session privileges
+        set the session privileges or clear the session (setting user email)
         :param admin: True / False
         :param email: the users email address, or None to have no login
         :return:
@@ -87,29 +95,23 @@ class TestHaploQA(unittest.TestCase):
                 },
             })
 
-    # tests
+    ### Unit Tests ###
 
     def test_home_page(self):
         """ test the home page as unauthenticated user"""
 
-        # make sure you are not logged in
-        self._set_session()
         req = self._client.get("tag/GigaMUGA.html")
         self.assertEqual(req.status, '200 OK')
 
     def test_private_sample(self):
         """hit private sample and verify it can't be viewed by an unauthenicated user"""
 
-        # make sure you are not logged in
-        self._set_session()
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         self.assertIn('Login Required', str(req.data))
 
     def test_public_sample(self):
         """test that you can view (but not edit) a public sample as a non-authenticated user"""
 
-        # make sure you are not logged in
-        self._set_session()
         req = self._client.get("sample/{}.html".format(self._sample_id))
         # make sure the not found / login page is not displayed
         self.assertNotIn('Login Required', str(req.data))
@@ -119,25 +121,16 @@ class TestHaploQA(unittest.TestCase):
     def test_private_sample_authenticated(self):
         """test you can view but not edit a private sample"""
 
-        # reset test user to regular and set default session
-        self._switch_admin()
+        # set default session
         self._set_session(False, self._tester_email)
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertNotIn(self._edit_sample_button, str(req.data))
-        # reset session
-        self._set_session()
 
     def test_private_sample(self):
         """verify the regular user can see the sample tag on, but not edit the tags page"""
-
-        # set session default - regular user
-        self._set_session()
-
-        # update the test sample to private
-        self._switch_admin(False)
 
         # hit the tags page - the sample should not be there
         req = self._client.get("tag/unit_testing_tag.html".format(self._private_sample['_id']))
@@ -146,51 +139,38 @@ class TestHaploQA(unittest.TestCase):
         # make sure you don't see the sample tag on the page
         # make sure that you get the sample page but not the edit button
         self.assertIn('unit_testing_tag', str(req.data))
-        # switch user back to regular and reset session
-        self._switch_admin()
-        self._set_session()
 
     def test_edit_sample(self):
         """test that the test user can edit a sample owned by them"""
 
-        # set default session and privs
-        self._switch_admin()
+        # set default session
         self._set_session(False, self._tester_email)
         req = self._client.get("sample/{}.html".format(self._sample_id))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertIn(self._edit_sample_button, str(req.data))
-        # reset session
-        self._set_session()
 
     def test_edit_sample_not_owned(self):
         """test that a regular user cannot edit a sample owned by another user"""
 
-        # set default session and privs
-        self._switch_admin()
+        # set default session
         self._set_session(False, self._tester_email)
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertNotIn(self._edit_sample_button, str(req.data))
-        # reset session
-        self._set_session()
 
     def test_user_samples(self):
         """testing permissions on user samples page"""
 
-        # make sure you are not logged in
-        self._set_session()
         req = self._client.get("user-samples/{}".format(self._uid))
         self.assertIn('Login Required', str(req.data))
         # set session for test user
         self._set_session(False, self._tester_email)
         req = self._client.get("user-samples/{}".format(self._uid))
         self.assertIn('Login Required', str(req.data))
-        # reset the session
-        self._set_session()
 
     def test_user_samples_admin(self):
         """verify you can see the user samples page as admin, the test sample is there, and you can edit the page"""
@@ -205,9 +185,6 @@ class TestHaploQA(unittest.TestCase):
         self.assertIn('unit_tester', str(req.data))
         # verify the edit button is available
         self.assertIn(self._edit_samples_button, str(req.data))
-        # reset session and privs
-        self._set_session()
-        self._switch_admin()
 
     def test_user_admin_unauthorized(self):
         """verify that non-authenticated users nor non-admin cannot see the user admin page"""
@@ -225,14 +202,11 @@ class TestHaploQA(unittest.TestCase):
     def test_user_admin(self):
         """verify that as admin you can see the user admin page"""
 
-        # promote user to admin and set session
+        # set default session
         self._switch_admin(True)
         self._set_session(True, self._tester_email)
         req = self._client.get("show-users.html")
         self.assertNotIn('not authorized', str(req.data))
-        # reset session and privs
-        self._set_session()
-        self._switch_admin()
 
     def test_admin_edit_sample(self):
         """test that an admin can edit a sample they don't own"""
@@ -247,37 +221,27 @@ class TestHaploQA(unittest.TestCase):
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertIn(self._edit_sample_button, str(req.data))
-        # reset permissions back to regular and reset session
-        self._switch_admin()
-        self._set_session()
 
     def test_owner_tags_unauthenticated(self):
         """verify you cannot see the owner tags page when not logged in"""
 
-        # make sure you are not logged in
-        self._set_session()
         req = self._client.get("owner-tags/unit_testing_tag.html")
         self.assertIn('Login Required', str(req.data))
 
     def test_owner_tags(self):
         """verify you can see the owner tags page and the test sample when logged in"""
 
-        # set the session
+        # set the default session
         self._set_session(False, self._tester_email)
         req = self._client.get("owner-tags/unit_testing_tag.html")
         # make sure you can see the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure you can see the test sample
         self.assertIn('unit_tester', str(req.data))
-        # reset the session
-        self._set_session()
-
 
     def test_user_tags_unauthenticated(self):
         """verify you cannot see the owner tags page when not logged in"""
 
-        # make sure the session has no user email
-        self._set_session()
         req = self._client.get("user-tags.html")
         self.assertIn('Login Required', str(req.data))
 
@@ -293,15 +257,12 @@ class TestHaploQA(unittest.TestCase):
 
     def test_tags_page(self):
         """elevate user to admin and verify you can edit the tags page"""
-        # set the session
+        # set the default session
         self._set_session(True, self._tester_email)
         # elevate user to admin
         self._switch_admin(True)
         req = self._client.get("tag/unit_testing_tag.html")
         self.assertIn(self._edit_samples_button, str(req.data))
-        # demote user and reset the session
-        self._switch_admin()
-        self._set_session()
 
     def _test_get_sample(self):
         """see if the test sample exists"""
