@@ -3,6 +3,7 @@
 # External Library Credits
 
 saveSvgAsPng.js: script to save a D3 plot (svg) as a png. MIT license - author Eric Shull (github.com/exupero/saveSvgAsPng)
+
 d3.tip.v0.6.3.js: script to create tooltips. - author Justin Palmer (http://labratrevenge.com/d3-tip/)
 
 TODO description of what this app does

@@ -1273,6 +1273,7 @@
     </div>
 
     <div class="page-header">
+        <br/>
         <h2>Genome Karyotype Plot</h2>
     </div>
 
@@ -1318,6 +1319,7 @@
     </div>
     {% if g.user %}
     <div class="page-header">
+        <br/>
         <h2>Genome Interval Plot</h2>
     </div>
 
@@ -1385,6 +1387,9 @@
         {% if g.user %}
         <div class="row">
             <div class="col-md-12">
+                <br/>
+                <h2 style="margin-top: 50px;">Sample: {{ sample.sample_id }}</h2>
+                <h4>Candidate Haplotypes</h4>
                 <table id="candidate-haplotype-table" class="table table-striped" style="margin-top: 10px;">
                     <thead><tr><th>Candidate Haplotype</th><th>Negative Log Likelihood</th></tr></thead>
                     <tbody id="candidate-haplotype-table-body" style="height: 100px;">
@@ -1397,7 +1402,7 @@
         </div>
 
         <div class="page-header">
-            <h2>GEMM Probabilities</h2>
+            <h4>GEMM Probabilities</h4>
         </div>
 
         <div class="row">
