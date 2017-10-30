@@ -18,15 +18,15 @@ unittest tool.
 
     > > python -m unittest tests.test_haploqa
 
-## > Run in verbose mode (recommended,  as this shows the test name being run and its relevant comments):
+### > Run in verbose mode (recommended,  as this shows the test name being run and its relevant comments):
 
     > > python -m unittest -v tests.test_haploqa
 
-## > To run one test class
+### > To run one test class
 
 
    > > python -m unittest tests.test_haploqa.TestHaploQA
 
-## > To run one test
+### > To run one test
 
     > > python -m unittest tests.test_haploqa.TestHaploQA.test_home_page
