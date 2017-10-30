@@ -72,10 +72,9 @@
              */
             function getComparisonSamples () {
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
+                var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
                     sample.comp_samples = data.samples;
-
-                    var comparisonSelect = $("#comparison-sample");
 
                     sample.comp_samples.forEach(function(sample) {
                         // only load samples that aren't the current
@@ -85,6 +84,15 @@
                         }
                     });
 
+                }).success(function() {
+                    var sampleSelected = comparisonSelect.children("option").filter(":selected");
+                    sample.current_comp = sampleSelected.val();
+                    updateComparisonSVG(sample.current_comp, 2);
+                    var labelText = sampleSelected.text();
+                    $("#comp-label").text("Sample: " + labelText);
+
+                    // if the previous chosen sample resulted in no data, remove the overlay
+                    d3.select("[id=no-data-overlay]").remove();
                 });
             }
 
@@ -102,6 +110,7 @@
 
                 // update the comparison svg and only attempt data retrieval twice
                 updateComparisonSVG(sample.current_comp, 2);
+                getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
             });
 
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
@@ -225,6 +234,7 @@
                 });
 
             var interval = null;
+            var lastChr = null;
             var updateIntervalButton = $('#update-interval-button');
             var clearIntervalButton = $('#clear-interval-button');
             var intervalText = $('#interval-edit');
@@ -236,6 +246,14 @@
             var updateIntervalDP = new DelayedPreemptable();
 
             function updateInterval(newInterval) {
+
+                if(interval === null || lastChr !== newInterval.chr) {
+                    // get the snp data for the plots
+                    getSNPData(sample._id, newInterval.chr, hapIntervalPlot);
+                    getSNPData(sample.current_comp, newInterval.chr, hapIntervalCompPlot);
+                    lastChr = newInterval.chr;
+                }
+
                 interval = newInterval;
 
                 if(newInterval === null) {
@@ -372,7 +390,6 @@
                 sample.tags = newSampleTags;
                 tagLinksPanel.empty();
                 // TODO replace the haplotype-strain check
-                console.error('TODO replace the haplotype-strain check');
                 var haplotypeStrainTagPresent = false;
                 newSampleTags.forEach(function(tag, i) {
                     if(tag === 'haplotype-strain') {
@@ -753,6 +770,7 @@
             var svg = d3.select('#hapkaryoplot-svg');
 
             var hapKaryoPlot = new HaploKaryoPlot({
+                name: "karyoplot",
                 svg: svg,
                 width: 900,
                 height: 900,
@@ -764,6 +782,7 @@
             var intervalSVG = d3.select("#hapintervalplot-svg");
 
             var hapIntervalPlot = new HaploKaryoPlot({
+                name: "interval-reference",
                 svg: intervalSVG,
                 width: 900,
                 height: 150,
@@ -774,6 +793,7 @@
             var intervalCompSVG = d3.select("#hapintervalplot-comp-svg");
 
             var hapIntervalCompPlot = new HaploKaryoPlot({
+                name: "interval-comparison",
                 svg: intervalCompSVG,
                 width: 900,
                 height: 150,
@@ -918,6 +938,25 @@
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
+                });
+            }
+
+            /**
+             * retrieve data on SNPs within a given sample and chromosome
+             *
+             * @param sampleId - the sample to search for
+             * @param chr - the chromosome to search for
+             * @param plotToUpdate - the plot that needs to receive the SNP data
+             */
+            function getSNPData(sampleId, chr, plotToUpdate) {
+                var snpsURL = "/snps.json/" + sampleId + "/" + chr;
+                $.getJSON(snpsURL, function(data) {
+                    plotToUpdate.updateSNPBar(data);
+                }).fail(function() {
+                    d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                    $("#alertDiv").html('<div class="alert alert-danger fade in"> ' +
+                         '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">x' +
+                         '</button>An error occurred while gathering SNP data.</div>');
                 });
             }
 
@@ -1296,9 +1335,7 @@
             </span>
         </div>
         <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
-        <select id="comparison-sample">
-            <option value="">Select Comparison Sample</option>
-        </select>
+        <select id="comparison-sample"></select>
     </div>
 
 

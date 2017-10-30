@@ -275,6 +275,7 @@ function ElemOverlay(targetElement, centerSpan) {
 function HaploKaryoPlot(params) {
     var self = this;
 
+    var name = params.name;
     var svg = params.svg;
     var width = params.width;
     var height = params.height;
@@ -324,6 +325,7 @@ function HaploKaryoPlot(params) {
         // interval overlay used on the global karyotype view.
         if(intervalMode) {
             self.updateHaplotypes();
+            self.updateSNPBar();
         } else {
             zoomOverlayGroup.selectAll("*").remove();
         }
@@ -429,6 +431,7 @@ function HaploKaryoPlot(params) {
     this.zoomIntervalChange = null;
 
     var cachedHaplotypeData = null;
+    var cachedSnpData = null;
     var cachedHaplotypeMap = {};
     var cachedStrainNames = null;
     var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
@@ -517,7 +520,7 @@ function HaploKaryoPlot(params) {
                             .attr("x", genomeScale(currHaploStart))
                             //.attr("y", chrOrdinalScale(chr))
                             //.attr("height", chrOrdinalScale.rangeBand())
-                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - 0.5)
                             .attr("height", chrOrdinalScale.rangeBand() / 2.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
                             .attr("class", "hap hap" + currStrainIdx1)
@@ -540,7 +543,7 @@ function HaploKaryoPlot(params) {
                             .attr("x", genomeScale(currHaploStart))
                             //.attr("y", chrOrdinalScale(chr))
                             //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
-                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
+                            .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - 0.5)
                             .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
                             .attr("class", "hap hap" + currStrainIdx1)
@@ -562,7 +565,7 @@ function HaploKaryoPlot(params) {
                             .attr("x", genomeScale(currHaploStart))
                             //.attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0))
                             //.attr("height", chrOrdinalScale.rangeBand() / 2.0)
-                            .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0))
+                            .attr("y", chrOrdinalScale(chr) + (3.0 * chrOrdinalScale.rangeBand() / 4.0) - 0.5)
                             .attr("height", chrOrdinalScale.rangeBand() / 4.0)
                             .attr("width", genomeScale(currHaploEnd) - genomeScale(currHaploStart))
                             .attr("class", "hap hap" + currStrainIdx2)
@@ -610,12 +613,119 @@ function HaploKaryoPlot(params) {
                     plotContentsGroup.append("rect")
                         .style('fill', 'red')
                         .attr("x", genomeScale(currBinStart))
-                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - height)
+                        // "- (height + 0.5)" : the concurrency bins need to be shifted up the 0.5 and the height of the haplotype bars
+                        .attr("y", chrOrdinalScale(chr) + (chrOrdinalScale.rangeBand() / 2.0) - (height + 0.5))
                         .attr("height", height)
                         .attr("width", genomeScale(currBinEnd) - genomeScale(currBinStart));
                 });
             }
         });
+    };
+
+
+    var snpBar = plot.append("g")
+            .attr("class", "snps-" + name)
+            .attr("transform", "translate(50, 70)");
+
+    /**
+     * updates/draws the bar showing SNP data
+     *
+     * @param snpData - data on snps in the current chromosome
+     */
+    this.updateSNPBar = function(snpData) {
+        if(typeof snpData === 'undefined') {
+            snpData = cachedSnpData;
+        } else {
+            cachedSnpData = snpData;
+        }
+
+        snpBar.selectAll("*").remove();
+
+        if (snpData !== null) {
+            // set number of bands to show over interval here; higher for thinner bands, lower for thicker
+            var numBands = 120;
+            var format = d3.format(",");
+
+            d3.select("body").selectAll("." + name).remove();
+
+            var intervalWidth = genomeScale(_zoomInterval.endPos) - genomeScale(_zoomInterval.startPos);
+            var snpBandWidth = intervalWidth/numBands;
+
+            // determine how many base pairs are in each band
+            var bpPerBand = (_zoomInterval.size/intervalWidth)*snpBandWidth;
+
+            var snpBins = [];
+            var bandCount = 0;
+            var max = 0;
+            for (var i = _zoomInterval.startPos; i <= _zoomInterval.endPos; i+=bpPerBand) {
+                var count = 0;
+                var positions = [];
+                for (var position in snpData) {
+                    if (position >= i && position <= i+bpPerBand) {
+                        count++;
+                        if (snpData.hasOwnProperty(position)) {
+                            positions.push(position);
+                        }
+                    }
+                }
+                if(count !== 0) {
+                    // check if max density
+                    if (count > max) {
+                        max = count;
+                    }
+                    snpBins.push({band: bandCount, density: count, snps: positions});
+                }
+                bandCount++;
+            }
+
+            // make a tooltip that shows the data on the hovered snp
+            var snpTip = d3.tip()
+                .attr("class", name)
+                .style("background", "rgba(250, 250, 250, 0.8)")
+                .style("padding", "8px")
+                .style("border-radius", "5px")
+                .offset([-10, 0])
+                .html(function(d) {
+                    if (d.density === 1) {
+                        var snp = snpData[d.snps[0]];
+                        return "<b>SNP ID:</b> " + snp.snp_id
+                            + "<br><b>Position:</b> " + format(d.snps[0]) + "b"
+                            + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
+                            + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
+                            + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
+                            + "<br><b>Y Probe Call:</b> " + (snp.y_probe_call)
+                            + "<br><b>Haplotype 1:</b> " + (snp.haplotype1)
+                            + "<br><b>Haplotype 2:</b> " + (snp.haplotype2);
+
+                    }
+
+                    return d.density + " SNPs"
+                });
+
+            snpBar.call(snpTip);
+
+            snpBar.selectAll(".density-band")
+                .data(snpBins)
+                .enter()
+                .append("rect")
+                .attr("class", "density-band")
+                .attr("width", snpBandWidth)
+                .attr("height", 10)
+                .attr("transform", function(d) {
+                    return "translate(" + ((d.band)*snpBandWidth) + ", 0)"
+                })
+                .style("fill", function(d) {
+                    // the max for density that was found earlier will be 100% opacity
+                    // calculate the opacity of all other bands based on the max
+                    var opacity = Math.round((d.density /max) * 100) / 100;
+                    return "rgba(0, 0, 0, " + opacity + ")";
+                })
+                .on("mouseover", snpTip.show)
+                .on("mousemove", function() { // tooltip follows mouse
+                    return snpTip.style("top",(d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");
+                })
+                .on("mouseout", snpTip.hide);
+        }
     };
 
     /**
