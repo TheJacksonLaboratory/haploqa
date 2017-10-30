@@ -1,6 +1,7 @@
 import unittest
 import haploqa.haploqaapp as hqa
 import haploqa.mongods as mdb
+from bson import ObjectId
 
 class TestHaploQA(unittest.TestCase):
     """
@@ -13,30 +14,32 @@ class TestHaploQA(unittest.TestCase):
         tester_email = 'tester@testers.dk'
         cls._tester_email = tester_email
         db = mdb.get_db()
-        # find a user to duplicat
+        # find a user to duplicate
         user = db.users.find_one(({'administrator': False}))
         test_user = user
-        test_user['_id'] = 'testuserID'
+        uid = ObjectId()
+        test_user['_id'] = uid
         test_user['email_address_lowercase'] = tester_email
-        #db.users.insert_one(test_user)
-        # find a sample to duplicate
+        test_user['email_address'] = tester_email
+        db.users.insert_one(test_user)
+        # make the user id available to the tests
+        cls._uid = uid
+        print("Setup: Created test user {}".format(uid))
+        # find a private sample not owned by the test user
         cls._private_sample = db.samples.find_one({'is_public': False, 'owner': {'$exists': True, '$nin': [tester_email]}})
-        print("private sample id: {}".format(cls._private_sample['_id']))
+        print("Setup: private sample id: {}".format(cls._private_sample['_id']))
         sample = db.samples.find_one({'sample_id': "32C"})
         sample2 = sample
-        # TODO: this key is not working on the sample page
-        # using tags page for now
-        sample_id = '93114124bd0411e78a091865'
-        print("test sample id is {}".format(sample_id))
+        sample_id = ObjectId()
+        print("Setup: test sample id is {}".format(sample_id))
         sample2['_id'] = sample_id
-        #make the id available to the tests'''
-        cls._sample_id = '583d77863ac36a08a0040c7c'
+        #make the id available to the tests
+        cls._sample_id = sample_id
         sample2['sample_id'] = 'unit_tester'
         sample2['tags'] = 'unit_testing_tag'
-        sample2['is_public'] = False
+        sample2['is_public'] = True
         sample2['owner'] = tester_email
         db.samples.insert_one(sample2)
-        print("Setup: created test sample")
         print("Setup: creating test client")
         client = hqa.app.test_client()
         # make the flask test client available for the tests
@@ -52,25 +55,19 @@ class TestHaploQA(unittest.TestCase):
     def tearDownClass(cls):
         cls._db.samples.delete_one({"sample_id": "unit_tester"})
         print("Teardown: removed test sample")
-
-    def test_home_page(self):
-        """ test the home page"""
-
-        req = self._client.get("tag/GigaMUGA.html")
-        self.assertEqual(req.status, '200 OK')
+        cls._db.users.delete_one({"email_address_lowercase": cls._tester_email})
+        print("Teardown: removed test user")
 
     # utility functions
     def _set_session(self, admin=False, email=None):
         """
         set the session privileges
         :param admin: True / False
+        :param email: the users email address, or None to have no login
         :return:
         """
 
         with self._client.session_transaction() as sess:
-            # dont need a real email as this is just faking the session
-            if email is None:
-                email = self._tester_email
             sess['user_email_address'] = email
             sess['administrator'] = admin
             sess['remote_addr'] = '127.0.0.1'
@@ -78,7 +75,7 @@ class TestHaploQA(unittest.TestCase):
     def _switch_admin(self, admin=False):
         """
         switch the test user's privileges to/from admin
-        :param admin:
+        :param admin: True / False
         :return:
         """
 
@@ -90,40 +87,49 @@ class TestHaploQA(unittest.TestCase):
                 },
             })
 
-    def test_public_sample(self):
-        """test unauthenticated user can view public sample but not edit it"""
-        # TODO: need to find a way to get a public sample, query not working
-        req = self._client.get("sample/5783c0073ac36a16331c00fe/.html")
-        # make sure you have an active session and can view the page
-        self.assertNotIn('Login Required', str(req.data))
-        # make sure that you get the sample page but not the edit button
-        self.assertNotIn(self._edit_sample_button, str(req.data))
+    # tests
 
+    def test_home_page(self):
+        """ test the home page as unauthenticated user"""
 
-    #TODO: not goign to work until I can get the sample endpoint working correctly
+        # make sure you are not logged in
+        self._set_session()
+        req = self._client.get("tag/GigaMUGA.html")
+        self.assertEqual(req.status, '200 OK')
+
     def test_private_sample(self):
         """hit private sample and verify it can't be viewed by an unauthenicated user"""
 
+        # make sure you are not logged in
+        self._set_session()
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         self.assertIn('Login Required', str(req.data))
 
-    def test_private_sample_for_regular_user(self):
+    def test_public_sample(self):
+        """test that you can view (but not edit) a public sample as a non-authenticated user"""
+
+        # make sure you are not logged in
+        self._set_session()
+        req = self._client.get("sample/{}.html".format(self._sample_id))
+        # make sure the not found / login page is not displayed
+        self.assertNotIn('Login Required', str(req.data))
+        # make sure you cannot edit the sample
+        self.assertNotIn(self._edit_sample_button, str(req.data))
+
+    def test_private_sample_authenticated(self):
         """test you can view but not edit a private sample"""
 
         # reset test user to regular and set default session
         self._switch_admin()
-        self._set_session()
+        self._set_session(False, self._tester_email)
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertNotIn(self._edit_sample_button, str(req.data))
+        # reset session
+        self._set_session()
 
-    # TODO: need to get a test sample working or designate one as test, owned by test user, etc
-    # TODO verify you can edit your own sample
-
-
-    # TODO: not going to work until I can get the sample endpoint working correctly.
     def test_private_sample(self):
         """verify the regular user can see the sample tag on, but not edit the tags page"""
 
@@ -140,71 +146,164 @@ class TestHaploQA(unittest.TestCase):
         # make sure you don't see the sample tag on the page
         # make sure that you get the sample page but not the edit button
         self.assertIn('unit_testing_tag', str(req.data))
-
-        # switch user back to regular
+        # switch user back to regular and reset session
         self._switch_admin()
+        self._set_session()
 
-    # TODO: change the sample's ownership and verify you can't edit it as a regular user
     def test_edit_sample(self):
+        """test that the test user can edit a sample owned by them"""
+
+        # set default session and privs
+        self._switch_admin()
+        self._set_session(False, self._tester_email)
+        req = self._client.get("sample/{}.html".format(self._sample_id))
+        # make sure you have an active session and can view the page
+        self.assertNotIn('Login Required', str(req.data))
+        # make sure that you get the sample page but not the edit button
+        self.assertIn(self._edit_sample_button, str(req.data))
+        # reset session
+        self._set_session()
+
+    def test_edit_sample_not_owned(self):
         """test that a regular user cannot edit a sample owned by another user"""
 
         # set default session and privs
         self._switch_admin()
-        self._set_session()
+        self._set_session(False, self._tester_email)
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertNotIn(self._edit_sample_button, str(req.data))
+        # reset session
+        self._set_session()
 
+    def test_user_samples(self):
+        """testing permissions on user samples page"""
 
-    def test_admin_can_edit_sample_not_owned_by_them(self):
+        # make sure you are not logged in
+        self._set_session()
+        req = self._client.get("user-samples/{}".format(self._uid))
+        self.assertIn('Login Required', str(req.data))
+        # set session for test user
+        self._set_session(False, self._tester_email)
+        req = self._client.get("user-samples/{}".format(self._uid))
+        self.assertIn('Login Required', str(req.data))
+        # reset the session
+        self._set_session()
+
+    def test_user_samples_admin(self):
+        """verify you can see the user samples page as admin, the test sample is there, and you can edit the page"""
+
+        # promote user to admin and set session
+        self._switch_admin(True)
+        self._set_session(True, self._tester_email)
+        req = self._client.get("user-samples/{}".format(self._uid))
+        # make sure you can see the page
+        self.assertNotIn('Login Required', str(req.data))
+        # verify you can see the sample
+        self.assertIn('unit_tester', str(req.data))
+        # verify the edit button is available
+        self.assertIn(self._edit_samples_button, str(req.data))
+        # reset session and privs
+        self._set_session()
+        self._switch_admin()
+
+    def test_user_admin_unauthorized(self):
+        """verify that non-authenticated users nor non-admin cannot see the user admin page"""
+
+        # make sure you're not logged in
+        self._set_session()
+        self._set_session(False, self._tester_email)
+        req = self._client.get("show-users.html")
+        self.assertIn('not authorized', str(req.data))
+        # set session for test user
+        self._switch_admin()
+        req = self._client.get("show-users.html")
+        self.assertIn('not authorized', str(req.data))
+
+    def test_user_admin(self):
+        """verify that as admin you can see the user admin page"""
+
+        # promote user to admin and set session
+        self._switch_admin(True)
+        self._set_session(True, self._tester_email)
+        req = self._client.get("show-users.html")
+        self.assertNotIn('not authorized', str(req.data))
+        # reset session and privs
+        self._set_session()
+        self._switch_admin()
+
+    def test_admin_edit_sample(self):
         """test that an admin can edit a sample they don't own"""
 
-        self.test_get_sample()
-        # set users status to admin
         # promote the test user to admin
         self._switch_admin(True)
-        self._set_session(True)
+        # set users session to admin
+        self._set_session(True, self._tester_email)
 
         req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
         self.assertIn(self._edit_sample_button, str(req.data))
+        # reset permissions back to regular and reset session
+        self._switch_admin()
+        self._set_session()
 
+    def test_owner_tags_unauthenticated(self):
+        """verify you cannot see the owner tags page when not logged in"""
 
-    # TODO: need to block access to this page
-    def _test_user_tags_unauthenticated(self):
-        """verify as a non-authenticated user you cannot see the user tags page"""
-
-        # use a non-existant user email to fake a non-authenticated session
-        #self._set_session(False, 'no@user.com')
-        req = self._client.get("tag/user-tags.html")
+        # make sure you are not logged in
+        self._set_session()
+        req = self._client.get("owner-tags/unit_testing_tag.html")
         self.assertIn('Login Required', str(req.data))
 
-    def test_user_tags_authenticated(self):
-        """verify you can see the test sample authenticated as a regular user"""
+    def test_owner_tags(self):
+        """verify you can see the owner tags page and the test sample when logged in"""
 
-        # set session defaults
-        #self._set_session()
-        req = self._client.get("tag/user-tags.html")
+        # set the session
+        self._set_session(False, self._tester_email)
+        req = self._client.get("owner-tags/unit_testing_tag.html")
+        # make sure you can see the page
+        self.assertNotIn('Login Required', str(req.data))
+        # make sure you can see the test sample
+        self.assertIn('unit_tester', str(req.data))
+        # reset the session
+        self._set_session()
+
+
+    def test_user_tags_unauthenticated(self):
+        """verify you cannot see the owner tags page when not logged in"""
+
+        # make sure the session has no user email
+        self._set_session()
+        req = self._client.get("user-tags.html")
+        self.assertIn('Login Required', str(req.data))
+
+    def test_user_tags(self):
+        """verify you can see the test tag when logged in"""
+
+        self._set_session(False, self._tester_email)
+        req = self._client.get("user-tags.html")
+        # verify you can see the page
+        self.assertNotIn('Login Required', str(req.data))
+        # verify you can see your tag
         self.assertIn('unit_testing_tag', str(req.data))
 
-    # TODO: looks like admin flag is not working
     def test_tags_page(self):
         """elevate user to admin and verify you can edit the tags page"""
         # set the session
-        self._set_session(True)
+        self._set_session(True, self._tester_email)
         # elevate user to admin
         self._switch_admin(True)
-        #self.test_get_sample()
         req = self._client.get("tag/unit_testing_tag.html")
         self.assertIn(self._edit_samples_button, str(req.data))
-        # demote user
+        # demote user and reset the session
         self._switch_admin()
+        self._set_session()
 
-    def test_get_sample(self):
+    def _test_get_sample(self):
         """see if the test sample exists"""
         db = mdb.get_db()
         sample = db.samples.find_one({'sample_id': "unit_tester"})
