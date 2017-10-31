@@ -25,10 +25,12 @@ import haploqa.usermanagement as usrmgmt
 app = flask.Flask(__name__)
 APP_VERSION = 0, 0
 BROKER_URL = 'amqp://guest:guest@localhost:5672//'
+
 app.config.update(
     CELERY_BROKER_URL=BROKER_URL,
     CELERY_RESULT_BACKEND=BROKER_URL,
 )
+
 app.jinja_env.globals.update(isnan=math.isnan)
 
 
@@ -658,7 +660,10 @@ def user_samples(user_id):
     # look up all samples by user id.
     # Only return top level information though (snp-level data is too much)
 
-    if flask.g.user['administrator'] is False:
+    if flask.g.user is not None:
+        if flask.g.user['administrator'] is False:
+            return flask.render_template('login-required.html')
+    else:
         return flask.render_template('login-required.html')
 
     db = mds.get_db()
@@ -725,6 +730,9 @@ def sample_tag_html(tag_id):
 
 @app.route('/owner-tags/<escfwd:tag_id>.html')
 def owner_tags(tag_id):
+
+    if flask.g.user is None:
+        return flask.render_template('login-required.html')
 
     # look up all samples with this tag ID and associated with current logged in user.
     # Only return top level information though
@@ -879,6 +887,9 @@ def user_tags():
     get all tags associated with the current logged in user
     :return:
     """
+    if flask.g.user is None:
+        return flask.render_template('login-required.html')
+
     user = flask.g.user
     db = mds.get_db()
 
