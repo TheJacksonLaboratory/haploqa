@@ -25,8 +25,6 @@ class TestHaploQA(unittest.TestCase):
         cls._uid = uid
         print("Setup: Created test user {}".format(uid))
         # find a private sample not owned by the test user
-        cls._private_sample = db.samples.find_one({'is_public': False, 'owner': {'$exists': True, '$nin': [tester_email]}})
-        print("Setup: private sample id: {}".format(cls._private_sample['_id']))
         sample = db.samples.find_one({'sample_id': "32C"})
         sample2 = sample
         sample_id = ObjectId()
@@ -65,6 +63,8 @@ class TestHaploQA(unittest.TestCase):
         #clear the session and reset test user priviliges
         self._set_session()
         self._switch_admin()
+        # reset the sample back to its default state
+        self._switch_sample(True, self._tester_email)
 
     ### Utility Functions ###
     def _set_session(self, admin=False, email=None):
@@ -79,6 +79,23 @@ class TestHaploQA(unittest.TestCase):
             sess['user_email_address'] = email
             sess['administrator'] = admin
             sess['remote_addr'] = '127.0.0.1'
+
+    def _switch_sample(self, public=True, owner=None):
+        """
+        switch test sample public / private or owner
+        :param public: True / False
+        :param owner: null or owner email
+        :return:
+        """
+
+        self._db.samples.update_one(
+            {"_id": self._sample_id},
+            {"$set":
+                {
+                    "is_public": public,
+                    "owner": owner
+                }
+            })
 
     def _switch_admin(self, admin=False):
         """
@@ -105,8 +122,9 @@ class TestHaploQA(unittest.TestCase):
 
     def test_private_sample(self):
         """hit private sample and verify it can't be viewed by an unauthenicated user"""
-
-        req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
+        # make sample private
+        self._switch_sample(False)
+        req = self._client.get("sample/{}.html".format(self._sample_id))
         self.assertIn('Login Required', str(req.data))
 
     def test_public_sample(self):
@@ -123,7 +141,9 @@ class TestHaploQA(unittest.TestCase):
 
         # set default session
         self._set_session(False, self._tester_email)
-        req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
+        # make sample private
+        self._switch_sample(False)
+        req = self._client.get("sample/{}.html".format(self._sample_id))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
@@ -133,7 +153,7 @@ class TestHaploQA(unittest.TestCase):
         """verify the regular user can see the sample tag on, but not edit the tags page"""
 
         # hit the tags page - the sample should not be there
-        req = self._client.get("tag/unit_testing_tag.html".format(self._private_sample['_id']))
+        req = self._client.get("tag/unit_testing_tag.html")
         # make sure you have an actve session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure you don't see the sample tag on the page
@@ -156,7 +176,9 @@ class TestHaploQA(unittest.TestCase):
 
         # set default session
         self._set_session(False, self._tester_email)
-        req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
+        # set owner of sample to other than the tester
+        self._switch_sample(False, 'not@tester.com')
+        req = self._client.get("sample/{}.html".format(self._sample_id))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button
@@ -215,8 +237,9 @@ class TestHaploQA(unittest.TestCase):
         self._switch_admin(True)
         # set users session to admin
         self._set_session(True, self._tester_email)
-
-        req = self._client.get("sample/{}.html".format(self._private_sample['_id']))
+        # set owner of sample to other than the tester
+        self._switch_sample(False, 'not@tester.com')
+        req = self._client.get("sample/{}.html".format(self._sample_id))
         # make sure you have an active session and can view the page
         self.assertNotIn('Login Required', str(req.data))
         # make sure that you get the sample page but not the edit button

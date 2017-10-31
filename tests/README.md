@@ -9,24 +9,23 @@ unittest tool.
 > Before you can run these tests, you'll need to put the 'src' directory into your python path:
 * * *
 
-    > > export PYTHONPATH=src/
+    export PYTHONPATH=src/
 
-## Syntax for running tests -
-* * *
+## Syntax for running tests
+______________________
 
-### > To run one test file (all classes in the file)
+### To run one test file (all classes in the file)
 
-    > > python -m unittest tests.test_haploqa
+    python -m unittest tests.test_haploqa
 
-### > Run in verbose mode (recommended,  as this shows the test name being run and its relevant comments):
+### Run in verbose mode *(recommended,  as this shows the test name being run and its relevant comments):*
 
-    > > python -m unittest -v tests.test_haploqa
+    python -m unittest -v tests.test_haploqa
 
-### > To run one test class
+### To run one test class
 
+    python -m unittest tests.test_haploqa.TestHaploQA
 
-   > > python -m unittest tests.test_haploqa.TestHaploQA
+### To run one test
 
-### > To run one test
-
-    > > python -m unittest tests.test_haploqa.TestHaploQA.test_home_page
+    python -m unittest tests.test_haploqa.TestHaploQA.test_home_page
