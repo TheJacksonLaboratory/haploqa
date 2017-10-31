@@ -689,7 +689,7 @@ function HaploKaryoPlot(params) {
                     if (d.density === 1) {
                         var snp = snpData[d.snps[0]];
                         return "<b>SNP ID:</b> " + snp.snp_id
-                            + "<br><b>Position:</b> " + format(d.snps[0]) + "b"
+                            + "<br><b>Position:</b> " + format(d.snps[0]) + " b"
                             + "<br><b>Allele 1 Fwd:</b> " + (snp.allele1_fwd)
                             + "<br><b>Allele 2 Fwd:</b> " + (snp.allele2_fwd)
                             + "<br><b>X Probe Call:</b> " + (snp.x_probe_call)
