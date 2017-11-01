@@ -436,6 +436,21 @@ function HaploKaryoPlot(params) {
     var cachedStrainNames = null;
     var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
     var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
+
+    this.drawOverlay = function(msg, xOffset) {
+        var contents = msg.toUpperCase();
+        var overlayGroup = svg.append("g")
+            .attr("class", "no-data-overlay");
+
+        overlayGroup.append("rect")
+            .attr("class", "no-data-overlay-bg")
+            .attr("width", 900)
+            .attr("height", 200);
+        overlayGroup.append("text")
+            .attr("class", "no-data-overlay-text")
+            .attr("transform", "translate(" + xOffset + ", 110)")
+            .html(contents);
+    }
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         svg.selectAll(".no-data-overlay").remove();
         console.log(haploData);
@@ -443,30 +458,10 @@ function HaploKaryoPlot(params) {
             haploData = cachedHaplotypeData;
         } else {
             if(intervalMode && cachedHaplotypeData === null) {
-                var overlayGroup = svg.append("g")
-                    .attr("class", "no-data-overlay");
-
-                overlayGroup.append("rect")
-                    .attr("class", "no-data-overlay-bg")
-                    .attr("width", 900)
-                    .attr("height", 200);
-                overlayGroup.append("text")
-                    .attr("class", "no-data-overlay-text")
-                    .attr("transform", "translate(190, 110)")
-                    .html("CHOOSE AN INTERVAL");
+                this.drawOverlay("choose an interval", 190);
             }
             else if(intervalMode && haploData.viterbi_haplotypes.concordant_percent === null) {
-                var overlayGroup = svg.append("g")
-                    .attr("class", "no-data-overlay");
-
-                overlayGroup.append("rect")
-                    .attr("class", "no-data-overlay-bg")
-                    .attr("width", 900)
-                    .attr("height", 200);
-                overlayGroup.append("text")
-                    .attr("class", "no-data-overlay-text")
-                    .attr("transform", "translate(225, 110)")
-                    .html("NO DATA TO SHOW");
+                this.drawOverlay("no data to show", 225)
             }
             cachedHaplotypeData = haploData;
         }

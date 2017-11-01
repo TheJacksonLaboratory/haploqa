@@ -921,20 +921,7 @@
                     }
                     // if no attempts left, inform user that no data turned up
                     else if(anyResultsPending(data) && attempt === 0) {
-                        var block = d3.select("[id=hapintervalplot-comp-svg]");
-
-                        var overlayGroup = block.append("g")
-                            .attr("class", "no-data-overlay");
-
-                        overlayGroup.append("rect")
-                            .attr("class", "no-data-overlay-bg")
-                            .attr("width", 900)
-                            .attr("height", 200);
-                        overlayGroup.append("text")
-                            .attr("class", "no-data-overlay-text")
-                            .attr("transform", "translate(225, 110)")
-                            .html("NO DATA TO SHOW");
-
+                        hapIntervalCompPlot.drawOverlay("no data to show", 225);
                     }
                 }).fail(function() {
                     showErrorMessage('An error occurred while updating haplotypes.');
