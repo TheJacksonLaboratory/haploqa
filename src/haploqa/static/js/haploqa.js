@@ -437,9 +437,23 @@ function HaploKaryoPlot(params) {
     var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
     var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
+        svg.selectAll(".no-data-overlay").remove();
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
+            if(intervalMode && cachedHaplotypeData === null) {
+                var overlayGroup = svg.append("g")
+                    .attr("class", "no-data-overlay");
+
+                overlayGroup.append("rect")
+                    .attr("class", "no-data-overlay-bg")
+                    .attr("width", 900)
+                    .attr("height", 200);
+                overlayGroup.append("text")
+                    .attr("class", "no-data-overlay-text")
+                    .attr("transform", "translate(225, 90)")
+                    .html("NO DATA TO SHOW");
+            }
             cachedHaplotypeData = haploData;
         }
 

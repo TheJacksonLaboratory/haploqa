@@ -92,7 +92,7 @@
                     $("#comp-label").text("Sample: " + labelText);
 
                     // if the previous chosen sample resulted in no data, remove the overlay
-                    d3.select("[id=no-data-overlay]").remove();
+                    d3.select("[class=no-data-overlay]").remove();
                 });
             }
 
@@ -106,7 +106,7 @@
                 $("#comp-label").text("Sample: " + labelText);
 
                 // if the previous chosen sample resulted in no data, remove the overlay
-                d3.select("[id=no-data-overlay]").remove();
+                d3.select("[class=no-data-overlay]").remove();
 
                 // update the comparison svg and only attempt data retrieval twice
                 updateComparisonSVG(sample.current_comp, 2);
@@ -924,14 +924,14 @@
                         var block = d3.select("[id=hapintervalplot-comp-svg]");
 
                         var overlayGroup = block.append("g")
-                            .attr("id", "no-data-overlay");
+                            .attr("class", "no-data-overlay");
 
                         overlayGroup.append("rect")
-                            .attr("id", "no-data-overlay-bg")
+                            .attr("class", "no-data-overlay-bg")
                             .attr("width", 900)
                             .attr("height", 200);
                         overlayGroup.append("text")
-                            .attr("id", "no-data-overlay-text")
+                            .attr("class", "no-data-overlay-text")
                             .attr("transform", "translate(225, 90)")
                             .html("NO DATA TO SHOW");
 
@@ -955,7 +955,10 @@
                 $.getJSON(snpsURL, function(data) {
                     plotToUpdate.updateSNPBar(data);
                 }).fail(function() {
-                    d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                    if (plotToUpdate == hapIntervalCompPlot) {
+                        d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                    }
+
                     alertDiv.html('<div class="alert alert-warning fade in"> ' +
                          '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">x' +
                          '</button>An error occurred while gathering SNP data.</div>');
