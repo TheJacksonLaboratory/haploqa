@@ -453,7 +453,6 @@ function HaploKaryoPlot(params) {
     }
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         svg.selectAll(".no-data-overlay").remove();
-        console.log(haploData);
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
