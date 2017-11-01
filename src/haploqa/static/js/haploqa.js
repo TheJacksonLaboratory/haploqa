@@ -441,12 +441,17 @@ function HaploKaryoPlot(params) {
             haploData = cachedHaplotypeData;
         } else {
             if(intervalMode) {
+                // get the size of the chr 1 and then add a few Mb on the right
+                // side so it's clear that the entire chr is being shown
+                var size = chrSizesHash["1"].size + 3000000;
+
                 var chr1 = {
-                    size: (chrSizesHash["1"].size + 3000000),
+                    size: size,
                     chr: "1",
                     startPos: 0,
-                    endPos: (chrSizesHash["1"].size + 3000000)
+                    endPos: size
                 };
+
                 this.zoomInterval(chr1)
             }
             cachedHaplotypeData = haploData;
