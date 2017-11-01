@@ -559,6 +559,12 @@
                 contribStrainTokensInput.tokenfield('setTokens', sample['contributing_strains']);
             }
 
+            /**
+             * creates the list of haplo links and svg legend based on the contributing
+             * strains for the comparison sample
+             *
+             * @param contribStrains - list of all contributing strains for the comparison sample
+             */
             function updateCompHaplotypeStrains(contribStrains) {
                 contribStrains.sort();
                 hapIntervalCompPlot.drawLegend(strainMap, contribStrains, 150);
@@ -931,7 +937,7 @@
             var alertDiv = $("#alertDiv");
 
             /**
-             * retrieve data on SNPs within a given sample and chromosome
+             * retrieves data on SNPs within a given sample and chromosome
              *
              * @param sampleId - the sample to search for
              * @param chr - the chromosome to search for
