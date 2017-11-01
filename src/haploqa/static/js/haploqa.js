@@ -438,6 +438,7 @@ function HaploKaryoPlot(params) {
     var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         svg.selectAll(".no-data-overlay").remove();
+        console.log(haploData);
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
@@ -451,7 +452,20 @@ function HaploKaryoPlot(params) {
                     .attr("height", 200);
                 overlayGroup.append("text")
                     .attr("class", "no-data-overlay-text")
-                    .attr("transform", "translate(225, 90)")
+                    .attr("transform", "translate(190, 110)")
+                    .html("CHOOSE AN INTERVAL");
+            }
+            else if(intervalMode && haploData.viterbi_haplotypes.concordant_percent === null) {
+                var overlayGroup = svg.append("g")
+                    .attr("class", "no-data-overlay");
+
+                overlayGroup.append("rect")
+                    .attr("class", "no-data-overlay-bg")
+                    .attr("width", 900)
+                    .attr("height", 200);
+                overlayGroup.append("text")
+                    .attr("class", "no-data-overlay-text")
+                    .attr("transform", "translate(225, 110)")
                     .html("NO DATA TO SHOW");
             }
             cachedHaplotypeData = haploData;
