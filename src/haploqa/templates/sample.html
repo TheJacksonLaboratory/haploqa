@@ -88,6 +88,7 @@
                     var sampleSelected = comparisonSelect.children("option").filter(":selected");
                     sample.current_comp = sampleSelected.val();
                     updateComparisonSVG(sample.current_comp, 2);
+                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
                     var labelText = sampleSelected.text();
                     $("#comp-label").text("Sample: " + labelText);
 

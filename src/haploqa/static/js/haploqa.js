@@ -440,6 +440,15 @@ function HaploKaryoPlot(params) {
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
+            if(intervalMode) {
+                var chr1 = {
+                    size: (chrSizesHash["1"].size + 3000000),
+                    chr: "1",
+                    startPos: 0,
+                    endPos: (chrSizesHash["1"].size + 3000000)
+                };
+                this.zoomInterval(chr1)
+            }
             cachedHaplotypeData = haploData;
         }
 
