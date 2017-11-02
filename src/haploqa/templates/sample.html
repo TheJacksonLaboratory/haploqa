@@ -88,6 +88,7 @@
                     var sampleSelected = comparisonSelect.children("option").filter(":selected");
                     sample.current_comp = sampleSelected.val();
                     updateComparisonSVG(sample.current_comp, 2);
+                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
                     var labelText = sampleSelected.text();
                     $("#comp-label").text("Sample: " + labelText);
 
@@ -927,6 +928,8 @@
                     }
                     // if no attempts left, inform user that no data turned up
                     else if(anyResultsPending(data) && attempt === 0) {
+                        d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                        d3.select("[class=no-data-overlay]").remove();
                         hapIntervalCompPlot.drawOverlay("no data to show", 225);
                     }
                 }).fail(function() {
@@ -968,6 +971,7 @@
             // initialize the UI
             resetEdits();
             updateHaplotypeSVG();
+            getSNPData(sample._id, 1, hapIntervalPlot);
 
             $('[data-toggle="tooltip"]').tooltip()
         });
