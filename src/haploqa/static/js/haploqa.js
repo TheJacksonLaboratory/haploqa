@@ -436,10 +436,50 @@ function HaploKaryoPlot(params) {
     var cachedStrainNames = null;
     var plot = svg.append("g").attr("class", "plot").attr("transform", "translate(0, 15)");
     var plotContentsGroup = plot.append("g").attr("class", "plot-contents");
+
+    /**
+     * creates an overlay over interval plots when data can't be shown
+     *
+     * @param msg - text to show up on the overlay
+     * @param xOffset - pixels to the right (used to try to manually center the text)
+     */
+    this.drawOverlay = function(msg, xOffset) {
+        var contents = msg.toUpperCase();
+        var overlayGroup = svg.append("g")
+            .attr("class", "no-data-overlay");
+
+        overlayGroup.append("rect")
+            .attr("class", "no-data-overlay-bg")
+            .attr("width", 900)
+            .attr("height", 200);
+        overlayGroup.append("text")
+            .attr("class", "no-data-overlay-text")
+            .attr("transform", "translate(" + xOffset + ", 110)")
+            .html(contents);
+    };
+
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
+        svg.selectAll(".no-data-overlay").remove();
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
+            if(intervalMode && haploData.viterbi_haplotypes.concordant_percent === null) {
+                this.drawOverlay("no data to show", 225)
+            }
+            else if(intervalMode) {
+                // get the size of the chr 1 and then add a few Mb on the right
+                // side so it's clear that the entire chr is being shown
+                var size = chrSizesHash["1"].size + 3000000;
+
+                var chr1 = {
+                    size: size,
+                    chr: "1",
+                    startPos: 0,
+                    endPos: size
+                };
+
+                this.zoomInterval(chr1);
+            }
             cachedHaplotypeData = haploData;
         }
 
