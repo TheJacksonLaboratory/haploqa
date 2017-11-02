@@ -74,15 +74,20 @@
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
                 var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
-                    sample.comp_samples = data.samples;
 
-                    sample.comp_samples.forEach(function(sample) {
+                    var posOfCurrent = 0;
+                    data.samples.forEach(function(sample, i) {
                         // only load samples that aren't the current
                         if (sample.sample_id !== sampleID) {
                             var option = new Option(sample.sample_id, sample._id);
                             comparisonSelect.append(option);
                         }
+                        else {
+                            posOfCurrent = i;
+                        }
                     });
+                    data.samples.splice(posOfCurrent, 1);
+                    sample.comp_samples = data.samples;
 
                 }).success(function() {
                     var sampleSelected = comparisonSelect.children("option").filter(":selected");
@@ -113,6 +118,42 @@
                 updateComparisonSVG(sample.current_comp, 2);
                 getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
             });
+
+            $("#comp-prev").on("click", function() {
+                var index;
+
+                for (var i = 0; i < sample.comp_samples.length; i++) {
+                    if (sample.current_comp === sample.comp_samples[i]._id) {
+                        index = i;
+                    }
+                }
+
+                if(index === 0) {
+                    var lastIndex = sample.comp_samples.length - 1;
+                    $("#comparison-sample").val(sample.comp_samples[lastIndex]._id).trigger("change");
+                }
+                else {
+                    $("#comparison-sample").val(sample.comp_samples[index-1]._id).trigger("change");
+                }
+            })
+
+            $("#comp-next").on("click", function() {
+                var index;
+
+                for (var i = 0; i < sample.comp_samples.length; i++) {
+                    if (sample.current_comp === sample.comp_samples[i]._id) {
+                        index = i;
+                    }
+                }
+
+                var lastIndex = sample.comp_samples.length - 1;
+                if(index === lastIndex) {
+                    $("#comparison-sample").val(sample.comp_samples[0]._id).trigger("change");
+                }
+                else {
+                    $("#comparison-sample").val(sample.comp_samples[index+1]._id).trigger("change");
+                }
+            })
 
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
@@ -1359,17 +1400,32 @@
                     class="haplotype-plot"></svg>
         </div>
     </div>
-
+        <br/>
+        <br/>
     <div class="row">
         <div class="col-md-12">
-            <label id="comp-label" class="sample-label"></label>
-            <div class="readonly-comp-haplotypes-panel"></div>
-            <svg
-                    id="hapintervalplot-comp-svg"
-                    width="900" height="200"
-                    class="haplotype-plot"></svg>
+            <div id="comp-carousel" class="carousel" data-ride="carousel" data-interval="false">
+                <div class="carousel-inner" role="listbox">
+                    <div class="carousel-item">
+                        <label id="comp-label" class="sample-label"></label>
+                        <div class="readonly-comp-haplotypes-panel"></div>
+                        <svg
+                            id="hapintervalplot-comp-svg"
+                            width="900" height="200"
+                            class="haplotype-plot">
+                        </svg>
+                    </div>
+                </div>
+                <a id="comp-prev" class="carousel-control left">
+                    <span class="glyphicon glyphicon-chevron-left black"></span>
+                </a>
+                <a id="comp-next" class="carousel-control right">
+                    <span class="glyphicon glyphicon-chevron-right black"></span>
+                </a>
+            </div>
         </div>
     </div>
+        <br/><br/>
 
     <div class="form-inline">
         <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
