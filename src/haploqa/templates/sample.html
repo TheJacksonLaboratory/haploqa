@@ -32,6 +32,8 @@
         if(sex === null) {
             sex = 'unknown';
         }
+
+        var allSds = {{ all_sds|tojson }};
         var allTags = {{ all_tags|tojson }};
         var allOwners = {{ all_owners|tojson }}
         var sample = {{ sample|tojson }};
@@ -368,6 +370,22 @@
                 readonlySampleVisibility.text(newSampleIsPublic ? 'Publicly Visible' : 'Requires Login');
             }
 
+            editStandardDesignationInput.tokenfield({
+                autocomplete: {
+                    source: allSds.map(function(stdes) {
+                        return {
+                            label: stdes,
+                            value: stdes
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            })
+
             editTagsInput.tokenfield({
                 autocomplete: {
                     source: allTags.map(function(tag) {
@@ -543,7 +561,6 @@
                     }
                     var strainIdx = strainNames.indexOf(strain);
                     //only show links in the haplotype strains if user is admin
-                    //TODO: need to get the plots rendering if sample is public
                     {% if g.user %}
                     var haploLink = $(
                             '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
@@ -722,6 +739,9 @@
                     data: postData,
                     dataType: 'json',
                     success: function(data) {
+
+                        var updateTs = data.ts + ' by {{ g.user.email_address }}';
+                        $('#lastupdate').text(updateTs);
 
                         $('#readonly-owner').text(owner);
 
@@ -1059,7 +1079,7 @@
                         <th>
                             Last Update
                         </th>
-                        <td>
+                        <td id="lastupdate">
                             {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
                         </td>
                     </tr>
