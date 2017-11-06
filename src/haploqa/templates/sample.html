@@ -85,15 +85,17 @@
                     });
 
                 }).success(function() {
-                    var sampleSelected = comparisonSelect.children("option").filter(":selected");
-                    sample.current_comp = sampleSelected.val();
-                    updateComparisonSVG(sample.current_comp, 2);
-                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
-                    var labelText = sampleSelected.text();
-                    $("#comp-label").text("Sample: " + labelText);
+                    // only if the user is logged in
+                    {% if g.user %}
+                        var sampleSelected = comparisonSelect.children("option").filter(":selected");
+                        sample.current_comp = sampleSelected.val();
+                        updateComparisonSVG(sample.current_comp, 2);
+                        var labelText = sampleSelected.text();
+                        $("#comp-label").text("Sample: " + labelText);
 
-                    // if the previous chosen sample resulted in no data, remove the overlay
-                    d3.select("[class=no-data-overlay]").remove();
+                        // if the previous chosen sample resulted in no data, remove the overlay
+                        d3.select("[id=no-data-overlay]").remove();
+                    {% endif %}
                 });
             }
 
@@ -295,11 +297,11 @@
                     gotoUCSCLink.removeClass('disabled');
                 }
 
-                hapKaryoPlot.zoomInterval(newInterval);
-                hapIntervalPlot.zoomInterval(newInterval);
-                hapIntervalCompPlot.zoomInterval(newInterval);
-
                 if(user !== null) {
+                    hapKaryoPlot.zoomInterval(newInterval);
+                    hapIntervalPlot.zoomInterval(newInterval);
+                    hapIntervalCompPlot.zoomInterval(newInterval);
+
                     // don't update haplotypes unless we have at least 1 sec of quiet time.
                     updateIntervalDP.delay(findCandidateHaps, 1000);
                 }
@@ -808,8 +810,11 @@
                 intervalMode: true
             });
 
-            hapIntervalPlot.zoomIntervalChange = updateInterval;
-            hapIntervalCompPlot.zoomIntervalChange = updateInterval;
+            // only if the user is logged in
+            {% if g.user %}
+                hapIntervalPlot.zoomIntervalChange = updateInterval;
+                hapIntervalCompPlot.zoomIntervalChange = updateInterval;
+            {% endif %}
 
             function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
@@ -909,6 +914,12 @@
              */
             function updateComparisonSVG(compId, attempt) {
                 attempt--;
+
+                // if user is not logged in, don't make request
+                if (typeof compId === "undefined") {
+                    return;
+                }
+
                 var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
                 $.getJSON(haplotypesURL, function(data) {
                     hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
@@ -947,6 +958,12 @@
              * @param plotToUpdate - the plot that needs to receive the SNP data
              */
             function getSNPData(sampleId, chr, plotToUpdate) {
+
+                // if user is not logged in, don't make request
+                if (typeof sampleId === "undefined") {
+                    return;
+                }
+
                 var snpsURL = "/snps.json/" + sampleId + "/" + chr;
                 $.getJSON(snpsURL, function(data) {
                     plotToUpdate.updateSNPBar(data);
@@ -972,6 +989,11 @@
             resetEdits();
             updateHaplotypeSVG();
             getSNPData(sample._id, 1, hapIntervalPlot);
+
+            // only if the user is logged in
+            {% if g.user %}
+                getSNPData(sample._id, 1, hapIntervalPlot);
+            {% endif %}
 
             $('[data-toggle="tooltip"]').tooltip()
         });
