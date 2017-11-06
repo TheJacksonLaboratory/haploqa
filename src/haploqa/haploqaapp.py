@@ -1067,6 +1067,7 @@ def sample_html(mongo_id):
     if sample is None:
         return flask.render_template('login-required.html')
 
+    all_std_des = db.standard_designations.distinct('standard_designation')
     all_tags = db.samples.distinct('tags')
     all_owners = db.users.distinct('email_address_lowercase')
     all_eng_tgts = db.snps.distinct('engineered_target', {'platform_id': sample['platform_id']})
@@ -1074,6 +1075,7 @@ def sample_html(mongo_id):
     return flask.render_template(
         'sample.html',
         sample=sample,
+        all_sds=all_std_des,
         all_tags=all_tags,
         all_owners=all_owners,
         all_eng_tgts=all_eng_tgts,
@@ -1592,7 +1594,7 @@ def update_sample(mongo_id):
     elif update_dict:
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
-    return flask.jsonify(task_ids=task_ids)
+    return flask.jsonify(task_ids=task_ids,ts=ts)
 
 
 @app.route('/update-samples.json', methods=['POST'])
