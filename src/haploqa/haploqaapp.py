@@ -13,6 +13,7 @@ import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
 import datetime
+import traceback
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -774,6 +775,7 @@ def standard_designation_json(standard_designation):
     """
     # look up all samples with this standard_designation. Only return top level information though
     # (snp-level data is too much)
+
     db = mds.get_db()
     matching_samples = _find_and_anno_samples(
         {'standard_designation': standard_designation},
@@ -788,6 +790,9 @@ def standard_designation_json(standard_designation):
     )
 
     matching_samples = list(matching_samples)
+
+    if len(matching_samples) == 0:
+        return '{"status": "failure", "msg": "no data"}'
 
     return flask.jsonify(samples=matching_samples)
 
@@ -1282,9 +1287,16 @@ def get_snps_json(mongo_id, chr_id):
     :param chr_id:
     :return: json snp data
     """
+    if mongo_id is None:
+        return '{"status": "failure", "msg": "no sample id provided"}'
 
     db = mds.get_db()
-    obj_id = ObjectId(mongo_id)
+
+    try:
+     obj_id = ObjectId(mongo_id)
+    except:
+        return '{"status": "failure", "msg": "invalid objectID"}'
+
     sample = _find_one_and_anno_samples({'_id': obj_id}, {}, db)
     if sample is None:
         flask.abort(400)
@@ -1341,7 +1353,14 @@ def get_snps_json(mongo_id, chr_id):
 
         return outDict
 
-    return flask.jsonify(gen_outDict())
+    try:
+        output = gen_outDict()
+        return flask.jsonify(output)
+    except:
+        tcb = traceback.format_exc()
+        sys.stderr.write(tcb)
+        return '{"status": "failure", "msg": "failure generating snp data, please check the log"}'
+
 
 @app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
 def combined_report(sdid):
@@ -1514,11 +1533,13 @@ def update_sample(mongo_id):
 
     db = mds.get_db()
     obj_id = ObjectId(mongo_id)
+
     sample = _find_one_and_anno_samples(
             {'_id': obj_id},
             {'platform_id': 1, 'sex': 1},
             db=db,
             require_write_perms=True)
+
     if sample is None:
         # either the sample does not exist or the user has no permissions to it
         flask.abort(400)
@@ -1594,7 +1615,7 @@ def update_sample(mongo_id):
     elif update_dict:
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
-    return flask.jsonify(task_ids=task_ids,ts=ts)
+    return flask.jsonify(ts=ts)
 
 
 @app.route('/update-samples.json', methods=['POST'])
@@ -1845,10 +1866,16 @@ def viterbi_haplotypes_json(mongo_id):
     """
 
     db = mds.get_db()
-    obj_id = ObjectId(mongo_id)
+
+    try:
+     obj_id = ObjectId(mongo_id)
+    except:
+        return '{"status": "failure", "msg": "invalid objectID"}'
+
     sample = _find_one_and_anno_samples({'_id': obj_id}, {'viterbi_haplotypes': 1, 'contributing_strains': 1}, db=db)
+
     if sample is None:
-        flask.abort(400)
+        return '{"status": "failure", "msg": "no sample found"}'
 
     return flask.jsonify(
         viterbi_haplotypes=sample['viterbi_haplotypes'],
