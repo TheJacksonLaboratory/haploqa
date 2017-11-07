@@ -1329,7 +1329,7 @@ def get_snps_json(mongo_id, chr_id):
 
             position = str(curr_snp['position_bp'])
             # good for debugging
-            #print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
+            # print("current snp index: {} @ position {:,}".format(snp_index, curr_snp['position_bp']))
             outDict[position] = {}
             outDict[position]['snp_id'] = curr_snp['snp_id']
             outDict[position]['x_probe_call'] = curr_snp['x_probe_call']
@@ -1357,7 +1357,8 @@ def get_snps_json(mongo_id, chr_id):
         output = gen_outDict()
         return flask.jsonify(output)
     except:
-        print(traceback.format_exc())
+        tcb = traceback.format_exc()
+        sys.stderr.write(tcb)
         return '{"status": "failure", "msg": "failure generating snp data, please check the log"}'
 
 
