@@ -13,6 +13,7 @@ import tempfile
 import uuid
 from werkzeug.routing import BaseConverter
 import datetime
+import traceback
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -1356,7 +1357,8 @@ def get_snps_json(mongo_id, chr_id):
         output = gen_outDict()
         return flask.jsonify(output)
     except:
-        return '{"status": "failure", "msg": "failure generating snp data"}'
+        print(traceback.format_exc())
+        return '{"status": "failure", "msg": "failure generating snp data, please check the log"}'
 
 
 @app.route('/combined-report/<escfwd:sdid>_summary_report.txt')
