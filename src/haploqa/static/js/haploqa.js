@@ -2,11 +2,15 @@
 // still stumble on them. We can encode/decode the string with a simple scheme like:
 // 'hi / there / \\ dude / \\f\\b\\\\'.replace(/\\/g, '\\b').replace(/\//g, '\\f').replace(/\\f/g, '/').replace(/\\b/g, '\\');
 function encURIComp(str) {
-    return encodeURIComponent(str.replace(/\\/g, '\\b').replace(/\//g, '\\f'));
+    if (str) {
+        return encodeURIComponent(str.replace(/\\/g, '\\b').replace(/\//g, '\\f'));
+    }
 }
 
 function decURIComp(str) {
-    return decodeURIComponent(str).replace(/\\f/g, '/').replace(/\\b/g, '\\');
+    if(str) {
+        return decodeURIComponent(str).replace(/\\f/g, '/').replace(/\\b/g, '\\');
+    }
 }
 
 var entityMap = {

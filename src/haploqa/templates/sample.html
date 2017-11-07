@@ -76,15 +76,17 @@
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
                 var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
-                    sample.comp_samples = data.samples;
 
-                    sample.comp_samples.forEach(function(sample) {
-                        // only load samples that aren't the current
-                        if (sample.sample_id !== sampleID) {
-                            var option = new Option(sample.sample_id, sample._id);
-                            comparisonSelect.append(option);
-                        }
-                    });
+                    if (data.samples) {
+                        sample.comp_samples = data.samples;
+                        sample.comp_samples.forEach(function (sample) {
+                            // only load samples that aren't the current
+                            if (sample.sample_id !== sampleID) {
+                                var option = new Option(sample.sample_id, sample._id);
+                                comparisonSelect.append(option);
+                            }
+                        });
+                    } //TODO: don't show the secondary genome interval plot or the comparison sample dropdown
 
                 }).success(function() {
                     var sampleSelected = comparisonSelect.children("option").filter(":selected");
