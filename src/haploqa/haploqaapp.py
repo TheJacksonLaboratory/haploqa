@@ -178,7 +178,6 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
-# TODO: deprecated
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -795,6 +794,26 @@ def standard_designation_json(standard_designation):
         return '{"status": "failure", "msg": "no data"}'
 
     return flask.jsonify(samples=matching_samples)
+
+
+@app.route('/st-des-admin.html')
+def st_des_admin():
+    """
+    standard designation admin page
+    :return:
+    """
+
+    user = flask.g.user
+    if user is None or not user['administrator']:
+        return flask.render_template('login-required.html')
+
+    db = mds.get_db()
+    all_st_des = db.standard_designations.find()
+
+    return flask.render_template(
+        'st-des-admin.html',
+        all_st_des=all_st_des,
+    )
 
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
@@ -1600,19 +1619,23 @@ def update_sample(mongo_id):
 
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
+        print("running update on 1603")
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
         sample_obj_id = str(sample['_id'])
+        print("i'm about to queue some jobs")
         for chr_id in chr_ids:
             t = infer_haplotype_structure_task.delay(
                 sample_obj_id,
                 chr_id,
                 haplotype_inference_uuid,
             )
+            print("appending task id#{}".format(t.task_id))
             task_ids.append(t.task_id)
 
     elif update_dict:
+        print("no tasks to be queued, running update on 1618")
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
     return flask.jsonify(ts=ts)

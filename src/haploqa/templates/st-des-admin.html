@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block title %}HaploQA{% endblock %}
+{% block content %}
+    <div class="page-header">
+        <h1>Standard Designation Management</h1>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            Standard Designations:
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                       <th>Name</th>
+                        <th>Color</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                    {% for st_des in all_st_des %}
+                    <tr>
+                        <td>{{ st_des.standard_designation }}</td>
+                        <td>{{ st_des.color }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+     <script>
+{% endblock %}
