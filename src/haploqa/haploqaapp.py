@@ -1651,6 +1651,9 @@ def update_sample(mongo_id):
     if 'color' in form:
         update_dict['color'] = form['color'].strip()
 
+    if 'hap_cand' in form:
+        update_dict['haplotype_candidate'] = form['hap_cand'] == 'true'
+
     if 'standard_designation' in form:
         update_dict['standard_designation'] = form['standard_designation'].strip()
 
