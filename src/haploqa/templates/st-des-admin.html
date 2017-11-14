@@ -2,30 +2,158 @@
 
 {% block title %}HaploQA{% endblock %}
 {% block content %}
+    <script>
+
+            //TODO: aggregate show/hide into one true/false function
+            function showColorEdit(id) {
+                //$('#st-des-'+id+'-color').css('display', 'none');
+                $('#'+id).minicolors({theme: 'bootstrap'});
+                $('#st-des-edit-'+id).css('display', 'block');
+                $('#confirm-'+id).css('display', 'block');
+                $('#cancel-'+id).css('display', 'block');
+                $('#edit-'+id).css('display', 'none');
+            }
+
+            function makeColorEdit(id) {
+                //show spinner and update div with color
+                var postData = {};
+                var colorHex = $('#'+id).val();
+                postData['color'] = colorHex;
+                $.ajax({
+                        method: "POST",
+                        url: "/update-st-des-color/"+id+".json",
+                        data: postData,
+                        success: function(data) {
+                            hideColorEdit(id);
+                            console.log(data);
+                        }
+                    }).fail(function(data) {
+                        $('#msg').text('an error occured');
+                        console.log(data);
+                    }).always(function(data) {
+                        hideColorEdit(id);
+                        console.log(data);
+                    });
+
+                $('#st-des-'+id+'-color').css('color', colorHex);
+                $('#st-des-'+id+'-color').html('&nbsp;&nbsp;'+colorHex);
+            }
+
+            function hideColorEdit(id) {
+                $('#confirm-'+id).css('display', 'none');
+                $('#cancel-'+id).css('display', 'none');
+                $('#edit-'+id).css('display', 'block');
+                $('#st-des-edit-'+id).css('display', 'none');
+                $('#st-des-'+id+'-color').css('display', 'block');
+            }
+
+            function showAddModal() {
+                var modalDialog = $('#add-modal');
+                $('#color').minicolors({theme: 'bootstrap'});
+                modalDialog.modal();
+                //$('#confirm-modal-message').text(msg);
+            }
+
+            function addStDes() {
+                var postData = {};
+                var std_des = $('#std_des').children().val();
+                console.log("st des: "+std_des);
+                postData['st_des'] =  std_des
+                postData['color'] = $('#color').val();
+
+                $.ajax({
+                        method: "POST",
+                        url: "/add-st-des.json",
+                        data: postData,
+                        success: function(data) {
+                            //location.reload();
+                            console.log(data);
+                            //TODO: clear form
+                        }
+                    }).fail(function(data) {
+                        $('#msg').text('An error occurred while adding the standard designation');
+                        //location.reload();
+                        console.log(data);
+                    }).always(function(data) {
+                        console.log(data);
+                    });
+
+            }
+
+    </script>
     <div class="page-header">
         <h1>Standard Designation Management</h1>
+        <div class="row">
+            <div>
+                <span>
+                    <button id="add-button" type="button" class="btn btn-primary" onclick="showAddModal();">Add Item
+                    </button>
+                </span>
+            </div>
+        </div>
     </div>
-    <div class="row">
-        <div class="col-md-12">
-            Standard Designations:
-            <table class="table table-striped">
+        <div class="row">
+            <b>Standard Designations:</b>
+            <table class="table table-striped col-md-4">
                 <thead>
                     <tr>
                        <th>Name</th>
-                        <th>Color</th>
+                       <th>Color</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                     {% for st_des in all_st_des %}
                     <tr>
-                        <td>{{ st_des.standard_designation }}</td>
-                        <td>{{ st_des.color }}</td>
+                        <td class="col-md-1">{{ st_des.standard_designation }}</td>
+                        <td class="col-md-1">
+                            <span id="st-des-edit-{{ st_des._id }}">
+                                <input type="text" id="{{ st_des._id }}" class="form-control color-edit" data-control="hue" \
+                                      style="display: none;" value="{{ st_des.color }}" style="display: none;">
+                            </span>
+                            <span id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};">&nbsp;&nbsp;{{ st_des.color }}</span>
+                        </td>
+                        <td class="col-md-1">
+                            <button id="edit-{{ st_des._id }}" type="button" class="btn btn-primary" \
+                                    onclick="showColorEdit('{{ st_des._id}}')">Edit Color
+                            </button>
+                            <button id="confirm-{{ st_des._id }}" type="button" class="btn btn-primary" \
+                                    style="display: none; width: 100px;" onclick="makeColorEdit('{{ st_des._id}}')">Confirm Edit
+                            </button>
+                        </td>
+                        <td class="col-md-1">
+                            <button id="cancel-{{ st_des._id }}" type="button" class="btn btn-warning" \
+                                    style="display: none; width: 100px;" onclick="hideColorEdit('{{ st_des._id }}');">Cancel Edit
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-     <script>
+    <!-- st des admin form -->
+    <div id="add-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">Add New Standard Designation</h4>
+                </div>
+                <div class="modal-body">
+                    <span>Standard Designation:</span>
+                    <span id="std_des"><input type="text"></span>
+                    <span>Color:</span>
+                    <span><input type="text" id="color" class="form-control color-edit" data-control="hue" \
+                                 style="display: none;" value="#000000" style="display: none;">
+                    </span>
+                    <div id="msg"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="add-item" type="button" class="btn btn-primary" onclick="addStDes();">Add Item</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
