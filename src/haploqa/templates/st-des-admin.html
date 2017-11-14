@@ -15,7 +15,6 @@
             }
 
             function makeColorEdit(id) {
-                //show spinner and update div with color
                 var postData = {};
                 var colorHex = $('#'+id).val();
                 postData['color'] = colorHex;
@@ -51,7 +50,6 @@
                 var modalDialog = $('#add-modal');
                 $('#color').minicolors({theme: 'bootstrap'});
                 modalDialog.modal();
-                //$('#confirm-modal-message').text(msg);
             }
 
             function addStDes() {
@@ -66,15 +64,14 @@
                         url: "/add-st-des.json",
                         data: postData,
                         success: function(data) {
-                            //location.reload();
                             console.log(data);
-                            //TODO: clear form
+                            $('#std_des').children().text("");
+                            $('#color').val('#000000');
+                            $('#msg').text('standard designation added successfully');
+                            //location.reload();
                         }
                     }).fail(function(data) {
                         $('#msg').text('An error occurred while adding the standard designation');
-                        //location.reload();
-                        console.log(data);
-                    }).always(function(data) {
                         console.log(data);
                     });
 

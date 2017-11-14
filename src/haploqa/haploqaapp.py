@@ -809,7 +809,6 @@ def add_st_des():
 
     try:
         form = flask.request.form
-        print(form)
         color = form['color']
         st_des = form['st_des']
         db = mds.get_db()
