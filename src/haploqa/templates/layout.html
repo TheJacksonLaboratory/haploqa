@@ -178,6 +178,7 @@
                         {% if g.user.administrator == True %}
                         <li><a href="{{ url_for('sample_data_export_html') }}">sample data export</a></li>
                         <li><a href="{{ url_for('show_users') }}">user admin</a></li>
+                        <li><a href="{{ url_for('st_des_admin') }}">standard designation admin</a></li>
                         <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
                         {% endif %}
                         <li><a href="{{ url_for('user_tags') }}">my samples</a></li>

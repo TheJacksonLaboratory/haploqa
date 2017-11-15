@@ -1701,7 +1701,8 @@ def update_sample(mongo_id):
                 chr_id,
                 haplotype_inference_uuid,
             )
-            print("appending task id#{}".format(t.task_id))
+            # to check tasks ids being appended
+            # print("appending task id#{}".format(t.task_id))
             task_ids.append(t.task_id)
 
     elif update_dict:
