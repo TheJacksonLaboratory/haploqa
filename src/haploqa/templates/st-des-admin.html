@@ -6,7 +6,6 @@
 
             //TODO: aggregate show/hide into one true/false function
             function showColorEdit(id) {
-                //$('#st-des-'+id+'-color').css('display', 'none');
                 $('#'+id).minicolors({theme: 'bootstrap'});
                 $('#st-des-edit-'+id).css('display', 'block');
                 $('#confirm-'+id).css('display', 'block');
@@ -54,27 +53,31 @@
 
             function addStDes() {
                 var postData = {};
-                var std_des = $('#std_des').children().val();
-                console.log("st des: "+std_des);
-                postData['st_des'] =  std_des
-                postData['color'] = $('#color').val();
+                var st_des = $('#st_des').val();
 
-                $.ajax({
-                        method: "POST",
-                        url: "/add-st-des.json",
-                        data: postData,
-                        success: function(data) {
+                if (st_des) {
+
+                        postData['st_des'] = st_des
+                        postData['color'] = $('#color').val();
+
+                        $.ajax({
+                            method: "POST",
+                            url: "/add-st-des.json",
+                            data: postData,
+                            success: function (data) {
+                                console.log(data);
+                                $('#std_des').children().text("");
+                                $('#color').val('#000000');
+                                location.reload();
+                            }
+                        }).fail(function (data) {
+                            $('#msg').text('An error occurred while adding the standard designation');
                             console.log(data);
-                            $('#std_des').children().text("");
-                            $('#color').val('#000000');
-                            $('#msg').text('standard designation added successfully');
-                            //location.reload();
-                        }
-                    }).fail(function(data) {
-                        $('#msg').text('An error occurred while adding the standard designation');
-                        console.log(data);
-                    });
+                        });
 
+                } else {
+                     $('#msg').text('Please enter a value for standard designation');
+                }
             }
 
     </script>
@@ -89,13 +92,26 @@
             </div>
         </div>
     </div>
-        <div class="row">
+        <div class="row" style="width: 600px;">
             <b>Standard Designations:</b>
-            <table class="table table-striped col-md-4">
+            <table class="table table-striped col-md-6">
                 <thead>
                     <tr>
                        <th>Name</th>
-                       <th>Color</th>
+                       <th>Color
+                           <span
+                                        class="glyphicon glyphicon-question-sign help-icon"
+                                        aria-hidden="true"
+                                        data-toggle="tooltip"
+                                        data-placement="top"
+                                        title="Click on the Edit Color button to bring up the color selection box.
+                                        Click the color box to select a color.
+                                        Click anywhere off the selector to make your selection.
+                                        Click the Confirm Edit button to save your changes.">
+                           </span>
+                       </th>
+                        <th></th>
+                        <th></th>
                         <th></th>
                     </tr>
                 </thead>
@@ -105,11 +121,13 @@
                     <tr>
                         <td class="col-md-1">{{ st_des.standard_designation }}</td>
                         <td class="col-md-1">
+                            <span id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};">&nbsp;&nbsp;{{ st_des.color }}</span>
+                        </td>
+                        <td class="col-md-2">
                             <span id="st-des-edit-{{ st_des._id }}">
                                 <input type="text" id="{{ st_des._id }}" class="form-control color-edit" data-control="hue" \
-                                      style="display: none;" value="{{ st_des.color }}" style="display: none;">
+                                      style="display: none;" value="{{ st_des.color }}">
                             </span>
-                            <span id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};">&nbsp;&nbsp;{{ st_des.color }}</span>
                         </td>
                         <td class="col-md-1">
                             <button id="edit-{{ st_des._id }}" type="button" class="btn btn-primary" \
@@ -119,7 +137,7 @@
                                     style="display: none; width: 100px;" onclick="makeColorEdit('{{ st_des._id}}')">Confirm Edit
                             </button>
                         </td>
-                        <td class="col-md-1">
+                        <td class="col-md-1" style="float:left;">
                             <button id="cancel-{{ st_des._id }}" type="button" class="btn btn-warning" \
                                     style="display: none; width: 100px;" onclick="hideColorEdit('{{ st_des._id }}');">Cancel Edit
                             </button>
@@ -133,18 +151,36 @@
     <!-- st des admin form -->
     <div id="add-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
-            <div class="modal-content">
+            <div class="modal-content" style="width: 300px;">
                 <div class="modal-header">
                     <h4 class="modal-title" id="myModalLabel">Add New Standard Designation</h4>
+                    <div id="msg" style="color:red; font-weight: bold;"></div>
                 </div>
-                <div class="modal-body">
-                    <span>Standard Designation:</span>
-                    <span id="std_des"><input type="text"></span>
-                    <span>Color:</span>
-                    <span><input type="text" id="color" class="form-control color-edit" data-control="hue" \
+                <div class="modal-body" style="height: 140px;">
+                        <div style="float:left; margin-right: 100%">
+                            <div>Standard Designation:</div>
+                            <div style="margin-top: 10px;">
+                                <input type="text" id="st_des"/>
+                            </div>
+                        </div>
+                        <div style="float:left;">
+                            <div style="margin-top: 10px;">Color:
+                                <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="Click the color box to select a color.
+                                    Click anywhere off the selector to make your selection.
+                                    Click the Add Item button to save your changes, or
+                                    the Cancel button to exit this dialogue.">
+                                </span>
+                            </div>
+                            <div style="float: left;">
+                                <input type="text" id="color" class="form-control color-edit" data-control="hue" \
                                  style="display: none;" value="#000000" style="display: none;">
-                    </span>
-                    <div id="msg"></div>
+                            </div>    
+                        </div>
                 </div>
                 <div class="modal-footer">
                     <button id="add-item" type="button" class="btn btn-primary" onclick="addStDes();">Add Item</button>
@@ -153,4 +189,7 @@
             </div>
         </div>
     </div>
+    <script>
+    $('[data-toggle="tooltip"]').tooltip()
+    </script>
 {% endblock %}
