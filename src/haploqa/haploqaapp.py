@@ -1689,12 +1689,10 @@ def update_sample(mongo_id):
 
         update_dict['viterbi_haplotypes.informative_count'] = 0
         update_dict['viterbi_haplotypes.concordant_count'] = 0
-        print("running update on 1603")
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
         # since we invalidated haplotypes lets kick off tasks to recalculate
         sample_obj_id = str(sample['_id'])
-        print("i'm about to queue some jobs")
         for chr_id in chr_ids:
             t = infer_haplotype_structure_task.delay(
                 sample_obj_id,
@@ -1706,7 +1704,6 @@ def update_sample(mongo_id):
             task_ids.append(t.task_id)
 
     elif update_dict:
-        print("no tasks to be queued, running update on 1618")
         db.samples.update_one({'_id': obj_id}, {'$set': update_dict})
 
     return flask.jsonify(ts=ts)

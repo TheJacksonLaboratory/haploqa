@@ -56,10 +56,8 @@
                 var st_des = $('#st_des').val();
 
                 if (st_des) {
-
                         postData['st_des'] = st_des
                         postData['color'] = $('#color').val();
-
                         $.ajax({
                             method: "POST",
                             url: "/add-st-des.json",
@@ -116,7 +114,6 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
                     {% for st_des in all_st_des %}
                     <tr>
                         <td class="col-md-1">{{ st_des.standard_designation }}</td>
