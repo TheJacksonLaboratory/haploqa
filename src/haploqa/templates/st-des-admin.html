@@ -13,6 +13,11 @@
                 $('#edit-'+id).css('display', 'none');
             }
 
+            function fadeMsg() {
+                $('#color_msg').css('display', 'block');
+                $('#color_msg').fadeOut(3000);
+            }
+
             function makeColorEdit(id) {
                 var postData = {};
                 var colorHex = $('#'+id).val();
@@ -22,13 +27,14 @@
                         url: "/update-st-des-color/"+id+".json",
                         data: postData,
                         success: function(data) {
+                            $('#color_msg').text('Color updated successfully');
+                            fadeMsg();
                             hideColorEdit(id);
                             console.log(data);
                         }
                     }).fail(function(data) {
-                        $('#msg').text('an error occured');
-                        console.log(data);
-                    }).always(function(data) {
+                        $('#color_msg').text('An error occurred updating the color');
+                        fadeMsg();
                         hideColorEdit(id);
                         console.log(data);
                     });
@@ -92,6 +98,7 @@
     </div>
         <div class="row" style="width: 600px;">
             <b>Standard Designations:</b>
+            <div id="color_msg" style="color:red; font-weight: bold; display:none;"></div>
             <table class="table table-striped col-md-6">
                 <thead>
                     <tr>
