@@ -32,6 +32,8 @@
         if(sex === null) {
             sex = 'unknown';
         }
+
+        var allSds = {{ all_sds|tojson }};
         var allTags = {{ all_tags|tojson }};
         var allOwners = {{ all_owners|tojson }}
         var sample = {{ sample|tojson }};
@@ -41,6 +43,8 @@
         $(function() {
 
             var editOwnerInput = $('#edit-owner-input');
+
+            $('#hap-candidate-checkbox').prop('checked', sample.haplotype_candidate);
 
             editOwnerInput.tokenfield({
                 autocomplete: {
@@ -75,30 +79,29 @@
                 var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
 
-                    var posOfCurrent = 0;
-                    data.samples.forEach(function(sample, i) {
-                        // only load samples that aren't the current
-                        if (sample.sample_id !== sampleID) {
-                            var option = new Option(sample.sample_id, sample._id);
-                            comparisonSelect.append(option);
-                        }
-                        else {
-                            posOfCurrent = i;
-                        }
-                    });
-                    data.samples.splice(posOfCurrent, 1);
-                    sample.comp_samples = data.samples;
+                    if (data.samples) {
+                        sample.comp_samples = data.samples;
+                        sample.comp_samples.forEach(function (sample) {
+                            // only load samples that aren't the current
+                            if (sample.sample_id !== sampleID) {
+                                var option = new Option(sample.sample_id, sample._id);
+                                comparisonSelect.append(option);
+                            }
+                        });
+                    } //TODO: HAP-58 don't show the secondary genome interval plot or the comparison sample dropdown
 
                 }).success(function() {
-                    var sampleSelected = comparisonSelect.children("option").filter(":selected");
-                    sample.current_comp = sampleSelected.val();
-                    updateComparisonSVG(sample.current_comp, 2);
-                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
-                    var labelText = sampleSelected.text();
-                    $("#comp-label").text("Sample: " + labelText);
+                    // only if the user is logged in
+                    {% if g.user %}
+                        var sampleSelected = comparisonSelect.children("option").filter(":selected");
+                        sample.current_comp = sampleSelected.val();
+                        updateComparisonSVG(sample.current_comp, 2);
+                        var labelText = sampleSelected.text();
+                        $("#comp-label").text("Sample: " + labelText);
 
-                    // if the previous chosen sample resulted in no data, remove the overlay
-                    d3.select("[class=no-data-overlay]").remove();
+                        // if the previous chosen sample resulted in no data, remove the overlay
+                        d3.select("[id=no-data-overlay]").remove();
+                    {% endif %}
                 });
             }
 
@@ -336,11 +339,11 @@
                     gotoUCSCLink.removeClass('disabled');
                 }
 
-                hapKaryoPlot.zoomInterval(newInterval);
-                hapIntervalPlot.zoomInterval(newInterval);
-                hapIntervalCompPlot.zoomInterval(newInterval);
-
                 if(user !== null) {
+                    hapKaryoPlot.zoomInterval(newInterval);
+                    hapIntervalPlot.zoomInterval(newInterval);
+                    hapIntervalCompPlot.zoomInterval(newInterval);
+
                     // don't update haplotypes unless we have at least 1 sec of quiet time.
                     updateIntervalDP.delay(findCandidateHaps, 1000);
                 }
@@ -408,6 +411,22 @@
                 sampleIsPublicCheckbox.prop('checked', newSampleIsPublic);
                 readonlySampleVisibility.text(newSampleIsPublic ? 'Publicly Visible' : 'Requires Login');
             }
+
+            editStandardDesignationInput.tokenfield({
+                autocomplete: {
+                    source: allSds.map(function(stdes) {
+                        return {
+                            label: stdes,
+                            value: stdes
+                        }
+                    }),
+                    delay: 100,
+                    autoFocus: true,
+                    minLength: 1
+                },
+                showAutocompleteOnFocus: true,
+                createTokensOnBlur: true
+            })
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -584,7 +603,6 @@
                     }
                     var strainIdx = strainNames.indexOf(strain);
                     //only show links in the haplotype strains if user is admin
-                    //TODO: need to get the plots rendering if sample is public
                     {% if g.user %}
                     var haploLink = $(
                             '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
@@ -739,6 +757,12 @@
                     postData['color'] = newColor;
                 }
 
+                var hapCandidate = $('#hap-candidate-checkbox').prop('checked');
+                var hcChanged = hapCandidate !== sample.haplotype_candidate;
+                if(hcChanged) {
+                    postData['hap_cand'] = hapCandidate;
+                }
+
                 var newStandardDesignation = editStandardDesignationInput.val();
                 var standardDesignationChanged = newStandardDesignation != sample.standard_designation;
                 if(standardDesignationChanged) {
@@ -770,6 +794,9 @@
                     dataType: 'json',
                     success: function(data) {
 
+                        var updateTs = data.ts + ' by {{ g.user.email_address }}';
+                        $('#lastupdate').text(updateTs);
+
                         $('#readonly-owner').text(owner);
 
                         if(tagsChanged) {
@@ -790,6 +817,10 @@
                         }
                         if(colorChanged) {
                             updateSampleColor(newColor);
+                        }
+                        if(hcChanged) {
+                            $('#hap-candidate').text(hapCandidate);
+                            $('#hap-candidate-checkbox').prop('checked', hapCandidate);
                         }
                         if(standardDesignationChanged) {
                             updateStandardDesignation(newStandardDesignation);
@@ -849,8 +880,11 @@
                 intervalMode: true
             });
 
-            hapIntervalPlot.zoomIntervalChange = updateInterval;
-            hapIntervalCompPlot.zoomIntervalChange = updateInterval;
+            // only if the user is logged in
+            {% if g.user %}
+                hapIntervalPlot.zoomIntervalChange = updateInterval;
+                hapIntervalCompPlot.zoomIntervalChange = updateInterval;
+            {% endif %}
 
             function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
@@ -950,6 +984,12 @@
              */
             function updateComparisonSVG(compId, attempt) {
                 attempt--;
+
+                // if user is not logged in, don't make request
+                if (typeof compId === "undefined") {
+                    return;
+                }
+
                 var haplotypesURL = "/sample/" + compId + "/viterbi-haplotypes.json";
                 $.getJSON(haplotypesURL, function(data) {
                     hapIntervalCompPlot.updateHaplotypes(data, strainMap, strainNames);
@@ -988,6 +1028,12 @@
              * @param plotToUpdate - the plot that needs to receive the SNP data
              */
             function getSNPData(sampleId, chr, plotToUpdate) {
+
+                // if user is not logged in, don't make request
+                if (typeof sampleId === "undefined") {
+                    return;
+                }
+
                 var snpsURL = "/snps.json/" + sampleId + "/" + chr;
                 $.getJSON(snpsURL, function(data) {
                     plotToUpdate.updateSNPBar(data);
@@ -1013,6 +1059,11 @@
             resetEdits();
             updateHaplotypeSVG();
             getSNPData(sample._id, 1, hapIntervalPlot);
+
+            // only if the user is logged in
+            {% if g.user %}
+                getSNPData(sample._id, 1, hapIntervalPlot);
+            {% endif %}
 
             $('[data-toggle="tooltip"]').tooltip()
         });
@@ -1098,7 +1149,7 @@
                         <th>
                             Last Update
                         </th>
-                        <td>
+                        <td id="lastupdate">
                             {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
                         </td>
                     </tr>
@@ -1115,7 +1166,7 @@
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <input id="edit-standarddesignation-input" type="text" class="form-control"/>
+                                <input id="edit-standarddesignation-input" type="text" class="form-control" value="{{ sample.standard_designation }}"/>
                             </span>
                             <span id="readonly-standarddesignation" data-display-when="sample-readonly">{{ sample.standard_designation }}</span>
                         </td>
@@ -1243,6 +1294,23 @@
                                 <span id="sample-color-icon" class="fa fa-square"></span>
                                 <span id="sample-color-text"></span>
                             </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Haplotype Candidate
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="indicate whether the sample is a qualifying haplotype candidate"></span>
+                        </th>
+                        <td>
+                            <span data-display-when="sample-edit" style="display: none;">
+                                <input id="hap-candidate-checkbox" type="checkbox" name="sample-public"> Is a Haplotype Candidate
+                            </span>
+                            <span id="hap-candidate" data-display-when="sample-readonly">{{ sample.haplotype_candidate }}</span>
                         </td>
                     </tr>
                     {% if g.user %}
