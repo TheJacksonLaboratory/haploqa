@@ -178,7 +178,7 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
-# TODO: deprecated
+# TODO: remove
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -777,6 +777,7 @@ def standard_designation_json(standard_designation):
     # (snp-level data is too much)
 
     db = mds.get_db()
+
     matching_samples = _find_and_anno_samples(
         {'standard_designation': standard_designation},
         {
@@ -795,6 +796,92 @@ def standard_designation_json(standard_designation):
         return '{"status": "failure", "msg": "no data"}'
 
     return flask.jsonify(samples=matching_samples)
+
+
+@app.route('/add-st-des.json', methods=['POST'])
+def add_st_des():
+    """
+    add a new standard designation
+    :return: 
+    """
+    user = flask.g.user
+    if user is None or not user['administrator']:
+        return '{"status": "failure", "msg": "not authorized"}'
+
+    try:
+        form = flask.request.form
+        color = form['color']
+        st_des = form['st_des']
+        db = mds.get_db()
+        db.standard_designations.insert({
+            'standard_designation': st_des,
+            'color': color,
+        })
+    except:
+        tcb = traceback.format_exc()
+        sys.stderr.write(tcb)
+        return '{"status": "failure", "msg": "error adding new standard designation"}'
+
+    return '{"status": "success"}'
+
+
+@app.route('/update-st-des-color/<st_des_id>.json', methods=['POST'])
+def update_st_des_color(st_des_id):
+    """
+    update a standard designations color
+    :param st_des_id: the document id of the standard designation
+
+    :return:
+    """
+
+    try:
+        obj_id = ObjectId(st_des_id)
+    except:
+        return '{"status": "failure", "msg": "invalid objectID"}'
+
+    user = flask.g.user
+    if user is None or not user['administrator']:
+        return '{"status": "failure", "msg": "not authorized"}'
+
+    try:
+        form = flask.request.form
+        color = form['color']
+        print('updating to color {}'.format(color))
+        db = mds.get_db()
+        db.standard_designations.update_one(
+            {'_id' : obj_id},
+            {
+                '$set': {
+                    'color': color
+                },
+            }
+        )
+    except:
+        tcb = traceback.format_exc()
+        sys.stderr.write(tcb)
+        return '{"status": "failure", "msg": "failure in update, please check the log"}'
+
+    return '{"status": "success"}'
+
+
+@app.route('/st-des-admin.html')
+def st_des_admin():
+    """
+    standard designation admin page
+    :return:
+    """
+
+    user = flask.g.user
+    if user is None or not user['administrator']:
+        return flask.render_template('login-required.html')
+
+    db = mds.get_db()
+    all_st_des = db.standard_designations.find()
+
+    return flask.render_template(
+        'st-des-admin.html',
+        all_st_des=all_st_des,
+    )
 
 
 @app.route('/standard-designation/<escfwd:standard_designation>.html')
@@ -1564,6 +1651,9 @@ def update_sample(mongo_id):
 
     if 'color' in form:
         update_dict['color'] = form['color'].strip()
+
+    if 'hap_cand' in form:
+        update_dict['haplotype_candidate'] = form['hap_cand'] == 'true'
 
     if 'standard_designation' in form:
         update_dict['standard_designation'] = form['standard_designation'].strip()

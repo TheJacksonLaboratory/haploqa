@@ -44,6 +44,8 @@
 
             var editOwnerInput = $('#edit-owner-input');
 
+            $('#hap-candidate-checkbox').prop('checked', sample.haplotype_candidate);
+
             editOwnerInput.tokenfield({
                 autocomplete: {
                     source: allOwners.map(function(owner) {
@@ -719,6 +721,12 @@
                     postData['color'] = newColor;
                 }
 
+                var hapCandidate = $('#hap-candidate-checkbox').prop('checked');
+                var hcChanged = hapCandidate !== sample.haplotype_candidate;
+                if(hcChanged) {
+                    postData['hap_cand'] = hapCandidate;
+                }
+
                 var newStandardDesignation = editStandardDesignationInput.val();
                 var standardDesignationChanged = newStandardDesignation != sample.standard_designation;
                 if(standardDesignationChanged) {
@@ -773,6 +781,10 @@
                         }
                         if(colorChanged) {
                             updateSampleColor(newColor);
+                        }
+                        if(hcChanged) {
+                            $('#hap-candidate').text(hapCandidate);
+                            $('#hap-candidate-checkbox').prop('checked', hapCandidate);
                         }
                         if(standardDesignationChanged) {
                             updateStandardDesignation(newStandardDesignation);
@@ -1118,7 +1130,7 @@
                         </th>
                         <td>
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <input id="edit-standarddesignation-input" type="text" class="form-control"/>
+                                <input id="edit-standarddesignation-input" type="text" class="form-control" value="{{ sample.standard_designation }}"/>
                             </span>
                             <span id="readonly-standarddesignation" data-display-when="sample-readonly">{{ sample.standard_designation }}</span>
                         </td>
@@ -1246,6 +1258,23 @@
                                 <span id="sample-color-icon" class="fa fa-square"></span>
                                 <span id="sample-color-text"></span>
                             </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Haplotype Candidate
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="indicate whether the sample is a qualifying haplotype candidate"></span>
+                        </th>
+                        <td>
+                            <span data-display-when="sample-edit" style="display: none;">
+                                <input id="hap-candidate-checkbox" type="checkbox" name="sample-public"> Is a Haplotype Candidate
+                            </span>
+                            <span id="hap-candidate" data-display-when="sample-readonly">{{ sample.haplotype_candidate }}</span>
                         </td>
                     </tr>
                     {% if g.user %}
