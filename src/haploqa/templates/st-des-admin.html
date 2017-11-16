@@ -3,7 +3,6 @@
 {% block title %}HaploQA{% endblock %}
 {% block content %}
     <script>
-
             //TODO: aggregate show/hide into one true/false function
             function showColorEdit(id) {
                 $('#'+id).minicolors({theme: 'bootstrap'});
@@ -27,13 +26,13 @@
                         url: "/update-st-des-color/"+id+".json",
                         data: postData,
                         success: function(data) {
-                            $('#color_msg').text('Color updated successfully');
+                            showNotificationMessage('Color updated successfully');
                             fadeMsg();
                             hideColorEdit(id);
                             console.log(data);
                         }
                     }).fail(function(data) {
-                        $('#color_msg').text('An error occurred updating the color');
+                        showNotificationMessage('An error occurred updating the color');
                         fadeMsg();
                         hideColorEdit(id);
                         console.log(data);
@@ -41,6 +40,14 @@
 
                 $('#st-des-'+id+'-color').css('color', colorHex);
                 $('#st-des-'+id+'-color').html('&nbsp;&nbsp;'+colorHex);
+            }
+
+            function showNotificationMessage(msg) {
+                $('#modal-message').text(msg);
+                $('#notification-modal').modal({"backdrop" : false});
+                setTimeout(function () {
+                    $('#notification-modal').modal('hide');
+                }, 2000);
             }
 
             function hideColorEdit(id) {
@@ -70,9 +77,11 @@
                             data: postData,
                             success: function (data) {
                                 console.log(data);
-                                $('#std_des').children().text("");
-                                $('#color').val('#000000');
-                                location.reload();
+                                $('#msg').text('Standard Designation added successfully');
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 1500);
+
                             }
                         }).fail(function (data) {
                             $('#msg').text('An error occurred while adding the standard designation');
@@ -98,7 +107,6 @@
     </div>
         <div class="row" style="width: 600px;">
             <b>Standard Designations:</b>
-            <div id="color_msg" style="color:red; font-weight: bold; display:none;"></div>
             <table class="table table-striped col-md-6">
                 <thead>
                     <tr>
