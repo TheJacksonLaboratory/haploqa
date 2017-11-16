@@ -50,6 +50,9 @@ def switch_admin(email_address, admin_flag):
     :return: true on success, None upon failure
     """
 
+    # Convert admin flag string to Boolean
+    is_admin = True if (admin_flag == "True") else False
+
     db = mds.get_db()
 
     user = db.users.find_one({
@@ -57,7 +60,7 @@ def switch_admin(email_address, admin_flag):
     })
 
     if user is not None:
-        db.users.update_one({'_id': user['_id']}, {'$set': {'administrator': admin_flag}})
+        db.users.update_one({'_id': user['_id']}, {'$set': {'administrator': is_admin}})
         return True
     else:
         return None
