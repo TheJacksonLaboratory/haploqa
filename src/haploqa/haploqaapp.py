@@ -178,6 +178,7 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
+# TODO: remove
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -1699,8 +1700,6 @@ def update_sample(mongo_id):
                 chr_id,
                 haplotype_inference_uuid,
             )
-            # to check tasks ids being appended
-            # print("appending task id#{}".format(t.task_id))
             task_ids.append(t.task_id)
 
     elif update_dict:

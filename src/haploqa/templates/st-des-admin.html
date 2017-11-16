@@ -112,22 +112,18 @@
                     <tr>
                        <th>Name</th>
                        <th>Color
-                           <span
-                                        class="glyphicon glyphicon-question-sign help-icon"
-                                        aria-hidden="true"
-                                        data-toggle="tooltip"
-                                        data-placement="top"
-                                        title="To edit a standard designation's color:
-                                        1. Click on the Edit Color button to bring up the color selection box.
-                                        2. Click inside the color selection box to select a color.
-                                        3. Click outside the color selection box to finish your selection.
-                                        4. Click the Confirm Edit button to save your changes,
-                                        or the Cancel Edit button to cancel your selection.">
+                           <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
+                           data-placement="top" title="To edit a standard designation's color:
+                           1. Click on the Edit Color button to bring up the color selection box.
+                           2. Click inside the color selection box to select a color.
+                           3. Click outside the color selection box to finish your selection.
+                           4. Click the Confirm Edit button to save your changes,
+                           or the Cancel Edit button to cancel your selection.">
                            </span>
                        </th>
-                        <th></th>
-                        <th></th>
-                        <th></th>
+                       <th></th>
+                       <th></th>
+                       <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -161,7 +157,6 @@
                 </tbody>
             </table>
         </div>
-    </div>
     <!-- st des admin form -->
     <div id="add-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -171,30 +166,26 @@
                     <div id="msg" style="color:red; font-weight: bold;"></div>
                 </div>
                 <div class="modal-body" style="height: 140px;">
-                        <div style="float:left; margin-right: 100%">
-                            <div>Standard Designation:</div>
-                            <div style="margin-top: 10px;">
-                                <input type="text" id="st_des"/>
-                            </div>
+                    <div style="float:left; margin-right: 100%">
+                        <div>Standard Designation:</div>
+                        <div style="margin-top: 10px;">
+                            <input type="text" id="st_des"/>
                         </div>
-                        <div style="float:left;">
-                            <div style="margin-top: 10px;">Color:
-                                <span
-                                    class="glyphicon glyphicon-question-sign help-icon"
-                                    aria-hidden="true"
-                                    data-toggle="tooltip"
-                                    data-placement="top"
-                                    title="Click the color box to select a color.
-                                    Click anywhere off the selector to make your selection.
-                                    Click the Add Item button to save your changes, or
-                                    the Cancel button to exit this dialogue.">
-                                </span>
-                            </div>
-                            <div style="float: left;">
-                                <input type="text" id="color" class="form-control color-edit" data-control="hue" \
-                                 style="display: none;" value="#000000" style="display: none;">
-                            </div>    
+                    </div>
+                    <div style="float:left;">
+                        <div style="margin-top: 10px;">Color:
+                            <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
+                            data-placement="top" title="Click the color box to select a color.
+                            Click anywhere off the selector to make your selection.
+                            Click the Add Item button to save your changes, or
+                            the Cancel button to exit this dialogue.">
+                            </span>
                         </div>
+                        <div style="float: left;">
+                            <input type="text" id="color" class="form-control color-edit" data-control="hue" \
+                            style="display: none;" value="#000000" style="display: none;">
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="add-item" type="button" class="btn btn-primary" onclick="addStDes();">Add Item</button>
