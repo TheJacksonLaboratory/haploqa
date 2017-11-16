@@ -5,7 +5,7 @@
     <script>
             //TODO: aggregate show/hide into one true/false function
             function showColorEdit(id) {
-                $('#'+id).minicolors({theme: 'bootstrap'});
+                $('#'+id).minicolors({theme: 'bootstrap', control: 'brightness', position: 'bottom right'});
                 $('#st-des-edit-'+id).css('display', 'block');
                 $('#confirm-'+id).css('display', 'block');
                 $('#cancel-'+id).css('display', 'block');
@@ -39,7 +39,7 @@
                     });
 
                 $('#st-des-'+id+'-color').css('color', colorHex);
-                $('#st-des-'+id+'-color').html('&nbsp;&nbsp;'+colorHex);
+                $('#st-des-'+id+'-color-hex').html('&nbsp;'+colorHex);
             }
 
             function showNotificationMessage(msg) {
@@ -55,12 +55,12 @@
                 $('#cancel-'+id).css('display', 'none');
                 $('#edit-'+id).css('display', 'block');
                 $('#st-des-edit-'+id).css('display', 'none');
-                $('#st-des-'+id+'-color').css('display', 'block');
+                //$('#st-des-'+id+'-color').css('display', 'block');
             }
 
             function showAddModal() {
                 var modalDialog = $('#add-modal');
-                $('#color').minicolors({theme: 'bootstrap'});
+                $('#color').minicolors({theme: 'bootstrap', control: 'brightness'});
                 modalDialog.modal();
             }
 
@@ -130,14 +130,15 @@
                     {% for st_des in all_st_des %}
                     <tr>
                         <td class="col-md-1">{{ st_des.standard_designation }}</td>
-                        <td class="col-md-1">
-                            <span id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};">&nbsp;&nbsp;{{ st_des.color }}</span>
-                        </td>
                         <td class="col-md-2">
-                            <span id="st-des-edit-{{ st_des._id }}">
-                                <input type="text" id="{{ st_des._id }}" class="form-control color-edit" data-control="hue" \
+                            <i id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};"></i>
+                            <strong id="st-des-{{ st_des._id }}-color-hex">&nbsp;{{ st_des.color }}</strong>
+                        </td>
+                        <td class="col-md-1">
+                            <div id="st-des-edit-{{ st_des._id }}" class="form-group">
+                                <input type="text" id="{{ st_des._id }}" class="form-control" data-control="brightness" \
                                       style="display: none;" value="{{ st_des.color }}">
-                            </span>
+                            </div>
                         </td>
                         <td class="col-md-1">
                             <button id="edit-{{ st_des._id }}" type="button" class="btn btn-primary" \
@@ -183,7 +184,7 @@
                         </div>
                         <div style="float: left;">
                             <input type="text" id="color" class="form-control color-edit" data-control="hue" \
-                            style="display: none;" value="#000000" style="display: none;">
+                            style="display: none;" value="#ffffff" style="display: none;">
                         </div>
                     </div>
                 </div>
