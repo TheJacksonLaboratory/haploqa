@@ -178,7 +178,6 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
-# TODO: remove
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -398,15 +397,6 @@ def change_password_html():
                     return flask.render_template('change-password.html')
         elif flask.request.method == 'GET':
             return flask.render_template('change-password.html')
-
-
-@app.route('/users.html')
-def users_html():
-    user = flask.g.user
-    if user is not None:
-        db = mds.get_db()
-        users = list(db.users.find({}, {'email_address': 1}))
-        return flask.render_template('users.html', users=users)
 
 
 #####################################################################
