@@ -464,12 +464,6 @@ function HaploKaryoPlot(params) {
 
     this.updateHaplotypes = function(haploData, haplotypeMap, strainNames) {
         svg.selectAll(".no-data-overlay").remove();
-        if(name === "interval-comparison") {
-            console.log(haploData);
-            if(typeof haploData === 'undefined') {
-                console.log(haploData.contributing_strains[3]);
-            }
-        }
         if(typeof haploData === 'undefined') {
             haploData = cachedHaplotypeData;
         } else {
@@ -546,16 +540,8 @@ function HaploKaryoPlot(params) {
             var currChrSize = chrSizesHash[chr];
 
             if(haplos.haplotype_blocks) {
-                var count = 0;
                 haplos.haplotype_blocks.forEach(function(currHaplo) {
                     var currStrain1 = haploData.contributing_strains[currHaplo.haplotype_index_1];
-                    if(count === 0 && name === "interval-comparison") {
-                        console.log(haploData.contributing_strains[3]);
-                        console.log(currHaplo.haplotype_index_1);
-                        console.log(currStrain1);
-                        count++;
-                        console.log("");
-                    }
                     var currStrainIdx1 = strainNames.indexOf(currStrain1);
                     var currStrain2 = haploData.contributing_strains[currHaplo.haplotype_index_2];
                     var currStrainIdx2 = strainNames.indexOf(currStrain2);
