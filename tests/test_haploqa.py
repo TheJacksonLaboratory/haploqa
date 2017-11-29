@@ -33,7 +33,7 @@ class TestHaploQA(unittest.TestCase):
         #make the id available to the tests
         cls._sample_id = sample_id
         sample2['sample_id'] = 'unit_tester'
-        sample2['tags'] = 'unit_testing_tag'
+        sample2['tags'] = ["unit_testing_tag"]
         sample2['is_public'] = True
         sample2['owner'] = tester_email
         db.samples.insert_one(sample2)
@@ -78,7 +78,8 @@ class TestHaploQA(unittest.TestCase):
         with self._client.session_transaction() as sess:
             sess['user_email_address'] = email
             sess['administrator'] = admin
-            sess['remote_addr'] = '127.0.0.1'
+            # set t0 127.0.0.1 if testing locally
+            sess['remote_addr'] = None
 
     def _switch_sample(self, public=True, owner=None):
         """

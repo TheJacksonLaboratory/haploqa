@@ -11,6 +11,9 @@
 
     export PYTHONPATH=src/
 
+    If testing locally make sure and set your remote address to 127.0.0.1 instead of the default of None.
+    (see the _set_session() method of test_haploqa.py for where to do this)
+
 ## Syntax for running tests
 ______________________
 
