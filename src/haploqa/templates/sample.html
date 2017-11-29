@@ -96,6 +96,12 @@
                         var sampleSelected = comparisonSelect.children("option").filter(":selected");
                         sample.current_comp = sampleSelected.val();
                         updateComparisonSVG(sample.current_comp, 2);
+                        if(interval) {
+                            getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+                        }
+                        else {
+                            getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
+                        }
                         var labelText = sampleSelected.text();
                         $("#comp-label").text("Sample: " + labelText);
 
@@ -119,7 +125,12 @@
 
                 // update the comparison svg and only attempt data retrieval twice
                 updateComparisonSVG(sample.current_comp, 2);
-                getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+                if(interval) {
+                    getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+                }
+                else {
+                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
+                }
             });
 
             $("#comp-prev").on("click", function() {
@@ -1058,7 +1069,6 @@
             // initialize the UI
             resetEdits();
             updateHaplotypeSVG();
-            getSNPData(sample._id, 1, hapIntervalPlot);
 
             // only if the user is logged in
             {% if g.user %}
