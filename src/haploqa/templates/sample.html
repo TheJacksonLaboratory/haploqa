@@ -80,14 +80,17 @@
                 $.getJSON(samplesURL, function(data) {
 
                     if (data.samples) {
-                        sample.comp_samples = data.samples;
-                        sample.comp_samples.forEach(function (sample) {
+                        var comp_samples = [];
+                        data.samples.forEach(function (sample) {
                             // only load samples that aren't the current
                             if (sample.sample_id !== sampleID) {
                                 var option = new Option(sample.sample_id, sample._id);
                                 comparisonSelect.append(option);
+                                comp_samples.push(sample);
                             }
                         });
+
+                        sample.comp_samples = comp_samples;
                     } //TODO: HAP-58 don't show the secondary genome interval plot or the comparison sample dropdown
 
                 }).success(function() {
@@ -149,7 +152,7 @@
                 else {
                     $("#comparison-sample").val(sample.comp_samples[index-1]._id).trigger("change");
                 }
-            })
+            });
 
             $("#comp-next").on("click", function() {
                 var index;
@@ -161,13 +164,14 @@
                 }
 
                 var lastIndex = sample.comp_samples.length - 1;
+
                 if(index === lastIndex) {
                     $("#comparison-sample").val(sample.comp_samples[0]._id).trigger("change");
                 }
                 else {
                     $("#comparison-sample").val(sample.comp_samples[index+1]._id).trigger("change");
                 }
-            })
+            });
 
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
             var candidateHaplotypeTableOverlay = new ElemOverlay(
