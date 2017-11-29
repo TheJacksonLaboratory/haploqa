@@ -99,6 +99,8 @@
                         var sampleSelected = comparisonSelect.children("option").filter(":selected");
                         sample.current_comp = sampleSelected.val();
                         updateComparisonSVG(sample.current_comp, 2);
+
+                        // if an interval has been chosen, use it, else default to chr 1
                         if(interval) {
                             getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
                         }
@@ -128,6 +130,8 @@
 
                 // update the comparison svg and only attempt data retrieval twice
                 updateComparisonSVG(sample.current_comp, 2);
+
+                // if an interval has been chosen, use it, else default to chr 1
                 if(interval) {
                     getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
                 }
@@ -136,6 +140,8 @@
                 }
             });
 
+            // when carousel previous button is pressed, get the previous sample
+            // carousel loops so if current sample is first, previous gets last sample
             $("#comp-prev").on("click", function() {
                 var index;
 
@@ -154,6 +160,8 @@
                 }
             });
 
+            // when carousel next button is pressed, get the next sample
+            // carousel loops so if current sample is last, previous gets first sample
             $("#comp-next").on("click", function() {
                 var index;
 
@@ -164,7 +172,6 @@
                 }
 
                 var lastIndex = sample.comp_samples.length - 1;
-
                 if(index === lastIndex) {
                     $("#comparison-sample").val(sample.comp_samples[0]._id).trigger("change");
                 }
