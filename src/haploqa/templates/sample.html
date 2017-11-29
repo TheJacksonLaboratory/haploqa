@@ -1455,76 +1455,71 @@
         </div>
     </div>
     {% if g.user %}
-    <div class="page-header">
-        <br/>
-        <h2>Genome Interval Plot</h2>
-    </div>
-
-    <div class="form-inline">
-        <label for="interval-edit">Interval:</label>
-        <div class="input-group">
-            <input type="text" class="form-control" id="interval-edit" size="50" placeholder="Chr2:45Mb-55Mb">
-            <span class="input-group-btn">
-                <button id="clear-interval-button" type="button" class="btn btn-default">
-                    <span class="glyphicon glyphicon-remove" aria-hidden="true" aria-label="clear interval"></span>
-                </button>
-                <button id="update-interval-button" class="btn btn-default" type="button">
-                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Update Interval
-                </button>
-            </span>
+        <div class="page-header">
+            <br/>
+            <h2>Genome Interval Plot</h2>
         </div>
-        <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
-        <select id="comparison-sample"></select>
-    </div>
 
-
-
-    <div class="row">
-        <div class="col-md-12">
-            <label class="sample-label">Sample: {{ sample.sample_id }}</label>
-            <div class="readonly-haplotypes-panel"></div>
-            <svg
-                    id="hapintervalplot-svg"
-                    width="900" height="200"
-                    class="haplotype-plot"></svg>
+        <div class="form-inline">
+            <label for="interval-edit">Interval:</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="interval-edit" size="50" placeholder="Chr2:45Mb-55Mb">
+                <span class="input-group-btn">
+                    <button id="clear-interval-button" type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-remove" aria-hidden="true" aria-label="clear interval"></span>
+                    </button>
+                    <button id="update-interval-button" class="btn btn-default" type="button">
+                        <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Update Interval
+                    </button>
+                </span>
+            </div>
+            <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
+            <select id="comparison-sample"></select>
         </div>
-    </div>
-        <br/>
-        <br/>
-    <div class="row">
-        <div class="col-md-12">
-            <div id="comp-carousel" class="carousel" data-ride="carousel" data-interval="false">
-                <div class="carousel-inner" role="listbox">
-                    <div class="carousel-item">
-                        <label id="comp-label" class="sample-label"></label>
-                        <div class="readonly-comp-haplotypes-panel"></div>
-                        <svg
-                            id="hapintervalplot-comp-svg"
-                            width="900" height="200"
-                            class="haplotype-plot">
-                        </svg>
-                    </div>
-                </div>
-                <a id="comp-prev" class="carousel-control left">
-                    <span class="glyphicon glyphicon-chevron-left black"></span>
-                </a>
-                <a id="comp-next" class="carousel-control right">
-                    <span class="glyphicon glyphicon-chevron-right black"></span>
-                </a>
+        <div class="row">
+            <div class="col-md-12">
+                <label class="sample-label">Sample: {{ sample.sample_id }}</label>
+                <div class="readonly-haplotypes-panel"></div>
+                <svg
+                        id="hapintervalplot-svg"
+                        width="900" height="200"
+                        class="haplotype-plot"></svg>
             </div>
         </div>
-    </div>
-        <br/><br/>
+        <br/>
+        <div class="row">
+            <div class="col-md-12">
+                <label id="comp-label" class="sample-label"></label>
+                <div class="readonly-comp-haplotypes-panel"></div>
+                <div id="comp-carousel" class="carousel" data-ride="carousel" data-interval="false">
+                    <div class="carousel-inner" role="listbox">
+                        <div class="carousel-item">
+                            <svg
+                                id="hapintervalplot-comp-svg"
+                                width="900" height="200"
+                                class="haplotype-plot">
+                            </svg>
+                        </div>
+                    </div>
+                    <a id="comp-prev" class="carousel-control left">
+                        <span class="glyphicon glyphicon-chevron-left black"></span>
+                    </a>
+                    <a id="comp-next" class="carousel-control right">
+                        <span class="glyphicon glyphicon-chevron-right black"></span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <br/>
+        <div class="form-inline">
+            <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
+                <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to Ensembl Browser
+            </a>
 
-    <div class="form-inline">
-        <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
-            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to Ensembl Browser
-        </a>
-
-        <a id="goto-ucsc-link" class="btn btn-default" href="#" target="_blank">
-            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
-        </a>
-    </div>
+            <a id="goto-ucsc-link" class="btn btn-default" href="#" target="_blank">
+                <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
+            </a>
+        </div>
 
     {#
     <div class="row">
@@ -1536,7 +1531,6 @@
     </div>
     #}
 
-        {% if g.user %}
         <div class="row">
             <div class="col-md-12">
                 <br/>
@@ -1573,6 +1567,5 @@
         <p>
         See the <a href="{{ url_for('gemm_intens_html', mongo_id=sample._id) }}">GEMM Intensities plot</a> for a more detailed view of the distribution of GEMM probe intensities.
         </p>
-        {% endif %}
     {% endif %}
 {% endblock %}
