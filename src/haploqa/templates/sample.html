@@ -80,14 +80,17 @@
                 $.getJSON(samplesURL, function(data) {
 
                     if (data.samples) {
-                        sample.comp_samples = data.samples;
-                        sample.comp_samples.forEach(function (sample) {
+                        var comp_samples = [];
+                        data.samples.forEach(function (sample) {
                             // only load samples that aren't the current
                             if (sample.sample_id !== sampleID) {
                                 var option = new Option(sample.sample_id, sample._id);
                                 comparisonSelect.append(option);
+                                comp_samples.push(sample);
                             }
                         });
+
+                        sample.comp_samples = comp_samples;
                     } //TODO: HAP-58 don't show the secondary genome interval plot or the comparison sample dropdown
 
                 }).success(function() {
@@ -96,6 +99,14 @@
                         var sampleSelected = comparisonSelect.children("option").filter(":selected");
                         sample.current_comp = sampleSelected.val();
                         updateComparisonSVG(sample.current_comp, 2);
+
+                        // if an interval has been chosen, use it, else default to chr 1
+                        if(interval) {
+                            getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+                        }
+                        else {
+                            getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
+                        }
                         var labelText = sampleSelected.text();
                         $("#comp-label").text("Sample: " + labelText);
 
@@ -119,7 +130,54 @@
 
                 // update the comparison svg and only attempt data retrieval twice
                 updateComparisonSVG(sample.current_comp, 2);
-                getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+
+                // if an interval has been chosen, use it, else default to chr 1
+                if(interval) {
+                    getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
+                }
+                else {
+                    getSNPData(sample.current_comp, 1, hapIntervalCompPlot);
+                }
+            });
+
+            // when carousel previous button is pressed, get the previous sample
+            // carousel loops so if current sample is first, previous gets last sample
+            $("#comp-prev").on("click", function() {
+                var index;
+
+                for (var i = 0; i < sample.comp_samples.length; i++) {
+                    if (sample.current_comp === sample.comp_samples[i]._id) {
+                        index = i;
+                    }
+                }
+
+                if(index === 0) {
+                    var lastIndex = sample.comp_samples.length - 1;
+                    $("#comparison-sample").val(sample.comp_samples[lastIndex]._id).trigger("change");
+                }
+                else {
+                    $("#comparison-sample").val(sample.comp_samples[index-1]._id).trigger("change");
+                }
+            });
+
+            // when carousel next button is pressed, get the next sample
+            // carousel loops so if current sample is last, previous gets first sample
+            $("#comp-next").on("click", function() {
+                var index;
+
+                for (var i = 0; i < sample.comp_samples.length; i++) {
+                    if (sample.current_comp === sample.comp_samples[i]._id) {
+                        index = i;
+                    }
+                }
+
+                var lastIndex = sample.comp_samples.length - 1;
+                if(index === lastIndex) {
+                    $("#comparison-sample").val(sample.comp_samples[0]._id).trigger("change");
+                }
+                else {
+                    $("#comparison-sample").val(sample.comp_samples[index+1]._id).trigger("change");
+                }
             });
 
             var candidateHaplotypeTable = $('#candidate-haplotype-table');
@@ -1022,7 +1080,6 @@
             // initialize the UI
             resetEdits();
             updateHaplotypeSVG();
-            getSNPData(sample._id, 1, hapIntervalPlot);
 
             // only if the user is logged in
             {% if g.user %}
@@ -1398,61 +1455,71 @@
         </div>
     </div>
     {% if g.user %}
-    <div class="page-header">
+        <div class="page-header">
+            <br/>
+            <h2>Genome Interval Plot</h2>
+        </div>
+
+        <div class="form-inline">
+            <label for="interval-edit">Interval:</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="interval-edit" size="50" placeholder="Chr2:45Mb-55Mb">
+                <span class="input-group-btn">
+                    <button id="clear-interval-button" type="button" class="btn btn-default">
+                        <span class="glyphicon glyphicon-remove" aria-hidden="true" aria-label="clear interval"></span>
+                    </button>
+                    <button id="update-interval-button" class="btn btn-default" type="button">
+                        <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Update Interval
+                    </button>
+                </span>
+            </div>
+            <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
+            <select id="comparison-sample"></select>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <label class="sample-label">Sample: {{ sample.sample_id }}</label>
+                <div class="readonly-haplotypes-panel"></div>
+                <svg
+                        id="hapintervalplot-svg"
+                        width="900" height="200"
+                        class="haplotype-plot"></svg>
+            </div>
+        </div>
         <br/>
-        <h2>Genome Interval Plot</h2>
-    </div>
-
-    <div class="form-inline">
-        <label for="interval-edit">Interval:</label>
-        <div class="input-group">
-            <input type="text" class="form-control" id="interval-edit" size="50" placeholder="Chr2:45Mb-55Mb">
-            <span class="input-group-btn">
-                <button id="clear-interval-button" type="button" class="btn btn-default">
-                    <span class="glyphicon glyphicon-remove" aria-hidden="true" aria-label="clear interval"></span>
-                </button>
-                <button id="update-interval-button" class="btn btn-default" type="button">
-                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span> Update Interval
-                </button>
-            </span>
+        <div class="row">
+            <div class="col-md-12">
+                <label id="comp-label" class="sample-label"></label>
+                <div class="readonly-comp-haplotypes-panel"></div>
+                <div id="comp-carousel" class="carousel" data-ride="carousel" data-interval="false">
+                    <div class="carousel-inner" role="listbox">
+                        <div class="carousel-item">
+                            <svg
+                                id="hapintervalplot-comp-svg"
+                                width="900" height="200"
+                                class="haplotype-plot">
+                            </svg>
+                        </div>
+                    </div>
+                    <a id="comp-prev" class="carousel-control left">
+                        <span class="glyphicon glyphicon-chevron-left black"></span>
+                    </a>
+                    <a id="comp-next" class="carousel-control right">
+                        <span class="glyphicon glyphicon-chevron-right black"></span>
+                    </a>
+                </div>
+            </div>
         </div>
-        <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
-        <select id="comparison-sample"></select>
-    </div>
+        <br/>
+        <div class="form-inline">
+            <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
+                <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to Ensembl Browser
+            </a>
 
-
-
-    <div class="row">
-        <div class="col-md-12">
-            <label class="sample-label">Sample: {{ sample.sample_id }}</label>
-            <div class="readonly-haplotypes-panel"></div>
-            <svg
-                    id="hapintervalplot-svg"
-                    width="900" height="200"
-                    class="haplotype-plot"></svg>
+            <a id="goto-ucsc-link" class="btn btn-default" href="#" target="_blank">
+                <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
+            </a>
         </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-12">
-            <label id="comp-label" class="sample-label"></label>
-            <div class="readonly-comp-haplotypes-panel"></div>
-            <svg
-                    id="hapintervalplot-comp-svg"
-                    width="900" height="200"
-                    class="haplotype-plot"></svg>
-        </div>
-    </div>
-
-    <div class="form-inline">
-        <a id="goto-ensembl-link" class="btn btn-default" href="#" target="_blank">
-            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to Ensembl Browser
-        </a>
-
-        <a id="goto-ucsc-link" class="btn btn-default" href="#" target="_blank">
-            <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
-        </a>
-    </div>
 
     {#
     <div class="row">
@@ -1464,7 +1531,6 @@
     </div>
     #}
 
-        {% if g.user %}
         <div class="row">
             <div class="col-md-12">
                 <br/>
@@ -1501,6 +1567,5 @@
         <p>
         See the <a href="{{ url_for('gemm_intens_html', mongo_id=sample._id) }}">GEMM Intensities plot</a> for a more detailed view of the distribution of GEMM probe intensities.
         </p>
-        {% endif %}
     {% endif %}
 {% endblock %}
