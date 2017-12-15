@@ -1,7 +1,9 @@
 {% extends "layout.html" %}
-
 {% block title %}HaploQA{% endblock %}
 {% block content %}
+    {% if g.user.std_des_admin != True %}
+    <div>You are not authorized to view this page</div>
+    {% else %}
     <script>
             //TODO: aggregate show/hide into one true/false function
             function showColorEdit(id) {
@@ -55,7 +57,6 @@
                 $('#cancel-'+id).css('display', 'none');
                 $('#edit-'+id).css('display', 'block');
                 $('#st-des-edit-'+id).css('display', 'none');
-                //$('#st-des-'+id+'-color').css('display', 'block');
             }
 
             function showAddModal() {
@@ -106,6 +107,7 @@
         </div>
     </div>
         <div class="row" style="width: 600px;">
+        <p>your current privs: {{ g.user.std_des_admin }}</p>
             <b>Standard Designations:</b>
             <table class="table table-striped col-md-6">
                 <thead>
@@ -140,7 +142,7 @@
                                       style="display: none;" value="{{ st_des.color }}">
                             </div>
                         </td>
-                        <td class="col-md-1">
+                        <td class="col-md-2">
                             <button id="edit-{{ st_des._id }}" type="button" class="btn btn-primary" \
                                     onclick="showColorEdit('{{ st_des._id}}')">Edit Color
                             </button>
@@ -198,4 +200,5 @@
     <script>
     $('[data-toggle="tooltip"]').tooltip()
     </script>
+{% endif %}
 {% endblock %}
