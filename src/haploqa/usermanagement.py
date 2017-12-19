@@ -99,7 +99,6 @@ def authenticate_user(email_address, password, db):
         'password_reset_hash': 0,
     })
     if user is not None:
-        print(user['_id'])
         password_hash = hash_str(password + user['salt'])
         if password_hash == user['password_hash']:
             # remove the password_hash to prevent it from leaking out
