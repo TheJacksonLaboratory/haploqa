@@ -3,6 +3,7 @@
 <head>
     {% block head %}
     <meta charset="utf-8">
+    <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
     {% if no_robots %}<meta name="robots" content="noindex,nofollow">{% endif %}
 
     <title>{% block title %}{% endblock %}</title>
@@ -136,12 +137,6 @@
                         Import Sample Data
                     </a>
                 </li>
-{#                <li>#}
-{#                    <a href="{{ url_for('sample_data_export_html') }}">#}
-{#                        <span class="glyphicon glyphicon-download" aria-hidden="true"></span>#}
-{#                        Export Sample Data#}
-{#                    </a>#}
-{#                </li>#}
                 {% endif %}
                 <li>
                     <a href="{{ url_for('contact_html') }}">
@@ -174,15 +169,17 @@
                         <span id="curr-user-label">{{ g.user.email_address }}</span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a id="logout-banner" href="#">logout</a></li>
+                        <li><a id="logout-banner" href="#">Logout</a></li>
                         {% if g.user.administrator == True %}
-                        <li><a href="{{ url_for('sample_data_export_html') }}">sample data export</a></li>
-                        <li><a href="{{ url_for('show_users') }}">user admin</a></li>
-                        <li><a href="{{ url_for('st_des_admin') }}">standard designation admin</a></li>
-                        <li><a href="{{ url_for('invite_user_html') }}">invite new user</a></li>
+                            <li><a href="{{ url_for('sample_data_export_html') }}">Sample Data Export</a></li>
+                            <li><a href="{{ url_for('show_users') }}">User Admin</a></li>
+                            {% if g.user.std_des_admin == True %}
+                                <li><a href="{{ url_for('st_des_admin') }}">Standard Designation Admin</a></li>
+                            {% endif %}
+                            <li><a href="{{ url_for('invite_user_html') }}">Invite New User</a></li>
                         {% endif %}
-                        <li><a href="{{ url_for('user_tags') }}">my samples</a></li>
-                        <li><a href="{{ url_for('change_password_html') }}">change password</a></li>
+                        <li><a href="{{ url_for('user_tags') }}">My Samples</a></li>
+                        <li><a href="{{ url_for('change_password_html') }}">Change Password</a></li>
                     </ul>
                 </li>
                 {% else %}
@@ -209,14 +206,10 @@
                 {% endif %}
             </ul>
         </div>
-        <!--/.nav-collapse -->
     </div>
 </nav>
-
-<!--div id="content" class="container-fluid"-->
 <div id="content" class="container">
     {% block content %}{% endblock %}
-
     <!-- Error Modal -->
     <div id="error-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -259,7 +252,6 @@
         </div>
     </div>
 </div>
-
 <div id="footer">
     <!-- TODO add footer content -->
 </div>

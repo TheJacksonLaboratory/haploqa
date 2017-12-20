@@ -87,20 +87,8 @@ class CustomJSONEncoder(flask.json.JSONEncoder):
             return str(o)
         return flask.json.JSONEncoder.default(self, o)
 
-
 app.json_encoder = CustomJSONEncoder
-
-
-# TODO this key must be changed to something secret (ie. not committed to the repo).
-# Comment out the print message when this is done
-print('===================================================')
-print('THIS VERSION OF HaploQA IS NOT SECURE. YOU MUST    ')
-print('REGENERATE THE SECRET KEY BEFORE DEPLOYMENT. SEE   ')
-print('"How to generate good secret keys" AT			  ')
-print('http://flask.pocoo.org/docs/quickstart/ FOR DETAILS')
-print('===================================================')
-app.secret_key = b'\x12}\x08\xfa\xbc\xaa6\x8b\xdd>%\x81`xk\x04\xb1\xdc\x8a0\xda\xa1\xab\x0f'
-
+app.secret_key = os.urandom(24)
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION

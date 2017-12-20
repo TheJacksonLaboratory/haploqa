@@ -1085,26 +1085,13 @@
             {% if g.user %}
                 getSNPData(sample._id, 1, hapIntervalPlot);
             {% endif %}
-
-            $('[data-toggle="tooltip"]').tooltip()
         });
     </script>
-    <style>
-        .help-icon {
-            visibility: hidden;
-        }
-
-        tr:hover .help-icon {
-            visibility: visible;
-        }
-    </style>
 {% endblock %}
-
 {% block content %}
     <div class="page-header">
         <h1>Sample: <span data-sampleid>{{ sample.sample_id }}</span></h1>
     </div>
-
     {% if g.user %}
     <div style="margin-bottom: 10px;">
         <!-- only allow admin or owner to edit a sample -->
@@ -1126,7 +1113,6 @@
         </span>
     </div>
     {% endif %}
-
     <div class="row">
         <div class="col-md-12">
             <table class="table">
@@ -1459,7 +1445,6 @@
             <br/>
             <h2>Genome Interval Plot</h2>
         </div>
-
         <div class="form-inline">
             <label for="interval-edit">Interval:</label>
             <div class="input-group">
@@ -1520,17 +1505,6 @@
                 <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
             </a>
         </div>
-
-    {#
-    <div class="row">
-        <div class="col-md-12">
-            <button class="btn btn-default" type="button">
-                <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span> Download Interval Haplotype Report
-            </button>
-        </div>
-    </div>
-    #}
-
         <div class="row">
             <div class="col-md-12">
                 <br/>
@@ -1546,11 +1520,9 @@
                 </table>
             </div>
         </div>
-
         <div class="page-header">
             <h4>GEMM Probabilities</h4>
         </div>
-
         <div class="row">
             <div class="col-md-12">
                 <table id="gemm-table" class="table table-striped" style="margin-top: 10px;">
@@ -1563,9 +1535,12 @@
                 </table>
             </div>
         </div>
-
         <p>
         See the <a href="{{ url_for('gemm_intens_html', mongo_id=sample._id) }}">GEMM Intensities plot</a> for a more detailed view of the distribution of GEMM probe intensities.
         </p>
     {% endif %}
+    <script>
+    //enable the tooltip style
+     $('[data-toggle="tooltip"]').tooltip();
+    </script>
 {% endblock %}
