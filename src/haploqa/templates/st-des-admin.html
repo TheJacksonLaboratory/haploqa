@@ -7,41 +7,37 @@
     <script>
             //TODO: aggregate show/hide into one true/false function
             function showColorEdit(id) {
-                $('#'+id).minicolors({theme: 'bootstrap', control: 'brightness', position: 'bottom right'});
-                $('#st-des-edit-'+id).css('display', 'block');
+                $('#'+id).colorpicker({useAlpha: false});
                 $('#confirm-'+id).css('display', 'block');
                 $('#cancel-'+id).css('display', 'block');
-                $('#edit-'+id).css('display', 'none');
             }
 
-            function fadeMsg() {
-                $('#color_msg').css('display', 'block');
-                $('#color_msg').fadeOut(3000);
+            function reload_page() {
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
             }
 
             function makeColorEdit(id) {
                 var postData = {};
                 var colorHex = $('#'+id).val();
-                postData['color'] = colorHex;
-                $.ajax({
+                if(colorHex) {
+                    postData['color'] = colorHex;
+                    $.ajax({
                         method: "POST",
-                        url: "/update-st-des-color/"+id+".json",
+                        url: "/update-st-des-color/" + id + ".json",
                         data: postData,
-                        success: function(data) {
+                        success: function (data) {
                             showNotificationMessage('Color updated successfully');
-                            fadeMsg();
-                            hideColorEdit(id);
-                            console.log(data);
+                            reload_page();
                         }
-                    }).fail(function(data) {
+                    }).fail(function (data) {
                         showNotificationMessage('An error occurred updating the color');
-                        fadeMsg();
-                        hideColorEdit(id);
                         console.log(data);
                     });
-
-                $('#st-des-'+id+'-color').css('color', colorHex);
-                $('#st-des-'+id+'-color-hex').html('&nbsp;'+colorHex);
+                } else {
+                    showNotificationMessage('An error occurred updating the color: you must enter a value');
+                }
             }
 
             function showNotificationMessage(msg) {
@@ -52,16 +48,14 @@
                 }, 2000);
             }
 
-            function hideColorEdit(id) {
+            function hideColorEdit(id, orig_color) {
                 $('#confirm-'+id).css('display', 'none');
                 $('#cancel-'+id).css('display', 'none');
-                $('#edit-'+id).css('display', 'block');
-                $('#st-des-edit-'+id).css('display', 'none');
             }
 
             function showAddModal() {
                 var modalDialog = $('#add-modal');
-                $('#color').minicolors({theme: 'bootstrap', control: 'brightness'});
+                $('#color').colorpicker({useAlpha: false});
                 modalDialog.modal();
             }
 
@@ -106,60 +100,53 @@
             </div>
         </div>
     </div>
-        <div class="row" style="width: 600px;">
+        <div class="row" style="width: 500px;">
             <b>Standard Designations:</b>
-            <table class="table table-striped col-md-6">
+            <table class="table table-striped col-md-7">
                 <thead>
                     <tr>
-                       <th>Name</th>
-                       <th>Color
+                       <th scope="col">Name</th>
+                       <th scope="col">Color
                            <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
                            data-placement="top" title="To edit a standard designation's color:
-                           1. Click on the Edit Color button to bring up the color selection box.
-                           2. Click inside the color selection box to select a color.
-                           3. Click outside the color selection box to finish your selection.
-                           4. Click the Confirm Edit button to save your changes,
+                           1. Click on the input field corresponding to the item you wish to edit.
+                           2. Click inside the color selection box to select a color or enter a hexadecimal color value, or color name, manually.
+                           3. Click the Confirm Edit button to save your changes,
                            or the Cancel Edit button to cancel your selection.">
                            </span>
                        </th>
-                       <th></th>
-                       <th></th>
-                       <th></th>
+                       <th scope="col"></th>
+                       <th scope="col"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for st_des in all_st_des %}
                     <tr>
-                        <td class="col-md-1">{{ st_des.standard_designation }}</td>
-                        <td class="col-md-2">
+                        <td class="col-md-4">
                             <i id="st-des-{{ st_des._id }}-color" class="fa fa-square" style="color: {{ st_des.color }};"></i>
-                            <strong id="st-des-{{ st_des._id }}-color-hex">&nbsp;{{ st_des.color }}</strong>
+                            {{ st_des.standard_designation }}
                         </td>
                         <td class="col-md-1">
-                            <div id="st-des-edit-{{ st_des._id }}" class="form-group">
-                                <input type="text" id="{{ st_des._id }}" class="form-control" data-control="brightness" \
-                                      style="display: none;" value="{{ st_des.color }}">
-                            </div>
+                            <input type="text" id="{{ st_des._id }}" class="form-control" value="{{ st_des.color }}" \
+                            onclick="showColorEdit('{{ st_des._id}}')" style="width: 80px;"/>
                         </td>
-                        <td class="col-md-2">
-                            <button id="edit-{{ st_des._id }}" type="button" class="btn btn-primary" \
-                                    onclick="showColorEdit('{{ st_des._id}}')">Edit Color
-                            </button>
+                        <td class="col-md-1">
                             <button id="confirm-{{ st_des._id }}" type="button" class="btn btn-primary" \
                                     style="display: none; width: 100px;" onclick="makeColorEdit('{{ st_des._id}}')">Confirm Edit
                             </button>
                         </td>
                         <td class="col-md-1" style="float:left;">
                             <button id="cancel-{{ st_des._id }}" type="button" class="btn btn-warning" \
-                                    style="display: none; width: 100px;" onclick="hideColorEdit('{{ st_des._id }}');">Cancel Edit
+                                    style="display: none; width: 100px;" onclick="hideColorEdit('{{ st_des._id }}', '{{ st_des.color }}');">Cancel Edit
                             </button>
                         </td>
+                        <script>$('#{{ st_des._id }}').colorpicker({useAlpha: false});</script>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    <!-- st des admin form -->
+    <!-- st des add modal -->
     <div id="add-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content" style="width: 300px;">
@@ -177,15 +164,14 @@
                     <div style="float:left;">
                         <div style="margin-top: 10px;">Color:
                             <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
-                            data-placement="top" title="Click the color box to select a color.
-                            Click anywhere off the selector to make your selection.
+                            data-placement="top" title="Click the input box below to select a
+                            color or enter a hexadecimal color value manually.
                             Click the Add Item button to save your changes, or
                             the Cancel button to exit this dialogue.">
                             </span>
                         </div>
                         <div style="float: left;">
-                            <input type="text" id="color" class="form-control color-edit" data-control="hue" \
-                            style="display: none;" value="#ffffff" style="display: none;">
+                            <input type="text" id="color" class="form-control" data-control="hue" value="#2b53de" style="width: 80px;">
                         </div>
                     </div>
                 </div>

@@ -2,6 +2,8 @@ from bisect import bisect_left, bisect_right
 from bson.objectid import ObjectId
 from bson.son import SON
 from celery import Celery
+import colorsys
+import datetime
 import flask
 import json
 import math
@@ -10,10 +12,9 @@ import os
 import pymongo
 import sys
 import tempfile
+import traceback
 import uuid
 from werkzeug.routing import BaseConverter
-import datetime
-import traceback
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -48,6 +49,12 @@ def escape_forward_slashes(s):
     :return: the escaped string
     """
     return s.replace('\\', '\\b').replace('/', '\\f')
+
+
+def get_hsv(hexrgb):
+    hexrgb = hexrgb.lstrip("#")  # in case you have Web color specs
+    r, g, b = (int(hexrgb[i:i + 2], 16) / 255.0 for i in range(0, 5, 2))
+    return colorsys.rgb_to_hsv(r, g, b)
 
 
 def unescape_forward_slashes(s):
@@ -856,9 +863,16 @@ def st_des_admin():
     db = mds.get_db()
     all_st_des = db.standard_designations.find()
 
+    ## Turn the cursor object into a list for sorting
+    std_des_list = []
+    for std_des in all_st_des:
+        std_des_list.append(std_des)
+
+    std_des_list.sort(key=lambda x: get_hsv(x['color']))
+
     return flask.render_template(
         'st-des-admin.html',
-        all_st_des=all_st_des,
+        all_st_des=std_des_list,
     )
 
 
