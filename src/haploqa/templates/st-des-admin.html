@@ -25,13 +25,13 @@
                     postData['color'] = colorHex;
                     $.ajax({
                         method: "POST",
-                        url: "/update-st-des-color/" + id + ".json",
+                        url: "/update-st-des-color/"+id+".json",
                         data: postData,
-                        success: function (data) {
+                        success: function(data) {
                             showNotificationMessage('Color updated successfully');
                             reload_page();
                         }
-                    }).fail(function (data) {
+                    }).fail(function(data) {
                         showNotificationMessage('An error occurred updating the color');
                         console.log(data);
                     });
@@ -110,7 +110,7 @@
                            <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
                            data-placement="top" title="To edit a standard designation's color:
                            1. Click on the input field corresponding to the item you wish to edit.
-                           2. Click inside the color selection box to select a color or enter a hexadecimal color value, or color name, manually.
+                           2. Click inside the color selection box to select a color or enter a hexadecimal color value manually.
                            3. Click the Confirm Edit button to save your changes,
                            or the Cancel Edit button to cancel your selection.">
                            </span>
