@@ -1466,7 +1466,7 @@ def combined_report(sdid):
 
     samples = list(matching_samples)
     # header
-    report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+    report = _iter_to_row(('sample_id', 'original_sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
     for sample in samples:
         id = str(sample['_id'])
         # TODO: check if the report is empty and add a message
@@ -1526,6 +1526,7 @@ def _summary_report_data(mongo_id):
                 if curr_hap_distance:
                     yield _iter_to_row((
                         sample['sample_id'],
+                        sample['other_ids'][0],
                         contributing_strains[hap_index_lte],
                         contributing_strains[hap_index_gte],
                         str(100 * curr_hap_distance / total_distance),
