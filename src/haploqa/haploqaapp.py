@@ -1193,6 +1193,7 @@ def sample_snp_report(mongo_id):
         if sample_uses_snp_format:
             yield _iter_to_row((
                 'sample_id',
+                'original_sample_id'
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -1203,6 +1204,7 @@ def sample_snp_report(mongo_id):
         else:
             yield _iter_to_row((
                 'sample_id',
+                'original_sample_id',
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -1235,6 +1237,7 @@ def sample_snp_report(mongo_id):
                     if sample_uses_snp_format:
                         yield _iter_to_row((
                             sample['sample_id'],
+                            sample['other_ids'][0],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
@@ -1245,6 +1248,7 @@ def sample_snp_report(mongo_id):
                     else:
                         yield _iter_to_row((
                             sample['sample_id'],
+                            sample['other_ids'][0],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
