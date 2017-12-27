@@ -78,8 +78,9 @@ class TestHaploQA(unittest.TestCase):
         with self._client.session_transaction() as sess:
             sess['user_email_address'] = email
             sess['administrator'] = admin
-            # set t0 127.0.0.1 if testing locally
+            # set to 127.0.0.1 if testing locally
             sess['remote_addr'] = None
+            #sess['remote_addr'] = '127.0.0.1'
 
     def _switch_sample(self, public=True, owner=None):
         """
@@ -109,7 +110,8 @@ class TestHaploQA(unittest.TestCase):
             {"email_address_lowercase": self._tester_email},
             {'$set':
                 {
-                    "administrator": admin
+                    "administrator": admin,
+                    "std_des_admin": True
                 },
             })
 
@@ -278,6 +280,24 @@ class TestHaploQA(unittest.TestCase):
         self.assertNotIn('Login Required', str(req.data))
         # verify you can see your tag
         self.assertIn('unit_testing_tag', str(req.data))
+
+    def test_std_des_admin(self):
+        """test permissions on standard designation admin page"""
+
+        # hit page w/o login
+        req = self._client.get("st-des-admin.html")
+        # verify the login required message
+        self.assertIn('Login Required', str(req.data))
+        # hit page with regular login
+        self._set_session(False, self._tester_email)
+        req = self._client.get("st-des-admin.html")
+        self.assertIn('Login Required', str(req.data))
+        # update user to st-des-admin
+        self._switch_admin(True)
+        req = self._client.get("st-des-admin.html")
+        # verify you can see the page
+        self.assertIn('Standard Designations', str(req.data))
+
 
     def test_tags_page(self):
         """elevate user to admin and verify you can edit the tags page"""

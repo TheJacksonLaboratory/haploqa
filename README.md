@@ -66,14 +66,14 @@ Start Mongo like:
 
 Stop mongo with `crtl+c`
 
-Start/Stop RabbitMQ like (not on the mac rabbitmq scripts will be located in /usr/local/sbin/) :
+Start/Stop RabbitMQ like (note on the mac rabbitmq scripts will be located in /usr/local/sbin/) :
 
     rabbitmq-server
     rabbitmqctl stop
 
 Start Celery worker like:
 
-    PYTHONPATH=src celery -A haploqa.haploqaapp.celery worker
+    PYTHONPATH=src python -m celery worker -A haploqa.haploqaapp.celery --logfile <abs_path>/logs/celery.log
 
 Stop Celery with `ctrl+c`
 
