@@ -1195,6 +1195,7 @@ def sample_snp_report(mongo_id):
         if sample_uses_snp_format:
             yield _iter_to_row((
                 'sample_id',
+                'original_sample_id'
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -1205,6 +1206,7 @@ def sample_snp_report(mongo_id):
         else:
             yield _iter_to_row((
                 'sample_id',
+                'original_sample_id',
                 'snp_id',
                 'chromosome',
                 'position_bp',
@@ -1237,6 +1239,7 @@ def sample_snp_report(mongo_id):
                     if sample_uses_snp_format:
                         yield _iter_to_row((
                             sample['sample_id'],
+                            sample['other_ids'][0],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
@@ -1247,6 +1250,7 @@ def sample_snp_report(mongo_id):
                     else:
                         yield _iter_to_row((
                             sample['sample_id'],
+                            sample['other_ids'][0],
                             curr_snp['snp_id'],
                             curr_snp['chromosome'],
                             str(curr_snp['position_bp']),
@@ -1468,7 +1472,7 @@ def combined_report(sdid):
 
     samples = list(matching_samples)
     # header
-    report = _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+    report = _iter_to_row(('sample_id', 'original_sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
     for sample in samples:
         id = str(sample['_id'])
         # TODO: check if the report is empty and add a message
@@ -1528,6 +1532,7 @@ def _summary_report_data(mongo_id):
                 if curr_hap_distance:
                     yield _iter_to_row((
                         sample['sample_id'],
+                        sample['other_ids'][0],
                         contributing_strains[hap_index_lte],
                         contributing_strains[hap_index_gte],
                         str(100 * curr_hap_distance / total_distance),
@@ -1586,13 +1591,14 @@ def sample_summary_report(mongo_id):
             cumulative_distance_dict[(hap_index_lte, hap_index_gte)] += curr_dist
 
     def tsv_generator():
-        yield _iter_to_row(('sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
+        yield _iter_to_row(('sample_id', 'original_sample_id', 'haplotype_1', 'haplotype_2', 'percent_of_genome'))
         for hap_index_lte in range(len(contributing_strains)):
             for hap_index_gte in range(hap_index_lte, len(contributing_strains)):
                 curr_hap_distance = cumulative_distance_dict[(hap_index_lte, hap_index_gte)]
                 if curr_hap_distance:
                     yield _iter_to_row((
                         sample['sample_id'],
+                        sample['other_ids'][0],
                         contributing_strains[hap_index_lte],
                         contributing_strains[hap_index_gte],
                         str(100 * curr_hap_distance / total_distance),
