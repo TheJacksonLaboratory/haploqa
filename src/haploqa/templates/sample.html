@@ -39,6 +39,7 @@
         var sample = {{ sample|tojson }};
         var allEngTgts = {{ all_eng_tgts|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
+        var comparisonStatus = true;
 
         $(function() {
 
@@ -78,30 +79,37 @@
                 var samplesURL = "/standard-designation.json/" + encURIComp(sample.standard_designation);
                 var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
+                    // if there is data and there's more than 1 sample in the standard designation (SD)
+                    if (typeof data.samples !== "undefined") {
+                        if(data.samples.length > 1) {
+                            var comp_samples = [];
+                            data.samples.forEach(function(sample) {
+                                // only load samples that aren't the current
+                                if (sample.sample_id !== sampleID) {
+                                    var option = new Option(sample.sample_id, sample._id);
+                                    comparisonSelect.append(option);
+                                    comp_samples.push(sample);
+                                }
+                            });
 
-                    if (data.samples) {
-                        var comp_samples = [];
-                        data.samples.forEach(function (sample) {
-                            // only load samples that aren't the current
-                            if (sample.sample_id !== sampleID) {
-                                var option = new Option(sample.sample_id, sample._id);
-                                comparisonSelect.append(option);
-                                comp_samples.push(sample);
-                            }
-                        });
-
-                        sample.comp_samples = comp_samples;
-                    } //TODO: HAP-58 don't show the secondary genome interval plot or the comparison sample dropdown
+                            sample.comp_samples = comp_samples;
+                        }
+                    }
+                    else {
+                        // if there's no comparison, hide all of the comparison sample-related elements
+                        comparisonStatus = false;
+                        d3.selectAll(".comparison-only").remove();
+                    }
 
                 }).success(function() {
-                    // only if the user is logged in
-                    {% if g.user %}
+                    // only if the user is logged in and there are other samples in the SD
+                    if(user !== null && comparisonStatus) {
                         var sampleSelected = comparisonSelect.children("option").filter(":selected");
                         sample.current_comp = sampleSelected.val();
                         updateComparisonSVG(sample.current_comp, 2);
 
                         // if an interval has been chosen, use it, else default to chr 1
-                        if(interval) {
+                        if (interval) {
                             getSNPData(sample.current_comp, interval.chr, hapIntervalCompPlot);
                         }
                         else {
@@ -112,11 +120,13 @@
 
                         // if the previous chosen sample resulted in no data, remove the overlay
                         d3.select("[id=no-data-overlay]").remove();
-                    {% endif %}
+                    }
                 });
             }
 
-            getComparisonSamples();
+            if(user !== null) {
+                getComparisonSamples();
+            }
 
             // load data when a comparison sample is chosen
             $("#comparison-sample").on("change", function() {
@@ -1458,8 +1468,8 @@
                     </button>
                 </span>
             </div>
-            <label for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
-            <select id="comparison-sample"></select>
+            <label class="comparison-only" for="comparison-sample" style="margin-left: 35px">Comparison Sample:</label>
+            <select class="comparison-only" id="comparison-sample"></select>
         </div>
         <div class="row">
             <div class="col-md-12">
@@ -1471,9 +1481,9 @@
                         class="haplotype-plot"></svg>
             </div>
         </div>
-        <br/>
-        <div class="row">
+        <div class="row comparison-only">
             <div class="col-md-12">
+                <br/>
                 <label id="comp-label" class="sample-label"></label>
                 <div class="readonly-comp-haplotypes-panel"></div>
                 <div id="comp-carousel" class="carousel" data-ride="carousel" data-interval="false">

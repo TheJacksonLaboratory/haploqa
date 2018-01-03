@@ -688,7 +688,7 @@ function HaploKaryoPlot(params) {
 
         snpBar.selectAll("*").remove();
 
-        if (snpData !== null) {
+        if (snpData && _zoomInterval) {
             // set number of bands to show over interval here; higher for thinner bands, lower for thicker
             var numBands = 120;
             var format = d3.format(",");
