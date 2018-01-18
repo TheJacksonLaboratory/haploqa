@@ -173,6 +173,57 @@ def lookup_user_from_session():
         else:
             flask.g.user = None
 
+@app.route('/hap-candidates.html')
+def hap_cands():
+    """
+    show all samples designated as haplotype candidates
+    :return:
+    """
+
+    # TODO: check for admin or curator
+    user = flask.g.user
+    if user is None or not user['administrator'] and not user['curator']:
+        return flask.render_template('login-required.html')
+
+    db = mds.get_db()
+
+    matching_samples = _find_and_anno_samples(
+        {'haplotype_candidate': True},
+        {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes.chromosome_data': 0,
+            'contributing_strains': 0,
+        },
+        db=db,
+        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+    )
+
+    matching_samples = list(matching_samples)
+    strain_map = _get_strain_map(db)
+    print(type(matching_samples))
+
+    samples_out = []
+
+    for sample in matching_samples:
+        st_des = sample['standard_designation']
+        print(st_des)
+        try:
+            print(strain_map[st_des]['color'])
+            sample['color'] = strain_map[st_des]['color']
+        ## more than one strain name associated with a sample
+        except KeyError:
+            pass
+
+        samples_out.append(sample)
+
+    return flask.render_template(
+        'hap-candidates.html',
+        samples=samples_out,
+        strain_colors=_get_strain_map(db),
+        )
+
+
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -848,7 +899,7 @@ def update_st_des_color(st_des_id):
 
     return '{"status": "success"}'
 
-
+#TODO: rename
 @app.route('/st-des-admin.html')
 def st_des_admin():
     """
@@ -1131,6 +1182,7 @@ def _find_one_and_anno_samples(query, projection, db=None, require_write_perms=F
         return next(iter(samples))
     except StopIteration:
         return None
+
 
 
 @app.route('/sample/<mongo_id>.html')
@@ -1544,6 +1596,22 @@ def _summary_report_data(mongo_id):
     for row in data:
         report += row
     return report
+
+
+@app.route('/check_hap_cands.json', methods=['POST'])
+def check_hap_cands():
+    """
+    check if any existing haplotype-candidate
+    designated samples have the same strain name
+    applied to them.
+    :param strain_name:
+    :return: json
+    """
+
+    form = flask.request.form
+    strain_name = form['strain_name']
+
+    return mds.hap_cands_by_strain(strain_name)
 
 @app.route('/sample/<mongo_id>-summary-report.txt')
 def sample_summary_report(mongo_id):

@@ -142,6 +142,49 @@ def init_db(db=None):
 
     return db
 
+## TODO: add method to remove haplotype candidate flag from list of samples
+def remove_hap_can(sample_ids, db=None):
+    """
+    disassociate a sample or set of samples as haplotype candidates
+    :param sample_ids:
+    :param db:
+    :return:
+    """
+
+    ## TODO: test with a bad id and see what error gets trigggered
+    for sample_id in sample_ids:
+        db.snps.update_one(
+            {'_id': sample_id},
+            {'$set': {'haplotype_candidate': False}},
+        )
+
+def hap_cands_by_strain(strain_name, db=None):
+    """
+    get any haplotype candidate designated samples that have
+    a specified strain name assigned to them
+    NOTE: this will only return samples with only this strain name applied,
+    as the front end system enforces only one strain name
+    can be applied to a haplotype-candidate strain.
+    @:param strain_name: name of the strain
+    """
+
+    if db is None:
+        db = get_db()
+
+    res = list(db.samples.find({'standard_designation': strain_name, 'haplotype_candidate': True}))
+    if len(res) == 1:
+        return 'your good to go homey!'
+    if len(res) > 1:
+        #return list of samples?
+        str = 'too many! found {} samples'.format(len(res))
+        #print('too many! found {} samples'.format(len(res)))
+        for sample in res:
+            str += '\nsample: {}, id# {} std des: {}, hap cand: {}'.format(sample['sample_id'], sample['_id'], sample['standard_designation'], sample['haplotype_candidate'])
+        return str
+    else:
+        return 'matching sample {} found, id: {}'.format(res[0]['_id'], res[0]['sample_id'])
+        #print('matching sample {} found, id: {}'.format(res[0]['_id'], res[0]['sample_id']))
+
 
 def get_snps(platform_id, chromosome, db=None):
     """
