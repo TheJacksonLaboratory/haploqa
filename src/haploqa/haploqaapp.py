@@ -900,7 +900,7 @@ def update_st_des_color(st_des_id):
     return '{"status": "success"}'
 
 #TODO: rename
-@app.route('/st-des-admin.html')
+@app.route('/strain-name-admin.html')
 def st_des_admin():
     """
     standard designation admin page
@@ -922,7 +922,7 @@ def st_des_admin():
     std_des_list.sort(key=lambda x: get_hsv(x['color']))
 
     return flask.render_template(
-        'st-des-admin.html',
+        'strain-name-admin.html',
         all_st_des=std_des_list,
     )
 
@@ -1597,6 +1597,16 @@ def _summary_report_data(mongo_id):
         report += row
     return report
 
+## TODO: leaving for now, might not be needed
+@app.route('/remove-hap-cands/<sample_id>.json', methods=['POST'])
+def rem_hap_cands():
+    """json endpoint to set a sample or set of
+    sample's haplotype candidate designation to false"""
+
+    form = flask.request.form
+    samples = form['samples']
+
+    return mds.remove_hap_cands(samples)
 
 @app.route('/check_hap_cands.json', methods=['POST'])
 def check_hap_cands():

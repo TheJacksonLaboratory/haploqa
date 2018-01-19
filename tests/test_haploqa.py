@@ -285,16 +285,16 @@ class TestHaploQA(unittest.TestCase):
         """test permissions on standard designation admin page"""
 
         # hit page w/o login
-        req = self._client.get("st-des-admin.html")
+        req = self._client.get("strain-name-admin.html")
         # verify the login required message
         self.assertIn('Login Required', str(req.data))
         # hit page with regular login
         self._set_session(False, self._tester_email)
-        req = self._client.get("st-des-admin.html")
+        req = self._client.get("strain-name-admin.html")
         self.assertIn('Login Required', str(req.data))
         # update user to st-des-admin
         self._switch_admin(True)
-        req = self._client.get("st-des-admin.html")
+        req = self._client.get("strain-name-admin.html")
         # verify you can see the page
         self.assertIn('Standard Designations', str(req.data))
 

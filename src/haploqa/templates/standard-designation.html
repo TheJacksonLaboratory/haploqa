@@ -1,6 +1,6 @@
 {% extends "samples.html" %}
 
-{% block title %}Samples with Standard Designation: {{ standard_designation }}{% endblock %}
+{% block title %}Samples with Strain Name: {{ standard_designation }}{% endblock %}
 
 {% block header %}{{ standard_designation }}
     <div class="row">
@@ -11,4 +11,4 @@
         </div>
     </div>
 {% endblock %}
-{% block nosamples %}No samples found for standard designation: {{ standard_designation }}{% endblock %}
+{% block nosamples %}No samples found for Strain Name: {{ standard_designation }}{% endblock %}

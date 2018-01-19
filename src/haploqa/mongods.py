@@ -142,8 +142,9 @@ def init_db(db=None):
 
     return db
 
-## TODO: add method to remove haplotype candidate flag from list of samples
-def remove_hap_can(sample_ids, db=None):
+## TODO: I don't think we're going to need this but leaving
+## it here for now in case we decide to update via AJAX
+def remove_hap_cands(sample_ids, db=None):
     """
     disassociate a sample or set of samples as haplotype candidates
     :param sample_ids:
@@ -173,17 +174,18 @@ def hap_cands_by_strain(strain_name, db=None):
 
     res = list(db.samples.find({'standard_designation': strain_name, 'haplotype_candidate': True}))
     if len(res) == 1:
-        return 'your good to go homey!'
+        return 'pass'
     if len(res) > 1:
         #return list of samples?
-        str = 'too many! found {} samples'.format(len(res))
-        #print('too many! found {} samples'.format(len(res)))
+        str = 'There are {} other samples found which are designated haplotyped candidates with this strain associated.<br>'.format(len(res))
+        str += 'Click on the links below to remove the haplotype candidate designation from the samples before proceeding:<br>'
         for sample in res:
-            str += '\nsample: {}, id# {} std des: {}, hap cand: {}'.format(sample['sample_id'], sample['_id'], sample['standard_designation'], sample['haplotype_candidate'])
+            #str += 'Sample: {}, id# {} std des: {}, hap cand: {}<br>'.format(sample['sample_id'], sample['_id'], sample['standard_designation'], sample['haplotype_candidate'])
+            str += '<a href="/sample/{}.html" target="blank">Sample: {}</a><br>'.format(sample['_id'], sample['sample_id'])
         return str
+    ## TODO: this shouldn't happen but leaving it in for now until done
     else:
         return 'matching sample {} found, id: {}'.format(res[0]['_id'], res[0]['sample_id'])
-        #print('matching sample {} found, id: {}'.format(res[0]['_id'], res[0]['sample_id']))
 
 
 def get_snps(platform_id, chromosome, db=None):
