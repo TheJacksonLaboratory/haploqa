@@ -797,64 +797,52 @@
 
                 var cancelUpdate = false;
 
-                //console.log('hap cand t/f: '+hapCandidate);
                 if(hapCandidate==true) {
 
                     var msg = '';
 
-                    //TODO: check and see if any
-
                     //make sure there is at least one, and only one strain name applied
                     var strain_list = newStandardDesignation.split(",");
-                    //console.log('new sex : ' + newSex);
-                    //console.log('strain list: ' + strain_list.length + ' contents: ' + newStandardDesignation);
-                    //TODO: js still evals an empty array to length 1???
-                    /*if (strain_list.length == 0) {
-                        msg += '<br><b> - You must apply a strain name to the sample in order to designate it as a haplotype candidate</b>';
-                    }*/
-                     if (strain_list.length > 1) {
-                        msg += '<br><b> - A haplotype candidate can only have one strain. Please update your sample accordingly.</b>';
-                        cancelUpdate = true;
-                        //console.log('cancelUpdate set true after strain check: '+cancelUpdate);
-                    //now we know we have only 1 strain name applied and can run the next check
-                    } else {
-                        /** we have only one strain name so we can check if
-                         * its been assigned to any other haplo candidate samples
-                         */
-                        //console.log('going to check for dupe strain name assignements');
 
-                        var pdata = {}
-                        pdata['strain_name'] = newStandardDesignation;
-                        //TODO: this is going to have to be done and wait until it comes back.
-                        $.ajax({
-                        type: "POST",
-                        async: false,
-                        url: "{{ url_for('check_hap_cands') }}",
-                        data: pdata,
-                        success: function (data) {
-                            //console.log('samples found? ' + data);
-                            if(data == 'pass') {
-                                //console.log('pass eval works');
-                            } else {
-                                msg += '<br>' + data;
-                                //console.log('the message is supposed to be: '+ msg);
-                                cancelUpdate = true;
-                                }
-                            }
-                        });
+                    if (newStandardDesignation.length == 0) {
+                        msg += '<br><b> - A Haplotype candidate must have at least one strain name</b>';
+                        cancelUpdate = true;
                     }
-                    //console.log('cancel update before sex check: ' + cancelUpdate);
-                    //console.log('msg before sex check: ' + msg);
+                     else {
+
+                        if (strain_list.length > 1) {
+                            msg += '<br><b> - A haplotype candidate can only have one strain. Please update your sample accordingly.</b>';
+                            cancelUpdate = true;
+                            //now we know we have only 1 strain name applied and can run the next check
+                        } else {
+                            /** we have only one strain name so we can check if
+                             * its been assigned to any other haplo candidate samples
+                             * TODO: parse json */
+
+                            var pdata = {}
+                            pdata['strain_name'] = newStandardDesignation;
+                            $.ajax({
+                                type: "POST",
+                                async: false,
+                                url: "{{ url_for('check_hap_cands') }}",
+                                data: pdata,
+                                success: function (data) {
+                                    if (data == 'pass') {
+                                    } else {
+                                        msg += '<br>' + data;
+                                        cancelUpdate = true;
+                                        }
+                                    }
+                                });
+                            }
+                        }
                     if (newSex != 'female') {
                         msg += "<br><b> - Your sample's sex must be female in order to designate or keep it as a haplotype candidate</b>";
                         cancelUpdate = true;
-                        //console.log('cancelUpdate set true after sex check: '+cancelUpdate);
                     }
-                    //console.log('cancelUpdate right before check: '+cancelUpdate);
                     if (cancelUpdate==true) {
-                        //console.log('message is '+msg);
                         $('#msg').html(msg);
-                        $('#warning').show();//.delay(6000).fadeOut(2000);
+                        $('#warning').show();
                     }
 
                 }
@@ -873,14 +861,15 @@
 
                 //console.log('cancelupdate before check:'+cancelUpdate);
                 if(!cancelUpdate) {
-                    console.log('makeing update');
                     saveTagRequest = $.ajax({
                         type: "POST",
                         url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
                         data: postData,
                         dataType: 'json',
                         success: function (data) {
-
+                            //clear warning message and hide div
+                            $('#msg').html('');
+                            $('#warning').hide();
                             var updateTs = data.ts + ' by {{ g.user.email_address }}';
                             $('#lastupdate').text(updateTs);
 
