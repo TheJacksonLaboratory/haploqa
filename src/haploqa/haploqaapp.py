@@ -206,15 +206,12 @@ def hap_cands():
 
     matching_samples = list(matching_samples)
     strain_map = _get_strain_map(db)
-    print(type(matching_samples))
 
     samples_out = []
 
     for sample in matching_samples:
         st_des = sample['standard_designation']
-        print(st_des)
         try:
-            print(strain_map[st_des]['color'])
             sample['color'] = strain_map[st_des]['color']
         ## more than one strain name associated with a sample
         except KeyError:
