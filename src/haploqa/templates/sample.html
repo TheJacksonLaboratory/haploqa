@@ -826,10 +826,19 @@
                                 async: false,
                                 url: "{{ url_for('check_hap_cands') }}",
                                 data: pdata,
+                                dataType: 'json',
                                 success: function (data) {
-                                    if (data == 'pass') {
+                                    if (data.results == 'none') {
                                     } else {
-                                        msg += '<br>' + data;
+                                        msg += '<br>There are other sample(s) found which are designated as haplotype ' +
+                                            'candidates with this strain associated.<br>';
+                                        msg += 'Click on the links below to remove the haplotype candidate designation ' +
+                                            'from the samples before proceeding:<br>';
+
+                                        $.each(data.results, function(item) {
+                                            msg += '<a href="/sample/'+data.results[item].sampleId+'.html" target="blank">' +
+                                                'Sample: '+data.results[item].sampleName+'</a><br>';
+                                        });
                                         cancelUpdate = true;
                                         }
                                     }

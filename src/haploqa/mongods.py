@@ -159,6 +159,7 @@ def remove_hap_cands(sample_ids, db=None):
             {'$set': {'haplotype_candidate': False}},
         )
 
+# TODO: just return json of sample name (sample_id field) and id (_id field), assemble html in sample.html js.
 def hap_cands_by_strain(strain_name, db=None):
     """
     get any haplotype candidate designated samples that have
@@ -173,19 +174,19 @@ def hap_cands_by_strain(strain_name, db=None):
         db = get_db()
 
     res = list(db.samples.find({'standard_designation': strain_name, 'haplotype_candidate': True}))
-    if len(res) == 1:
-        return 'pass'
+    # we don't need to worry about no results here because the front end is validating the form
+    if len(res) <= 1:
+        return 'none'
     if len(res) > 1:
-        #return list of samples?
-        str = 'There are {} other samples found which are designated haplotyped candidates with this strain associated.<br>'.format(len(res))
-        str += 'Click on the links below to remove the haplotype candidate designation from the samples before proceeding:<br>'
+        samples = []
         for sample in res:
-            #str += 'Sample: {}, id# {} std des: {}, hap cand: {}<br>'.format(sample['sample_id'], sample['_id'], sample['standard_designation'], sample['haplotype_candidate'])
-            str += '<a href="/sample/{}.html" target="blank">Sample: {}</a><br>'.format(sample['_id'], sample['sample_id'])
-        return str
+            name = str(sample['sample_id'])
+            sample_id = str(sample['_id'])
+            samples.append({'sampleId': sample_id, 'sampleName': name})
+        return samples
     ## TODO: this shouldn't happen but leaving it in for now until done
     else:
-        return 'matching sample {} found, id: {}'.format(res[0]['_id'], res[0]['sample_id'])
+        return 'result: {}'.format(len(res))
 
 
 def get_snps(platform_id, chromosome, db=None):
