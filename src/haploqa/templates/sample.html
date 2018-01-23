@@ -440,8 +440,7 @@
             }
 
             function updateSampleStrainId(newSampleStrainId) {
-                editStrainIdInput.val(newSampleStrainId);
-                readonlyStrainId.val(newSampleStrainId);
+                readonlyStrainId.html(newSampleStrainId);
             }
 
             function updateSampleIsPublic(newSampleIsPublic) {
@@ -729,7 +728,6 @@
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
-                console.log('this is running');
                 if(saveTagRequest !== null) {
                     saveTagRequest.abort();
                     saveTagRequest = null;
@@ -782,10 +780,8 @@
                 postData['owner'] = owner;
 
                 var newStrainId = editStrainIdInput.val();
-                console.log('new strain id: '+newStrainId+' old strain id: '+strainID);
                 var StrainIdChanged = newStrainId !== strainID;
                 if(StrainIdChanged) {
-                    console.log('strain id changed');
                     postData['strain_id'] = newStrainId;
                 }
 
@@ -887,9 +883,7 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
-                console.log('cancelupdate before check:'+cancelUpdate);
                 if(!cancelUpdate) {
-                    console.log('running update');
                     saveTagRequest = $.ajax({
                         type: "POST",
                         url: "{{ url_for('update_sample', mongo_id=sample._id) }}",

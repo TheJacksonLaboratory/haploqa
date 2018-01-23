@@ -1738,10 +1738,7 @@ def update_sample(mongo_id):
         update_dict['standard_designation'] = form['standard_designation'].strip()
 
     if 'strain_id' in form:
-        print('strain id is {}'.format(form['strain_id']))
-        update_dict['strain_name'] = form['strain_id'].strip()
-    else:
-        print('no strain id detected')
+        update_dict['strain_id'] = form['strain_id'].strip()
 
     if 'notes' in form:
         update_dict['notes'] = form['notes'].strip()
