@@ -1006,6 +1006,8 @@ def index_html():
         {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
         {'$sort': SON([('count', -1), ('_id', -1)])},
     ]
+
+    # TODO: needs to show correct count for regular users
     if user is None:
         # anonymous users should only be given access to public samples
         pipeline.insert(0, {'$match': {'is_public': True}})
@@ -1139,16 +1141,21 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
         db = mds.get_db()
 
     user = flask.g.user
-    user_mongoid = None if user is None else user['_id']
+    user_email = None if user is None else user['email_address_lowercase']
+    try:
+        user_is_curator = user['curator']
+    except KeyError:
+        user_is_curator = False
+    try:
+        user_is_admin = user['administrator']
+    except KeyError:
+        user_is_admin = False
 
     def anno_sample(sample):
         sample['user_can_write'] = user is not None
-        if user is None and 'is_public' not in sample:
-            sample['is_public'] = True
         _add_default_attributes(sample)
 
-        sample['user_is_owner'] = user_mongoid is not None and user_mongoid == sample['owner']
-
+        sample['user_is_owner'] = user_email is not None and user_email == sample['owner']
         return sample
 
     if user is None:
@@ -1159,6 +1166,23 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
             # since this is anonymous access only return publicly visible samples
             query = {
                 '$and': [
+                    {'is_public': True},
+                    query,
+                ]
+            }
+
+    else:
+        if user_is_admin or user_is_curator:
+            pass
+        # we have a regular user, only return public samples and
+        # samples owned by them
+        else:
+            query = {
+                '$and': [
+                    {'owner': user_email},
+                    query,
+                ],
+                '$or': [
                     {'is_public': True},
                     query,
                 ]
