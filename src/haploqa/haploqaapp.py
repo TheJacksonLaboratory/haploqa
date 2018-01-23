@@ -1737,6 +1737,12 @@ def update_sample(mongo_id):
     if 'standard_designation' in form:
         update_dict['standard_designation'] = form['standard_designation'].strip()
 
+    if 'strain_id' in form:
+        print('strain id is {}'.format(form['strain_id']))
+        update_dict['strain_name'] = form['strain_id'].strip()
+    else:
+        print('no strain id detected')
+
     if 'notes' in form:
         update_dict['notes'] = form['notes'].strip()
 
@@ -1802,6 +1808,7 @@ def update_samples():
     form = flask.request.form
     sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
     owner = form['owner']
+    strain_id = form['strain_id']
     tags = json.loads(form['tags'])
     tags_action = form['tags_action']
     contributing_strains = json.loads(form['contributing_strains'])
@@ -1815,6 +1822,9 @@ def update_samples():
     add_to_set_dict = dict()
     remove_dict = dict()
     set_dict = dict()
+
+    if len(strain_id) > 0:
+        set_dict['strain_id'] = str(strain_id)
 
     if len(owner) > 0:
         set_dict['owner'] = str(owner).strip('"')

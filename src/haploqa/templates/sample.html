@@ -28,6 +28,11 @@
         });
 
         var sampleID = {{ sample.sample_id|tojson }};
+        {% if sample.strain_id %}
+        var strainID = {{ sample.strain_id|tojson }}
+        {% else %}
+        var strainID = ""
+        {% endif %}
         var sex = {{ sample.sex|tojson }};
         if(sex === null) {
             sex = 'unknown';
@@ -413,11 +418,11 @@
             var editNotesInput = $('#edit-notes-input');
             var readonlyNotesPanel = $('#readonly-notes');
 
-            var sampleColorIcon = $('#sample-color-icon');
-            var sampleColorText = $('#sample-color-text');
-
             var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
             var readonlySampleVisibility = $('#readonly-sample-visibility');
+
+            var editStrainIdInput = $('#edit-strain-id-input');
+            var readonlyStrainId = $('#readonly-strain-id');
 
             var editSexSelect = $('#edit-sex-select');
             var readonlySex = $('#readonly-sex');
@@ -432,6 +437,11 @@
                     editSexSelect.val(sexLower);
                 }
                 readonlySex.text(newSex);
+            }
+
+            function updateSampleStrainId(newSampleStrainId) {
+                editStrainIdInput.val(newSampleStrainId);
+                readonlyStrainId.val(newSampleStrainId);
             }
 
             function updateSampleIsPublic(newSampleIsPublic) {
@@ -719,6 +729,7 @@
             });
             var saveTagRequest = null;
             saveSampleButton.click(function() {
+                console.log('this is running');
                 if(saveTagRequest !== null) {
                     saveTagRequest.abort();
                     saveTagRequest = null;
@@ -769,6 +780,14 @@
 
                 var owner = $('#edit-owner-input').val();
                 postData['owner'] = owner;
+
+                var newStrainId = editStrainIdInput.val();
+                console.log('new strain id: '+newStrainId+' old strain id: '+strainID);
+                var StrainIdChanged = newStrainId !== strainID;
+                if(StrainIdChanged) {
+                    console.log('strain id changed');
+                    postData['strain_id'] = newStrainId;
+                }
 
                 var newSex = editSexSelect.val();
                 var sexChanged = newSex !== sex;
@@ -868,8 +887,9 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
-                //console.log('cancelupdate before check:'+cancelUpdate);
+                console.log('cancelupdate before check:'+cancelUpdate);
                 if(!cancelUpdate) {
+                    console.log('running update');
                     saveTagRequest = $.ajax({
                         type: "POST",
                         url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -912,6 +932,9 @@
                             }
                             if (sampleIsPublicChanged) {
                                 updateSampleIsPublic(newSampleIsPublic);
+                            }
+                            if (StrainIdChanged) {
+                                updateSampleStrainId(newStrainId);
                             }
                             if (sexChanged) {
                                 updateSex(newSex);
@@ -1230,7 +1253,7 @@
                     {% endif %}
                     <tr>
                         <th>
-                            Standard Designation
+                            Strain Name(s)
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -1243,6 +1266,23 @@
                                 <input id="edit-standarddesignation-input" type="text" class="form-control" value="{{ sample.standard_designation }}"/>
                             </span>
                             <span id="readonly-standarddesignation" data-display-when="sample-readonly">{{ sample.standard_designation }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Strain ID
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="The Strain ID associated with this sample"></span>
+                        </th>
+                        <td>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-strain-id-input" type="text" class="form-control" value="{{ sample.strain_id }}"/>
+                            </span>
+                            <span id="readonly-strain-id" data-display-when="sample-readonly">{{ sample.strain_id }}</span>
                         </td>
                     </tr>
                     <tr>
@@ -1288,7 +1328,7 @@
                                     data-placement="top"
                                     title="add help text"></span>
                         </th>
-                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }} raw data: {{ sample.heterozygous_percent }}</td></tr>
+                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td></tr>
                     <tr>
                         <th>
                             % Hom. Calls
