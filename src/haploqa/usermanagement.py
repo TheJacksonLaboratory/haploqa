@@ -49,8 +49,7 @@ def switch_user_privs(email_address, user_type):
     :return: true on success, None upon failure
     """
 
-    # Convert admin flag string to Boolean
-    is_admin = True if (user_type == "admin") else False
+    is_admin = True if (user_type == "administrator") else False
     is_curator = True if (user_type == "curator") else False
 
     db = mds.get_db()
@@ -61,8 +60,7 @@ def switch_user_privs(email_address, user_type):
 
     if user is not None:
         db.users.update_one({'_id': user['_id']},
-                            {'$set': {'administrator': is_admin}},
-                            {'curator': is_curator})
+                            {'$set': {'administrator': is_admin, 'curator': is_curator}})
         return True
     else:
         return None

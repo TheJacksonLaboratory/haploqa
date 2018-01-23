@@ -250,7 +250,7 @@ def update_user_privs():
         flask.abort(400)
 
     form = flask.request.form
-    if usrmgmt.switch_user_privs(form['email'], form['user_type']) is not None:
+    if usrmgmt.switch_user_privs(form['email'], form['status']) is not None:
         return flask.jsonify({'success': True})
     else:
         return flask.jsonify({'success': False})
@@ -2509,5 +2509,4 @@ def max_likelihood_chr_genoprobs(sample_id, chrom, db):
 
 if __name__ == '__main__':
     # start server (for development use only)
-    app.debug = True
-    app.run(host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
