@@ -770,8 +770,10 @@
                 var newContribStrains = discardDupElems(newContribStrainTokens.map(function(tok) {return tok.value}));
                 newContribStrains.sort();
                 var contribStrainsChanged = !arraysEq(newContribStrains, sample.contributing_strains);
+                var haplotyping_timestamp = new Date(Date.now());
                 if(contribStrainsChanged) {
                     postData['contributing_strains'] = JSON.stringify(newContribStrains);
+                    postData['last_haplotyping'] = haplotyping_timestamp;
                 }
 
                 var newSampleID = editSampleIDInput.val();
@@ -841,6 +843,9 @@
                             updateCtrlEngTgts(newNegCtrlEngTgts, false);
                         }
                         if(contribStrainsChanged) {
+                            // This time stamp will mirror the last update.
+                            // On reload, a more indepth time stamp will replace it.
+                            $("#lasthaplotype").text(data.ts);
                             updateHaplotypeStrains(newContribStrains);
                             updateHaplotypeSVG();
                         }
@@ -1168,6 +1173,21 @@
                         </th>
                         <td id="lastupdate">
                             {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            Last Haplotyping
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="This will show the timestamp for the last time that haplotypes were calculated for this sample">
+                            </span>
+                        </th>
+                        <td id="lasthaplotype">
+                            {% if sample.last_haplotyping %}{{ sample.last_haplotyping }}{% else %}N/A{% endif %}
                         </td>
                     </tr>
                     {% endif %}
