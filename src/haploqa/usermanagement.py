@@ -41,17 +41,17 @@ def lookup_salt(email_address, db):
     else:
         return None
 
-def switch_admin(email_address, admin_flag):
+def switch_user_privs(email_address, user_type):
     """
-    updates a users administrative status
+    updates a users status
     :param email_address: the email address of the user to update
-    :param admin_flag: admin status (boolean)
-    :param db: the database
+    :param user_type: regular, curator, admin
     :return: true on success, None upon failure
     """
 
     # Convert admin flag string to Boolean
-    is_admin = True if (admin_flag == "True") else False
+    is_admin = True if (user_type == "admin") else False
+    is_curator = True if (user_type == "curator") else False
 
     db = mds.get_db()
 
@@ -60,7 +60,9 @@ def switch_admin(email_address, admin_flag):
     })
 
     if user is not None:
-        db.users.update_one({'_id': user['_id']}, {'$set': {'administrator': is_admin}})
+        db.users.update_one({'_id': user['_id']},
+                            {'$set': {'administrator': is_admin}},
+                            {'curator': is_curator})
         return True
     else:
         return None

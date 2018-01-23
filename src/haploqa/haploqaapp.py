@@ -99,8 +99,8 @@ app.json_encoder = CustomJSONEncoder
 # uncomment the line below and comment out the os.random call if you are
 # developing and don't want to keep having to log in every time
 # you make an update to the app
-#app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
-app.secret_key = os.urandom(24)
+app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
+#app.secret_key = os.urandom(24)
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION
@@ -239,8 +239,8 @@ def show_users():
         users=users,
     )
 
-@app.route('/switch-admin.json', methods=['POST'])
-def switch_admin():
+@app.route('/update_user_privs.json', methods=['POST'])
+def update_user_privs():
     """
     Promote / Demote a user's status
     :return: True / False
@@ -250,7 +250,7 @@ def switch_admin():
         flask.abort(400)
 
     form = flask.request.form
-    if usrmgmt.switch_admin(form['email'], form['administrator']) is not None:
+    if usrmgmt.switch_user_privs(form['email'], form['user_type']) is not None:
         return flask.jsonify({'success': True})
     else:
         return flask.jsonify({'success': False})
