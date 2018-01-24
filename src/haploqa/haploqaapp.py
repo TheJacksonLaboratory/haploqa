@@ -1013,7 +1013,29 @@ def index_html():
         pipeline.insert(0, {'$match': {'is_public': True}})
         sample_count = db.samples.count({'is_public': True})
     else:
-        sample_count = db.samples.count({})
+        try:
+            user_is_curator = user['curator']
+        except KeyError:
+            user_is_curator = False
+        try:
+            user_is_admin = user['administrator']
+        except KeyError:
+            user_is_admin = False
+        if user_is_admin or user_is_curator:
+            sample_count = db.samples.count({})
+        # we have a regular user, only return public samples and
+        # samples owned by them
+        else:
+            query = {
+                '$and': [
+                    {'owner': user['email_address_lowercase']},
+                ],
+                '$or': [
+                    {'is_public': True},
+                ]
+            }
+            pipeline.insert(0, {'$match': {'owner': user['email_address_lowercase']}})
+            sample_count = db.samples.count({'owner': user['email_address_lowercase']})
 
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
@@ -1142,14 +1164,6 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
 
     user = flask.g.user
     user_email = None if user is None else user['email_address_lowercase']
-    try:
-        user_is_curator = user['curator']
-    except KeyError:
-        user_is_curator = False
-    try:
-        user_is_admin = user['administrator']
-    except KeyError:
-        user_is_admin = False
 
     def anno_sample(sample):
         sample['user_can_write'] = user is not None
@@ -1172,6 +1186,14 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
             }
 
     else:
+        try:
+            user_is_curator = user['curator']
+        except KeyError:
+            user_is_curator = False
+        try:
+            user_is_admin = user['administrator']
+        except KeyError:
+            user_is_admin = False
         if user_is_admin or user_is_curator:
             pass
         # we have a regular user, only return public samples and
