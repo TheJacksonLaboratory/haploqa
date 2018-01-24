@@ -749,7 +749,7 @@
                     success: function(data) {
                         var updateTs = data.ts + ' by {{ g.user.email_address }}';
                         $('#lastupdate').text(updateTs);
-                        
+
                         // This time stamp will mirror the last update.
                         // On reload, a more indepth time stamp will replace it.
                         $("#lasthaplotype").html(data.ts
@@ -889,7 +889,10 @@
                         if(contribStrainsChanged) {
                             // This time stamp will mirror the last update.
                             // On reload, a more indepth time stamp will replace it.
-                            $("#haplotype-timestamp").text(data.ts);
+                            $("#lasthaplotype").html(data.ts
+                                + '<button id="run-haplotyping" type="button" class="btn btn-info btn-sm">'
+                                + '<span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> '
+                                + 'Recalculate Haplotypes </button>');
                             updateHaplotypeStrains(newContribStrains);
                             updateHaplotypeSVG();
                         }
