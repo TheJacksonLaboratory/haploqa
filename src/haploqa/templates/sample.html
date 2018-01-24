@@ -35,7 +35,7 @@
 
         var allSds = {{ all_sds|tojson }};
         var allTags = {{ all_tags|tojson }};
-        var allOwners = {{ all_owners|tojson }}
+        var allOwners = {{ all_owners|tojson }};
         var sample = {{ sample|tojson }};
         var allEngTgts = {{ all_eng_tgts|tojson }};
         var haplotypePollingIntervalMillisecs = 2500;
@@ -228,12 +228,11 @@
                             data.best_candidates.forEach(function(currCandidate) {
                                 function makeHapLink(strainName) {
                                     var strainIdx = strainNames.indexOf(strainName);
-                                    var haploLink = $(
-                                            '<a href="/standard-designation/' + encURIComp(strainName) + '.html" class="hap hap' + strainIdx + '">'
-                                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strainName].color + ';"></span>'
-                                            + escapeHtml(strainName)
-                                            + '</a>');
-                                    return haploLink;
+                                    return ($('<a href="/standard-designation/' + encURIComp(strainName)
+                                        + '.html" class="hap hap' + strainIdx + '">'
+                                        + '<span id="sample-color-icon" class="fa fa-square" style="color: '
+                                        + strainMap[strainName].color + ';"></span>'
+                                        + escapeHtml(strainName) + '</a>'));
                                 }
 
                                 var tr = $(document.createElement('tr'));
@@ -401,6 +400,7 @@
             var editSampleButton = $('#edit-sample-button');
             var saveSampleButton = $('#save-sample-button');
             var cancelSampleButton = $('#cancel-sample-button');
+            var runHaplotypingButton = $('#run-haplotyping');
 
             var readonlyHaplotypesPanel = $('.readonly-haplotypes-panel');
             var readonlyCompHaplotypesPanel = $('.readonly-comp-haplotypes-panel');
@@ -458,7 +458,7 @@
                 },
                 showAutocompleteOnFocus: true,
                 createTokensOnBlur: true
-            })
+            });
 
             editTagsInput.tokenfield({
                 autocomplete: {
@@ -635,15 +635,14 @@
                     }
                     var strainIdx = strainNames.indexOf(strain);
                     //only show links in the haplotype strains if user is admin
+                    var haploLink;
                     {% if g.user %}
-                    var haploLink = $(
-                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
-                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
-                            + escapeHtml(strain)
-                            + '</a>');
+                        haploLink = $('<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx
+                            + '">' + '<span id="sample-color-icon" class="fa fa-square" style="color: '
+                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</a>');
                     {% else %}
-                    var haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
-                            + escapeHtml(strain) + '</span>');
+                        haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: '
+                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</span>');
                     {% endif %}
                     readonlyHaplotypesPanel.append(haploLink);
                 });
@@ -669,15 +668,14 @@
                     var strainIdx = strainNames.indexOf(strain);
                     //only show links in the haplotype strains if user is admin
                     //TODO: need to get the plots rendering if sample is public
+                    var haploLink;
                     {% if g.user %}
-                    var haploLink = $(
-                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
-                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
-                            + escapeHtml(strain)
-                            + '</a>');
+                        haploLink = $('<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx
+                            + '">' + '<span id="sample-color-icon" class="fa fa-square" style="color: '
+                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</a>');
                     {% else %}
-                    var haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
-                            + escapeHtml(strain) + '</span>');
+                        haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: '
+                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</span>');
                     {% endif %}
                     readonlyCompHaplotypesPanel.append(haploLink);
                     updateHaplotypeLinkHoverListeners();
@@ -730,6 +728,46 @@
                 switchEditSampleView(false);
                 resetEdits();
             });
+
+            runHaplotypingButton.click(function() {
+                runHaplotypingButton
+                    .attr("disabled", true)
+                    .html("<i class='fa fa-circle-o-notch fa-spin' aria-hidden='true'></i> Running...");
+
+                var postData = {};
+
+                var haplotyping_timestamp = new Date(Date.now());
+
+                postData['contributing_strains'] = JSON.stringify(sample.contributing_strains);
+                postData['last_haplotyping'] = haplotyping_timestamp;
+
+                saveTagRequest = $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
+                    data: postData,
+                    dataType: 'json',
+                    success: function(data) {
+                        // This time stamp will mirror the last update.
+                        // On reload, a more indepth time stamp will replace it.
+                        $("#haplotype-timestamp").text(data.ts);
+                        updateHaplotypeStrains(sample.contributing_strains);
+                        updateHaplotypeSVG();
+                    }
+                }).fail(function() {
+                    showErrorMessage('An error occurred while saving sample.');
+                }).always(function() {
+                    saveTagRequest = null;
+                    sampleUpdateSpinner.css('display', 'none');
+                });
+
+                // keep button disabled for 30 seconds to keep users from sending multiple requests
+                setTimeout(function() {
+                    runHaplotypingButton
+                        .attr("disabled", false)
+                        .html("<span class='glyphicon glyphicon-repeat' aria-hidden='true'></span> Recalculate Haplotypes");
+                }, 30000)
+            });
+
             var saveTagRequest = null;
             saveSampleButton.click(function() {
                 if(saveTagRequest !== null) {
@@ -845,7 +883,7 @@
                         if(contribStrainsChanged) {
                             // This time stamp will mirror the last update.
                             // On reload, a more indepth time stamp will replace it.
-                            $("#lasthaplotype").text(data.ts);
+                            $("#haplotype-timestamp").text(data.ts);
                             updateHaplotypeStrains(newContribStrains);
                             updateHaplotypeSVG();
                         }
@@ -947,7 +985,7 @@
                 });
             }
 
-            function clearHaplotypeHightlight(haploID) {
+            function clearHaplotypeHightlight() {
                 svg.selectAll('rect.hap').style({
                     'fill-opacity': null,
                     'stroke': null
@@ -1046,7 +1084,7 @@
                     }
                     // if no attempts left, inform user that no data turned up
                     else if(anyResultsPending(data) && attempt === 0) {
-                        d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                        d3.select("[class=snps-interval-comparison]").selectAll("*").remove();
                         d3.select("[class=no-data-overlay]").remove();
                         hapIntervalCompPlot.drawOverlay("no data to show", 225);
                     }
@@ -1076,7 +1114,7 @@
                     plotToUpdate.updateSNPBar(data);
                 }).fail(function() {
                     if (plotToUpdate == hapIntervalCompPlot) {
-                        d3.select("[class=snps-interval-comparison").selectAll("*").remove();
+                        d3.select("[class=snps-interval-comparison]").selectAll("*").remove();
                     }
 
                     alertDiv.html('<div class="alert alert-warning fade in"> ' +
@@ -1177,17 +1215,20 @@
                     </tr>
                     <tr>
                         <th>
-                            Last Haplotyping
+                            Last Haplotype Calculation
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
                                     data-toggle="tooltip"
                                     data-placement="top"
-                                    title="This will show the timestamp for the last time that haplotypes were calculated for this sample">
+                                    title="This shows the timestamp for the last time that haplotypes were calculated for this sample">
                             </span>
                         </th>
                         <td id="lasthaplotype">
                             {% if sample.last_haplotyping %}{{ sample.last_haplotyping }}{% else %}N/A{% endif %}
+                            <button id="run-haplotyping" type="button" class="btn btn-info btn-sm">
+                                <span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> Recalculate Haplotypes
+                            </button>
                         </td>
                     </tr>
                     {% endif %}

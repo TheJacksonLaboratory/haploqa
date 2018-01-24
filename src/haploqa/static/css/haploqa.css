@@ -12,6 +12,10 @@
     top: 100%;
 }
 
+#run-haplotyping {
+    margin-left: 2vw;
+}
+
 select {
     height: 30px;
     width: 225px;
