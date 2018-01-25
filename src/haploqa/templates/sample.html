@@ -102,8 +102,8 @@
                     }
 
                 }).success(function() {
-                    // only if the user is logged in and there are other samples in the SD
-                    if(user !== null && comparisonStatus) {
+                    // only if there are other samples in the SD
+                    if(comparisonStatus) {
                         var sampleSelected = comparisonSelect.children("option").filter(":selected");
                         sample.current_comp = sampleSelected.val();
                         updateComparisonSVG(sample.current_comp, 2);
@@ -124,9 +124,7 @@
                 });
             }
 
-            if(user !== null) {
-                getComparisonSamples();
-            }
+            getComparisonSamples();
 
             // load data when a comparison sample is chosen
             $("#comparison-sample").on("change", function() {
@@ -370,14 +368,12 @@
                     gotoUCSCLink.removeClass('disabled');
                 }
 
-                if(user !== null) {
-                    hapKaryoPlot.zoomInterval(newInterval);
-                    hapIntervalPlot.zoomInterval(newInterval);
-                    hapIntervalCompPlot.zoomInterval(newInterval);
+                hapKaryoPlot.zoomInterval(newInterval);
+                hapIntervalPlot.zoomInterval(newInterval);
+                hapIntervalCompPlot.zoomInterval(newInterval);
 
-                    // don't update haplotypes unless we have at least 1 sec of quiet time.
-                    updateIntervalDP.delay(findCandidateHaps, 1000);
-                }
+                // don't update haplotypes unless we have at least 1 sec of quiet time.
+                updateIntervalDP.delay(findCandidateHaps, 1000);
             }
 
             clearIntervalButton.click(function() {
@@ -634,16 +630,13 @@
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
                     var strainIdx = strainNames.indexOf(strain);
-                    //only show links in the haplotype strains if user is admin
-                    var haploLink;
-                    {% if g.user %}
-                        haploLink = $('<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx
-                            + '">' + '<span id="sample-color-icon" class="fa fa-square" style="color: '
-                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</a>');
-                    {% else %}
-                        haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: '
-                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</span>');
-                    {% endif %}
+
+                    var haploLink = $(
+                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain)
+                            + '</a>');
+
                     readonlyHaplotypesPanel.append(haploLink);
                 });
                 updateHaplotypeLinkHoverListeners();
@@ -666,17 +659,13 @@
                         readonlyCompHaplotypesPanel.append(document.createTextNode(', '));
                     }
                     var strainIdx = strainNames.indexOf(strain);
-                    //only show links in the haplotype strains if user is admin
-                    //TODO: need to get the plots rendering if sample is public
-                    var haploLink;
-                    {% if g.user %}
-                        haploLink = $('<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx
-                            + '">' + '<span id="sample-color-icon" class="fa fa-square" style="color: '
-                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</a>');
-                    {% else %}
-                        haploLink = $('<span><span id="sample-color-icon" class="fa fa-square" style="color: '
-                            + strainMap[strain].color + ';"></span>' + escapeHtml(strain) + '</span>');
-                    {% endif %}
+
+                    var haploLink = $(
+                            '<a href="' + strainMap[strain].url + '" class="hap hap' + strainIdx + '">'
+                            + '<span id="sample-color-icon" class="fa fa-square" style="color: ' + strainMap[strain].color + ';"></span>'
+                            + escapeHtml(strain)
+                            + '</a>');
+
                     readonlyCompHaplotypesPanel.append(haploLink);
                     updateHaplotypeLinkHoverListeners();
                 });
@@ -964,11 +953,8 @@
                 intervalMode: true
             });
 
-            // only if the user is logged in
-            {% if g.user %}
-                hapIntervalPlot.zoomIntervalChange = updateInterval;
-                hapIntervalCompPlot.zoomIntervalChange = updateInterval;
-            {% endif %}
+            hapIntervalPlot.zoomIntervalChange = updateInterval;
+            hapIntervalCompPlot.zoomIntervalChange = updateInterval;
 
             function highlightHaplotype(strainName) {
                 clearHaplotypeHightlight();
@@ -1027,10 +1013,8 @@
 
             //looks like this is where the hover events for the highlight haplotype plot
             // are being registered
-            {% if g.user %}
             hapKaryoPlot.mouseOverHaplotype = highlightHaplotype;
             hapKaryoPlot.mouseOutHaplotype = clearHaplotypeHightlight;
-            {% endif %}
 
             var haploSnpConcordance = $('#haplo-snp-concordance');
             var updateHaplotypeSVGTimeoutID = null;
@@ -1144,9 +1128,7 @@
             updateHaplotypeSVG();
 
             // only if the user is logged in
-            {% if g.user %}
-                getSNPData(sample._id, 1, hapIntervalPlot);
-            {% endif %}
+            getSNPData(sample._id, 1, hapIntervalPlot);
         });
     </script>
 {% endblock %}
@@ -1520,7 +1502,7 @@
             </a>
         </div>
     </div>
-    {% if g.user %}
+
         <div class="page-header">
             <br/>
             <h2>Genome Interval Plot</h2>
@@ -1585,6 +1567,7 @@
                 <span class="glyphicon glyphicon-link" aria-hidden="true"></span> Go to UCSC Browser
             </a>
         </div>
+    {% if g.user %}
         <div class="row">
             <div class="col-md-12">
                 <br/>
