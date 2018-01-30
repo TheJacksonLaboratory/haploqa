@@ -289,6 +289,7 @@ function HaploKaryoPlot(params) {
     var minStartBp = null;
     var maxEndBp = null;
     var chrSizesHash = {};
+
     chrSizes.forEach(function(currChr) {
         if(minStartBp === null || currChr.startPos < minStartBp) {
             minStartBp = currChr.startPos;
@@ -786,7 +787,7 @@ function HaploKaryoPlot(params) {
         svg.selectAll("g")
             .filter(function() {return (this.classList[0] === "plot-legend");})
             .remove();
-        
+
         var legend = svg.append("g")
             .attr("class", "plot-legend")
             .attr("transform", "translate(30, " + yOffset + ")");
