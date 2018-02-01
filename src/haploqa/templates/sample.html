@@ -80,20 +80,18 @@
                 var comparisonSelect = $("#comparison-sample");
                 $.getJSON(samplesURL, function(data) {
                     // if there is data and there's more than 1 sample in the standard designation (SD)
-                    if (typeof data.samples !== "undefined") {
-                        if(data.samples.length > 1) {
-                            var comp_samples = [];
-                            data.samples.forEach(function(sample) {
-                                // only load samples that aren't the current
-                                if (sample.sample_id !== sampleID) {
-                                    var option = new Option(sample.sample_id, sample._id);
-                                    comparisonSelect.append(option);
-                                    comp_samples.push(sample);
-                                }
-                            });
+                    if (typeof data.samples !== "undefined" && data.samples.length > 1) {
+                        var comp_samples = [];
+                        data.samples.forEach(function(sample) {
+                            // only load samples that aren't the current
+                            if (sample.sample_id !== sampleID) {
+                                var option = new Option(sample.sample_id, sample._id);
+                                comparisonSelect.append(option);
+                                comp_samples.push(sample);
+                            }
+                        });
 
-                            sample.comp_samples = comp_samples;
-                        }
+                        sample.comp_samples = comp_samples;
                     }
                     else {
                         // if there's no comparison, hide all of the comparison sample-related elements
@@ -226,11 +224,12 @@
                             data.best_candidates.forEach(function(currCandidate) {
                                 function makeHapLink(strainName) {
                                     var strainIdx = strainNames.indexOf(strainName);
+
                                     return ($('<a href="/standard-designation/' + encURIComp(strainName)
                                         + '.html" class="hap hap' + strainIdx + '">'
                                         + '<span id="sample-color-icon" class="fa fa-square" style="color: '
                                         + strainMap[strainName].color + ';"></span>'
-                                        + escapeHtml(strainName) + '</a>'));
+                                        + escapeHtml(strainName) + '</a>'))
                                 }
 
                                 var tr = $(document.createElement('tr'));
@@ -619,13 +618,13 @@
 
             function updateHaplotypeStrains(newContribStrains) {
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
-                sample['contributing_strains'].sort();
+                var sortedContribStrains = sample['contributing_strains'].concat().sort();
 
-                hapKaryoPlot.drawLegend(strainMap, sample['contributing_strains'], 900);
-                hapIntervalPlot.drawLegend(strainMap, sample['contributing_strains'], 150);
+                hapKaryoPlot.drawLegend(strainMap, sortedContribStrains, 900);
+                hapIntervalPlot.drawLegend(strainMap, sortedContribStrains, 150);
 
                 readonlyHaplotypesPanel.empty();
-                sample['contributing_strains'].forEach(function(strain, i) {
+                sortedContribStrains.forEach(function(strain, i) {
                     if(i >= 1) {
                         readonlyHaplotypesPanel.append(document.createTextNode(', '));
                     }
@@ -650,11 +649,12 @@
              * @param contribStrains - list of all contributing strains for the comparison sample
              */
             function updateCompHaplotypeStrains(contribStrains) {
-                contribStrains.sort();
-                hapIntervalCompPlot.drawLegend(strainMap, contribStrains, 150);
+                var sortedContribStrains = contribStrains.concat().sort();
+
+                hapIntervalCompPlot.drawLegend(strainMap, sortedContribStrains, 150);
 
                 readonlyCompHaplotypesPanel.empty();
-                contribStrains.forEach(function(strain, i) {
+                sortedContribStrains.forEach(function(strain, i) {
                     if(i >= 1) {
                         readonlyCompHaplotypesPanel.append(document.createTextNode(', '));
                     }
