@@ -1473,7 +1473,8 @@ def get_snps_json(mongo_id, chr_id):
             outDict[position]['y_probe_call'] = curr_snp['y_probe_call']
 
             if snp_hap_block is None:
-                hap1, hap2 = ""
+                hap1 = ""
+                hap2 = ""
             else:
                 hap1 = contributing_strains[snp_hap_block['haplotype_index_1']]
                 hap2 = contributing_strains[snp_hap_block['haplotype_index_2']]
@@ -1614,7 +1615,8 @@ def rem_hap_cands():
 def check_hap_cands():
     """
     check if any existing haplotype-candidate
-    designated samples have the same strain name
+    designated samples in the same platform
+    have the same strain name
     applied to them.
     :param strain_name:
     :return: json
@@ -1622,8 +1624,9 @@ def check_hap_cands():
 
     form = flask.request.form
     strain_name = form['strain_name']
+    platform = form['platform']
 
-    return flask.jsonify(results=mds.hap_cands_by_strain(strain_name))
+    return flask.jsonify(results=mds.hap_cands_by_strain(strain_name, platform))
 
 
 @app.route('/sample/<mongo_id>-summary-report.txt')
@@ -1755,6 +1758,9 @@ def update_sample(mongo_id):
     if 'contributing_strains' in form or 'sex' in form:
         platform = db.platforms.find_one({'platform_id': sample['platform_id']})
         chr_ids = platform['chromosomes']
+
+        if 'last_haplotyping' in form:
+            update_dict['last_haplotyping'] = form['last_haplotyping']
 
         if 'contributing_strains' in form:
             update_dict['contributing_strains'] = json.loads(form['contributing_strains'])

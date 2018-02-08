@@ -143,7 +143,7 @@ def init_db(db=None):
     return db
 
 ## TODO: I don't think we're going to need this but leaving
-## it here for now in case we decide to update via AJAX
+## TODO: ...it here for now in case we decide to update via AJAX
 def remove_hap_cands(sample_ids, db=None):
     """
     disassociate a sample or set of samples as haplotype candidates
@@ -160,7 +160,7 @@ def remove_hap_cands(sample_ids, db=None):
         )
 
 # TODO: just return json of sample name (sample_id field) and id (_id field), assemble html in sample.html js.
-def hap_cands_by_strain(strain_name, db=None):
+def hap_cands_by_strain(strain_name, platform, db=None):
     """
     get any haplotype candidate designated samples that have
     a specified strain name assigned to them
@@ -173,7 +173,9 @@ def hap_cands_by_strain(strain_name, db=None):
     if db is None:
         db = get_db()
 
-    res = list(db.samples.find({'standard_designation': strain_name, 'haplotype_candidate': True}))
+    res = list(db.samples.find({'standard_designation': strain_name,
+                                'haplotype_candidate': True,
+                                'platform_id': platform}))
     # we don't need to worry about no results here because the front end is validating the form
     if len(res) <= 1:
         return 'none'
