@@ -142,6 +142,54 @@ def init_db(db=None):
 
     return db
 
+## TODO: I don't think we're going to need this but leaving
+## TODO: ...it here for now in case we decide to update via AJAX
+def remove_hap_cands(sample_ids, db=None):
+    """
+    disassociate a sample or set of samples as haplotype candidates
+    :param sample_ids:
+    :param db:
+    :return:
+    """
+
+    ## TODO: test with a bad id and see what error gets trigggered
+    for sample_id in sample_ids:
+        db.snps.update_one(
+            {'_id': sample_id},
+            {'$set': {'haplotype_candidate': False}},
+        )
+
+# TODO: just return json of sample name (sample_id field) and id (_id field), assemble html in sample.html js.
+def hap_cands_by_strain(strain_name, platform, db=None):
+    """
+    get any haplotype candidate designated samples that have
+    a specified strain name assigned to them
+    NOTE: this will only return samples with only this strain name applied,
+    as the front end system enforces only one strain name
+    can be applied to a haplotype-candidate strain.
+    @:param strain_name: name of the strain
+    """
+
+    if db is None:
+        db = get_db()
+
+    res = list(db.samples.find({'standard_designation': strain_name,
+                                'haplotype_candidate': True,
+                                'platform_id': platform}))
+    # we don't need to worry about no results here because the front end is validating the form
+    if len(res) <= 1:
+        return 'none'
+    if len(res) > 1:
+        samples = []
+        for sample in res:
+            name = str(sample['sample_id'])
+            sample_id = str(sample['_id'])
+            samples.append({'sampleId': sample_id, 'sampleName': name})
+        return samples
+    ## TODO: this shouldn't happen but leaving it in for now until done
+    else:
+        return 'result: {}'.format(len(res))
+
 
 def get_snps(platform_id, chromosome, db=None):
     """

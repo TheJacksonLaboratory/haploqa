@@ -72,25 +72,25 @@
                             data: postData,
                             success: function (data) {
                                 console.log(data);
-                                $('#msg').text('Standard Designation added successfully');
+                                $('#msg').text('Strain Name added successfully');
                                 setTimeout(function() {
                                     location.reload();
                                 }, 1500);
 
                             }
                         }).fail(function (data) {
-                            $('#msg').text('An error occurred while adding the standard designation');
+                            $('#msg').text('An error occurred while adding the strain name');
                             console.log(data);
                         });
 
                 } else {
-                     $('#msg').text('Please enter a value for standard designation');
+                     $('#msg').text('Please enter a value for strain name');
                 }
             }
 
     </script>
     <div class="page-header">
-        <h1>Standard Designation Management</h1>
+        <h1>Strain Name Management</h1>
         <div class="row">
             <div>
                 <span>
@@ -101,14 +101,14 @@
         </div>
     </div>
         <div class="row" style="width: 500px;">
-            <b>Standard Designations:</b>
+            <b>Strain Names:</b>
             <table class="table table-striped col-md-7">
                 <thead>
                     <tr>
                        <th scope="col">Name</th>
                        <th scope="col">Color
                            <span class="glyphicon glyphicon-question-sign help-icon" aria-hidden="true" data-toggle="tooltip"
-                           data-placement="top" title="To edit a standard designation's color:
+                           data-placement="top" title="To edit a strain name's color:
                            1. Click on the input field corresponding to the item you wish to edit.
                            2. Click inside the color selection box to select a color or enter a hexadecimal color value manually.
                            3. Click the Confirm Edit button to save your changes,
@@ -151,12 +151,12 @@
         <div class="modal-dialog">
             <div class="modal-content" style="width: 300px;">
                 <div class="modal-header">
-                    <h4 class="modal-title" id="myModalLabel">Add New Standard Designation</h4>
+                    <h4 class="modal-title" id="myModalLabel">Add New Strain Name</h4>
                     <div id="msg" style="color:#3c763d; font-weight: bold;"></div>
                 </div>
                 <div class="modal-body" style="height: 140px;">
                     <div style="float:left; margin-right: 100%">
-                        <div>Standard Designation:</div>
+                        <div>Strain Name:</div>
                         <div style="margin-top: 10px;">
                             <input type="text" id="st_des"/>
                         </div>

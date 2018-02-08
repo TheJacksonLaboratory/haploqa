@@ -1,0 +1,68 @@
+{% extends "layout.html" %}
+
+{% block title %}Haplotype Candidate Samples{% endblock %}
+
+{% block header %}Haplotype Candidate Samples{% endblock %}
+
+{% block content %}
+{%  if samples %}
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th>ID (Secondary IDs)</th>
+                    <th>Strain Name</th>
+                    <th>Sex</th>
+                    <th>Platform</th>
+                    <th>% Het. Calls</th>
+                    <th>% Hom. Calls</th>
+                    <th>% No Call</th>
+                    <th>% Concordance</th>
+                    {% if g.user %}<th>Public</th>{% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                    {% for sample in samples %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('sample_html', mongo_id=sample._id) }}">
+                                {% if sample.haplotype_candidate %}
+                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ sample.color }};"></span>
+                                {% endif %}
+                                {{ sample.sample_id }}
+                            </a>
+                            {% if sample.other_ids %}
+                                ({% for other_id in sample.other_ids %}{{ other_id }}{% if not loop.last %}, {% endif %}{% endfor %})
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if sample.standard_designation %}
+                                <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ sample.sex or 'Unknown' }}</td>
+                        <td>{{ sample.platform_id }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.heterozygous_percent) }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.homozygous_percent) }}</td>
+                        <td>{{ '{0:0.2f}%'.format(sample.no_read_percent) }}</td>
+                        <td>
+                            {% if sample.viterbi_haplotypes.concordant_percent != None %}
+                                {{ '{0:0.2f}%'.format(sample.viterbi_haplotypes.concordant_percent) }}
+                            {% endif %}
+                        </td>
+                        {% if g.user %}
+                        <td>{% if sample.is_public %}<span class="glyphicon glyphicon-ok" aria-hidden="true" aria-label="sample is public"></span>{% endif %}</td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                        <tr><td colspan="10">
+                        </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}No matching samples found
+{% endif %}
+{% endblock %}

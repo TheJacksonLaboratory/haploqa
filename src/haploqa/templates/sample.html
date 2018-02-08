@@ -408,11 +408,8 @@
             var editNotesInput = $('#edit-notes-input');
             var readonlyNotesPanel = $('#readonly-notes');
 
-            var editColorComponent = $('#edit-color-component');
             var sampleColorIcon = $('#sample-color-icon');
             var sampleColorText = $('#sample-color-text');
-            var colorTableRow = $('#color-table-row');
-            editColorComponent.minicolors({theme: 'bootstrap'});
 
             var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
             var readonlySampleVisibility = $('#readonly-sample-visibility');
@@ -489,7 +486,6 @@
                     }
                     tagLinksPanel.append('<a href="../tag/' + encURIComp(tag) + '.html">' + tag + '</a>');
                 });
-                colorTableRow.css('display', haplotypeStrainTagPresent ? '' : 'none');
 
                 editTagsInput.tokenfield('setTokens', newSampleTags.map(function(tag) {
                     return {
@@ -683,14 +679,6 @@
                 editSampleIDInput.val(newSampleID);
             }
 
-            function updateSampleColor(newColor) {
-                sample.color = newColor;
-
-                editColorComponent.minicolors('value', newColor);
-                sampleColorIcon.css({'color': newColor});
-                sampleColorText.text(newColor);
-            }
-
             function switchEditSampleView(isEdit) {
                 $('[data-display-when="sample-edit"]').css('display', isEdit ? '' : 'none');
                 $('[data-display-when="sample-readonly"]').css('display', isEdit ? 'none' : '');
@@ -706,7 +694,6 @@
                 updateStandardDesignation(sample.standard_designation);
                 updateHaplotypeStrains(sample.contributing_strains);
                 updateSampleID(sampleID);
-                updateSampleColor(sample.color);
                 updateNotes(sample.notes);
                 updateSampleIsPublic(sample.is_public);
                 updateSex(sex);
@@ -818,10 +805,10 @@
                 var owner = $('#edit-owner-input').val();
                 postData['owner'] = owner;
 
-                var newColor = editColorComponent.minicolors('value');
-                var colorChanged = newColor !== sample.color;
-                if(colorChanged) {
-                    postData['color'] = newColor;
+                var newSex = editSexSelect.val();
+                var sexChanged = newSex !== sex;
+                if(sexChanged) {
+                    postData['sex'] = newSex;
                 }
 
                 var hapCandidate = $('#hap-candidate-checkbox').prop('checked');
@@ -836,6 +823,76 @@
                     postData['standard_designation'] = newStandardDesignation;
                 }
 
+                /**
+                  *  if hap cand true:
+                  *  noOtherSamplesHapCandbyStrainName (ajax - need two endpoints?)
+                  *  TODO: need a way to put messages below edit button
+                  *  TODO: prevent form submit if conditions fail
+                  */
+
+                var cancelUpdate = false;
+
+                if(hapCandidate==true) {
+
+                    var msg = '';
+
+                    //make sure there is at least one, and only one strain name applied
+                    var strain_list = newStandardDesignation.split(",");
+
+                    if (newStandardDesignation.length == 0) {
+                        msg += '<br><b> - A Haplotype candidate must have at least one strain name</b>';
+                        cancelUpdate = true;
+                    }
+                     else {
+
+                        if (strain_list.length > 1) {
+                            msg += '<br><b> - A haplotype candidate can only have one strain. Please update your sample accordingly.</b>';
+                            cancelUpdate = true;
+                            //now we know we have only 1 strain name applied and can run the next check
+                        } else {
+                            /** we have only one strain name so we can check if
+                             * its been assigned to any other haplo candidate samples
+                             * TODO: parse json */
+
+                            var pdata = {}
+                            pdata['strain_name'] = newStandardDesignation;
+                            pdata['platform'] = '{{ sample.platform_id }}';
+
+                            $.ajax({
+                                type: "POST",
+                                async: false,
+                                url: "{{ url_for('check_hap_cands') }}",
+                                data: pdata,
+                                dataType: 'json',
+                                success: function (data) {
+                                    if (data.results == 'none') {
+                                    } else {
+                                        msg += '<br>There are other sample(s) found which are designated as haplotype ' +
+                                            'candidates with this strain associated.<br>';
+                                        msg += 'Click on the links below to remove the haplotype candidate designation ' +
+                                            'from the samples before proceeding:<br>';
+
+                                        $.each(data.results, function(item) {
+                                            msg += '<a href="/sample/'+data.results[item].sampleId+'.html" target="blank">' +
+                                                'Sample: '+data.results[item].sampleName+'</a><br>';
+                                        });
+                                        cancelUpdate = true;
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    if (newSex != 'female') {
+                        msg += "<br><b> - Your sample's sex must be female in order to designate or keep it as a haplotype candidate</b>";
+                        cancelUpdate = true;
+                    }
+                    if (cancelUpdate==true) {
+                        $('#msg').html(msg);
+                        $('#warning').show();
+                    }
+
+                }
+
                 var newNotes = editNotesInput.val();
                 var notesChanged = newNotes != sample.notes;
                 if(notesChanged) {
@@ -848,73 +905,65 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
-                var newSex = editSexSelect.val();
-                var sexChanged = newSex !== sex;
-                if(sexChanged) {
-                    postData['sex'] = newSex;
+                console.log('cancelupdate before check:'+cancelUpdate);
+                if(!cancelUpdate) {
+                    saveTagRequest = $.ajax({
+                        type: "POST",
+                        url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
+                        data: postData,
+                        dataType: 'json',
+                        success: function (data) {
+                            //clear warning message and hide div
+                            $('#msg').html('');
+                            $('#warning').hide();
+                            var updateTs = data.ts + ' by {{ g.user.email_address }}';
+                            $('#lastupdate').text(updateTs);
+
+                            $('#readonly-owner').text(owner);
+
+                            if (tagsChanged) {
+                                updateSampleTags(newTags);
+                            }
+                            if (posCtrlEngTgtsChanged) {
+                                updateCtrlEngTgts(newPosCtrlEngTgts, true);
+                            }
+                            if (negCtrlEngTgtsChanged) {
+                                updateCtrlEngTgts(newNegCtrlEngTgts, false);
+                            }
+                            if (contribStrainsChanged) {
+                                updateHaplotypeStrains(newContribStrains);
+                                updateHaplotypeSVG();
+                            }
+                            if (sampleIDChanged) {
+                                updateSampleID(newSampleID);
+                            }
+                            if (hcChanged) {
+                                $('#hap-candidate').text(hapCandidate);
+                                $('#hap-candidate-checkbox').prop('checked', hapCandidate);
+                            }
+                            if (standardDesignationChanged) {
+                                updateStandardDesignation(newStandardDesignation);
+                            }
+                            if (notesChanged) {
+                                updateNotes(newNotes);
+                            }
+                            if (sampleIsPublicChanged) {
+                                updateSampleIsPublic(newSampleIsPublic);
+                            }
+                            if (sexChanged) {
+                                updateSex(newSex);
+                                updateHaplotypeSVG();
+                            }
+
+                        }
+                    }).fail(function () {
+                        showErrorMessage('An error occurred while saving sample.');
+                    }).always(function () {
+                        saveTagRequest = null;
+                        sampleUpdateSpinner.css('display', 'none');
+                    });
+
                 }
-
-                saveTagRequest = $.ajax({
-                    type: "POST",
-                    url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
-                    data: postData,
-                    dataType: 'json',
-                    success: function(data) {
-
-                        var updateTs = data.ts + ' by {{ g.user.email_address }}';
-                        $('#lastupdate').text(updateTs);
-
-                        $('#readonly-owner').text(owner);
-
-                        if(tagsChanged) {
-                            updateSampleTags(newTags);
-                        }
-                        if(posCtrlEngTgtsChanged) {
-                            updateCtrlEngTgts(newPosCtrlEngTgts, true);
-                        }
-                        if(negCtrlEngTgtsChanged) {
-                            updateCtrlEngTgts(newNegCtrlEngTgts, false);
-                        }
-                        if(contribStrainsChanged) {
-                            // This time stamp will mirror the last update.
-                            // On reload, a more indepth time stamp will replace it.
-                            $("#lasthaplotype").html(data.ts
-                                + '<button id="run-haplotyping" type="button" class="btn btn-info btn-sm">'
-                                + '<span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> '
-                                + 'Recalculate Haplotypes </button>');
-                            updateHaplotypeStrains(newContribStrains);
-                            updateHaplotypeSVG();
-                        }
-                        if(sampleIDChanged) {
-                            updateSampleID(newSampleID);
-                        }
-                        if(colorChanged) {
-                            updateSampleColor(newColor);
-                        }
-                        if(hcChanged) {
-                            $('#hap-candidate').text(hapCandidate);
-                            $('#hap-candidate-checkbox').prop('checked', hapCandidate);
-                        }
-                        if(standardDesignationChanged) {
-                            updateStandardDesignation(newStandardDesignation);
-                        }
-                        if(notesChanged) {
-                            updateNotes(newNotes);
-                        }
-                        if(sampleIsPublicChanged) {
-                            updateSampleIsPublic(newSampleIsPublic);
-                        }
-                        if(sexChanged) {
-                            updateSex(newSex);
-                            updateHaplotypeSVG();
-                        }
-                    }
-                }).fail(function() {
-                    showErrorMessage('An error occurred while saving sample.');
-                }).always(function() {
-                    saveTagRequest = null;
-                    sampleUpdateSpinner.css('display', 'none');
-                });
 
                 switchEditSampleView(false);
             });
@@ -1144,6 +1193,11 @@
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
             </button>
+            <div class="alert alert-danger" id="warning" style="display: none;">
+                    <a href="#" class="close" data-dismiss="alert" aria-label="close" title="close">×</a>
+                    <strong>Warning!</strong>
+                    <div id="msg"></div>
+                </div>
             <span id="sample-update-spinner" class="fa fa-spinner fa-pulse" style="display: none;"></span>
         </span>
         {% endif %}
@@ -1225,7 +1279,7 @@
                     {% endif %}
                     <tr>
                         <th>
-                            Standard Designation
+                            Strain Name(s)
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
                                     aria-hidden="true"
@@ -1345,26 +1399,6 @@
                         </td>
                     </tr>
                     {% endif %}
-                    <tr id="color-table-row">
-                        <th>
-                            Haplotype Color
-                            <span
-                                    class="glyphicon glyphicon-question-sign help-icon"
-                                    aria-hidden="true"
-                                    data-toggle="tooltip"
-                                    data-placement="top"
-                                    title="add help text"></span>
-                        </th>
-                        <td>
-                            <span data-display-when="sample-edit" style="display: none;">
-                                <input type="text" id="edit-color-component" class="form-control" data-control="hue" value="#000000">
-                            </span>
-                            <span data-display-when="sample-readonly">
-                                <span id="sample-color-icon" class="fa fa-square"></span>
-                                <span id="sample-color-text"></span>
-                            </span>
-                        </td>
-                    </tr>
                     <tr>
                         <th>
                             Haplotype Candidate
