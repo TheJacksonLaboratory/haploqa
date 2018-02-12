@@ -99,8 +99,8 @@ app.json_encoder = CustomJSONEncoder
 # uncomment the line below and comment out the os.random call if you are
 # developing and don't want to keep having to log in every time
 # you make an update to the app
-app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
-#app.secret_key = os.urandom(24)
+#app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
+app.secret_key = os.urandom(24)
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION
