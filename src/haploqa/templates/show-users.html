@@ -56,8 +56,6 @@
         <script>
 
         function switch_status(email, status) {
-            console.log(email);
-            console.log(status);
             $.ajax({
                 type: "POST",
                 url: "{{ url_for('update_user_privs') }}",
