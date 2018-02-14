@@ -28,6 +28,11 @@
         });
 
         var sampleID = {{ sample.sample_id|tojson }};
+        {% if sample.strain_id %}
+        var strainID = {{ sample.strain_id|tojson }}
+        {% else %}
+        var strainID = ""
+        {% endif %}
         var sex = {{ sample.sex|tojson }};
         if(sex === null) {
             sex = 'unknown';
@@ -408,11 +413,11 @@
             var editNotesInput = $('#edit-notes-input');
             var readonlyNotesPanel = $('#readonly-notes');
 
-            var sampleColorIcon = $('#sample-color-icon');
-            var sampleColorText = $('#sample-color-text');
-
             var sampleIsPublicCheckbox = $('#sample-is-public-checkbox');
             var readonlySampleVisibility = $('#readonly-sample-visibility');
+
+            var editStrainIdInput = $('#edit-strain-id-input');
+            var readonlyStrainId = $('#readonly-strain-id');
 
             var editSexSelect = $('#edit-sex-select');
             var readonlySex = $('#readonly-sex');
@@ -427,6 +432,10 @@
                     editSexSelect.val(sexLower);
                 }
                 readonlySex.text(newSex);
+            }
+
+            function updateSampleStrainId(newSampleStrainId) {
+                readonlyStrainId.html(newSampleStrainId);
             }
 
             function updateSampleIsPublic(newSampleIsPublic) {
@@ -805,6 +814,12 @@
                 var owner = $('#edit-owner-input').val();
                 postData['owner'] = owner;
 
+                var newStrainId = editStrainIdInput.val();
+                var StrainIdChanged = newStrainId !== strainID;
+                if(StrainIdChanged) {
+                    postData['strain_id'] = newStrainId;
+                }
+
                 var newSex = editSexSelect.val();
                 var sexChanged = newSex !== sex;
                 if(sexChanged) {
@@ -905,7 +920,6 @@
                     postData['is_public'] = newSampleIsPublic;
                 }
 
-                console.log('cancelupdate before check:'+cancelUpdate);
                 if(!cancelUpdate) {
                     saveTagRequest = $.ajax({
                         type: "POST",
@@ -949,6 +963,9 @@
                             }
                             if (sampleIsPublicChanged) {
                                 updateSampleIsPublic(newSampleIsPublic);
+                            }
+                            if (StrainIdChanged) {
+                                updateSampleStrainId(newStrainId);
                             }
                             if (sexChanged) {
                                 updateSex(newSex);
@@ -1296,6 +1313,23 @@
                     </tr>
                     <tr>
                         <th>
+                            Strain ID
+                            <span
+                                    class="glyphicon glyphicon-question-sign help-icon"
+                                    aria-hidden="true"
+                                    data-toggle="tooltip"
+                                    data-placement="top"
+                                    title="The Strain ID associated with this sample"></span>
+                        </th>
+                        <td>
+                            <span class="form-group" data-display-when="sample-edit" style="display: none;">
+                                <input id="edit-strain-id-input" type="text" class="form-control" value="{{ sample.strain_id }}"/>
+                            </span>
+                            <span id="readonly-strain-id" data-display-when="sample-readonly">{{ sample.strain_id }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
                             Sex
                             <span
                                     class="glyphicon glyphicon-question-sign help-icon"
@@ -1410,9 +1444,12 @@
                                     title="indicate whether the sample is a qualifying haplotype candidate"></span>
                         </th>
                         <td>
-                            <span data-display-when="sample-edit" style="display: none;">
-                                <input id="hap-candidate-checkbox" type="checkbox" name="sample-public"> Is a Haplotype Candidate
-                            </span>
+                            <!-- only allow admin or curator to edit haplotype candidate designation -->
+                            {% if g.user.administrator == True or g.user.curator == True%}
+                                <span data-display-when="sample-edit" style="display: none;">
+                                    <input id="hap-candidate-checkbox" type="checkbox" name="sample-public"> Is a Haplotype Candidate
+                                </span>
+                            {% endif %}
                             <span id="hap-candidate" data-display-when="sample-readonly">{{ sample.haplotype_candidate }}</span>
                         </td>
                     </tr>

@@ -239,8 +239,8 @@ def show_users():
         users=users,
     )
 
-@app.route('/switch-admin.json', methods=['POST'])
-def switch_admin():
+@app.route('/update_user_privs.json', methods=['POST'])
+def update_user_privs():
     """
     Promote / Demote a user's status
     :return: True / False
@@ -250,7 +250,7 @@ def switch_admin():
         flask.abort(400)
 
     form = flask.request.form
-    if usrmgmt.switch_admin(form['email'], form['administrator']) is not None:
+    if usrmgmt.switch_user_privs(form['email'], form['status']) is not None:
         return flask.jsonify({'success': True})
     else:
         return flask.jsonify({'success': False})
@@ -1006,12 +1006,36 @@ def index_html():
         {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
         {'$sort': SON([('count', -1), ('_id', -1)])},
     ]
+
+    # TODO: needs to show correct count for regular users
     if user is None:
         # anonymous users should only be given access to public samples
         pipeline.insert(0, {'$match': {'is_public': True}})
         sample_count = db.samples.count({'is_public': True})
     else:
-        sample_count = db.samples.count({})
+        try:
+            user_is_curator = user['curator']
+        except KeyError:
+            user_is_curator = False
+        try:
+            user_is_admin = user['administrator']
+        except KeyError:
+            user_is_admin = False
+        if user_is_admin or user_is_curator:
+            sample_count = db.samples.count({})
+        # we have a regular user, only return public samples and
+        # samples owned by them
+        else:
+            query = {
+                '$and': [
+                    {'owner': user['email_address_lowercase']},
+                ],
+                '$or': [
+                    {'is_public': True},
+                ]
+            }
+            pipeline.insert(0, {'$match': {'owner': user['email_address_lowercase']}})
+            sample_count = db.samples.count({'owner': user['email_address_lowercase']})
 
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
@@ -1139,16 +1163,13 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
         db = mds.get_db()
 
     user = flask.g.user
-    user_mongoid = None if user is None else user['_id']
+    user_email = None if user is None else user['email_address_lowercase']
 
     def anno_sample(sample):
         sample['user_can_write'] = user is not None
-        if user is None and 'is_public' not in sample:
-            sample['is_public'] = True
         _add_default_attributes(sample)
 
-        sample['user_is_owner'] = user_mongoid is not None and user_mongoid == sample['owner']
-
+        sample['user_is_owner'] = user_email is not None and user_email == sample['owner']
         return sample
 
     if user is None:
@@ -1159,6 +1180,31 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
             # since this is anonymous access only return publicly visible samples
             query = {
                 '$and': [
+                    {'is_public': True},
+                    query,
+                ]
+            }
+
+    else:
+        try:
+            user_is_curator = user['curator']
+        except KeyError:
+            user_is_curator = False
+        try:
+            user_is_admin = user['administrator']
+        except KeyError:
+            user_is_admin = False
+        if user_is_admin or user_is_curator:
+            pass
+        # we have a regular user, only return public samples and
+        # samples owned by them
+        else:
+            query = {
+                '$and': [
+                    {'owner': user_email},
+                    query,
+                ],
+                '$or': [
                     {'is_public': True},
                     query,
                 ]
@@ -1740,6 +1786,9 @@ def update_sample(mongo_id):
     if 'standard_designation' in form:
         update_dict['standard_designation'] = form['standard_designation'].strip()
 
+    if 'strain_id' in form:
+        update_dict['strain_id'] = form['strain_id'].strip()
+
     if 'notes' in form:
         update_dict['notes'] = form['notes'].strip()
 
@@ -1808,6 +1857,7 @@ def update_samples():
     form = flask.request.form
     sample_ids_to_update = [ObjectId(x) for x in json.loads(form['samples_to_update'])]
     owner = form['owner']
+    strain_id = form['strain_id']
     tags = json.loads(form['tags'])
     tags_action = form['tags_action']
     contributing_strains = json.loads(form['contributing_strains'])
@@ -1821,6 +1871,9 @@ def update_samples():
     add_to_set_dict = dict()
     remove_dict = dict()
     set_dict = dict()
+
+    if len(strain_id) > 0:
+        set_dict['strain_id'] = str(strain_id)
 
     if len(owner) > 0:
         set_dict['owner'] = str(owner).strip('"')
@@ -2515,5 +2568,4 @@ def max_likelihood_chr_genoprobs(sample_id, chrom, db):
 
 if __name__ == '__main__':
     # start server (for development use only)
-    app.debug = True
-    app.run(host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')

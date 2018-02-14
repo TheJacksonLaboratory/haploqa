@@ -18,6 +18,7 @@
             var contribStrainsActionDropdown = new BootstrapDropdown($('#contrib-strains-action-dropdown'));
             var sampleVisibilityDropdown = new BootstrapDropdown($('#sample-visibility-dropdown'));
             var editOwnerInput = $('#edit-owner-input');
+            var editStrainIdInput = $('#edit-strain-id-input');
 
             editOwnerInput.tokenfield({
                 autocomplete: {
@@ -157,6 +158,7 @@
                     data: {
                         samples_to_update: JSON.stringify(selectedSampleIDs),
                         owner:  editOwnerInput.val(),
+                        strain_id: editStrainIdInput.val(),
                         tags: JSON.stringify(newTags),
                         tags_action: tagActionDropdown.getValue(),
                         contributing_strains: JSON.stringify(newContribStrainNames),
@@ -198,6 +200,12 @@
                 <label for="edit-owner-input">Owner</label>
                 <div class="input-group">
                     <input type="text" class="form-control" style="width: 400px;" id="edit-owner-input" placeholder="please enter only one owner!">
+                </div><!-- /input-group -->
+            </div>
+            <div class="form-group">
+                <label for="edit-strain-id-input">Strain ID</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" style="width: 200px;" id="edit-strain-id-input">
                 </div><!-- /input-group -->
             </div>
             <div class="form-group">
@@ -277,6 +285,7 @@
                     <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" checked></th>
                     <th>ID (Secondary IDs)</th>
                     <th>Strain Name</th>
+                    <th>Strain ID</th>
                     <th>Sex</th>
                     <th>Platform</th>
                     <th>% Het. Calls</th>
@@ -305,6 +314,9 @@
                             {% if sample.standard_designation %}
                                 <a href="{{ url_for('standard_designation_html', standard_designation=sample.standard_designation) }}">{{ sample.standard_designation }}</a>
                             {% endif %}
+                        </td>
+                        <td>
+                            {% if sample.strain_id %}{{ sample.strain_id }}{% endif %}
                         </td>
                         <td>{{ sample.sex or 'Unknown' }}</td>
                         <td>{{ sample.platform_id }}</td>
