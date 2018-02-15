@@ -612,6 +612,78 @@
                 return strainNames.indexOf(e.attrs.value) >= 0;
             });
 
+            var strainTS = {};
+            var changes = [];
+
+            // gets all last_update timestamps for contributing strains
+            function getLastContributingCandidateUpdates() {
+                sample.contributing_strains.forEach(function (strain) {
+                    var url = '/get-hap-candidate-ts/' + strain.replace("/", "@");
+                    $.getJSON(url, function (data) {
+                        if(data.last_update) {
+                            strainTS[strain] = data.last_update;
+                        }
+                        else {
+                            strainTS[strain] = null
+                        }
+                    });
+                });
+            }
+
+            // makes bootstrap alert with links to all of the candidate strains that were changed since last haplotyping
+            function alertUserOfUpdates() {
+                if(changes.length > 0) {
+                    var updateAlert = $("#update-alert");
+
+                    var strainsList = "";
+                    changes.forEach(function(strain) {
+                        strainsList += ("<i><a href='" + strainMap[strain].url + "'>" + strain + "</a></i><br/>")
+                    });
+                    strainsList += "<br/>";
+
+                    updateAlert.html(
+                        '<div class="alert alert-info fade in"> ' +
+                            '<button type="button" class="close" data-dismiss="alert" aria-label="Close">\n' +
+                            '    <span aria-hidden="true">&times;</span>\n' +
+                            '</button>' +
+                            '<h3>Just so you know</h3>' +
+                            '<hr>' +
+                            '<p>It appears that since the last time haplotype probabilities were calculated on this ' +
+                            'sample, there have been changes in the following sample(s):<br/><br/>' +
+                            strainsList +
+                            'These changes may or may not affect the haplotype probabilities if you re-run the ' +
+                            'haplotype calculations at this time.<br/><br/>' +
+                        '</div>');
+
+                    updateAlert.animate({bottom: "5%"}, 300);
+                }
+            }
+
+            // iterates through the contributing strains and checks for newer last_update
+            function checkForUpdatesSinceHaplotyping() {
+                var contrStrains = Object.keys(strainTS);
+
+                var refTS = new Date(sample.last_haplotyping);
+
+                contrStrains.forEach(function(strain) {
+                    if(strainTS[strain]) {
+                        var compTS = new Date(strainTS[strain]);
+
+                        if(refTS < compTS) {
+                            changes.push(strain);
+                        }
+                    }
+                });
+
+                alertUserOfUpdates();
+            }
+
+            // only check contributing strains for updates if the sample isn't a candidate
+            if(!sample.haplotype_candidate) {
+                getLastContributingCandidateUpdates();
+                setTimeout(checkForUpdatesSinceHaplotyping, 6000);
+            }
+
             function updateHaplotypeStrains(newContribStrains) {
                 sample['contributing_strains'] = discardDupElems(newContribStrains);
                 var sortedContribStrains = sample['contributing_strains'].concat().sort();
@@ -712,10 +784,8 @@
 
                 var postData = {};
 
-                var haplotyping_timestamp = new Date(Date.now());
-
                 postData['contributing_strains'] = JSON.stringify(sample.contributing_strains);
-                postData['last_haplotyping'] = haplotyping_timestamp;
+                postData['last_haplotyping'] = true;
 
                 saveTagRequest = $.ajax({
                     type: "POST",
@@ -723,6 +793,7 @@
                     data: postData,
                     dataType: 'json',
                     success: function(data) {
+                        console.log(data);
                         var updateTs = data.ts + ' by {{ g.user.email_address }}';
                         $('#lastupdate').text(updateTs);
 
@@ -1250,32 +1321,34 @@
                         </td>
                     </tr>
                     {% if g.user %}
-                    <tr>
-                        <th>
-                            Last Update
-                        </th>
-                        <td id="lastupdate">
-                            {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            Last Haplotype Calculation
-                            <span
-                                    class="glyphicon glyphicon-question-sign help-icon"
-                                    aria-hidden="true"
-                                    data-toggle="tooltip"
-                                    data-placement="top"
-                                    title="This shows the timestamp for the last time that haplotypes were calculated for this sample">
-                            </span>
-                        </th>
-                        <td id="lasthaplotype">
-                            {% if sample.last_haplotyping %}{{ sample.last_haplotyping }}{% else %}N/A{% endif %}
-                            <button id="run-haplotyping" type="button" class="btn btn-info btn-sm">
-                                <span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> Recalculate Haplotypes
-                            </button>
-                        </td>
-                    </tr>
+                        <tr>
+                            <th>
+                                Last Update
+                            </th>
+                            <td id="lastupdate">
+                                {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
+                            </td>
+                        </tr>
+                        {% if not sample.haplotype_candidate %}
+                            <tr>
+                                <th>
+                                    Last Haplotype Calculation
+                                    <span
+                                            class="glyphicon glyphicon-question-sign help-icon"
+                                            aria-hidden="true"
+                                            data-toggle="tooltip"
+                                            data-placement="top"
+                                            title="This shows the timestamp for the last time that haplotypes were calculated for this sample">
+                                    </span>
+                                </th>
+                                <td id="lasthaplotype">
+                                    {% if sample.last_haplotyping %}{{ sample.last_haplotyping }}{% else %}N/A{% endif %}
+                                    <button id="run-haplotyping" type="button" class="btn btn-info btn-sm">
+                                        <span class="glyphicon glyphicon-repeat" aria-hidden="true"></span> Recalculate Haplotypes
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endif %}
                     {% endif %}
                     <tr>
                         <th>
