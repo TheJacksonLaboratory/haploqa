@@ -802,7 +802,6 @@
                     data: postData,
                     dataType: 'json',
                     success: function(data) {
-                        console.log(data);
                         var updateTs = data.ts + ' by {{ g.user.email_address }}';
                         $('#lastupdate').text(updateTs);
 
