@@ -2,88 +2,66 @@
 
 {% block title %}HaploQA{% endblock %}
 {% block content %}
-    {% if session['admin'] != True %}
-    <div>You are not authorized to view this page</div>
+    {% if g.user.administrator != True %}
+        <div>You are not authorized to view this page</div>
     {% else %}
-    <div class="page-header">
-        <h1>HaploQA Users</h1>
-    </div>
-    <div class="row">
-        <div class="col-md-12">
-            Current Users in System:
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Email</th>
-                        <th>Affilation</th>
-                        <th>Created</th>
-                        <th>Last Accessed</th>
-                        <th>Admin?</th>
-                        <th>Remove</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                    {% for user in users %}
-                    <tr>
-                        <td><a href="{{ url_for('user_samples', user_id=user._id) }}" title="view all samples owned by this user">{{ user.email_address }}</a></td>
-                        <td>{{ user.affiliation }}</td>
-                        <td>{{ user.created }}</td>
-                        <td>{{ user.last_login }}</td>
-                        <td><a id="make-admin" title="click to toggle user privileges" style="cursor: pointer" onclick="switch_admin('{{ user.email_address }}', '{{ user.administrator }}')">{{ user.administrator }}</a></td>
-                        <td><a id="remove-user" style="cursor: pointer" onclick="remove_user('{{ user.email_address }}')">Remove</a> </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="page-header">
+            <h1>HaploQA Users</h1>
         </div>
-    </div>
-     <script>
+        <div class="row">
+            <div class="col-md-12">
+                Current Users in System:
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Affilation</th>
+                            <th>Created</th>
+                            <th>Last Accessed</th>
+                            <th>User Level</th>
+                            <th>Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                        {% for user in users %}
+                            {% if user.administrator == True %}
+                            {% set status = 'administrator' %}
+                            {% elif user.curator == True %}
+                            {% set status = 'curator' %}
+                            {% else %}
+                            {% set status = 'regular' %}
+                            {% endif %}
+                        <tr>
+                            <td><a href="{{ url_for('user_samples', user_id=user._id) }}" title="view all samples owned by this user">{{ user.email_address }}</a></td>
+                            <td>{{ user.affiliation }}</td>
+                            <td>{{ user.created }}</td>
+                            <td>{{ user.last_login }}</td>
+                            <td><select title="click to change user privileges" onchange="switch_status('{{ user.email_address }}', this.value)">
+                                {% for userType in ["regular", "curator", "administrator"] %}
+                                    {% if status == userType %}
+                                    <option value="{{ userType }}" selected>{{ userType }}</option>
+                                    {% else %}
+                                    <option value="{{ userType }}">{{ userType }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select></td>
+                            <td><a id="remove-user" style="cursor: pointer" onclick="remove_user('{{ user.email_address }}')">Remove</a> </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <script>
 
-    function switch_admin(email, status) {
-        if (status == 'True') {
-            //demote
-            var msg = 'This will demote the user with email address  \
-            ' + email + ' to a regular user. Are you sure you wish to perform this action?';
-            status = 'False';
-        } else {
-            //promote
-            var msg = 'This will promote the user with email address  \
-            ' + email + ' to administrator. Are you sure you wish to perform this action?';
-            status = 'True';
-        }
-
-        showConfirmMessage(msg);
-        $('#confirm').click(function () {
-                makeAdminRequest = $.ajax({
+        function switch_status(email, status) {
+            $.ajax({
                 type: "POST",
-                url: "{{ url_for('switch_admin') }}",
+                url: "{{ url_for('update_user_privs') }}",
                 data: {
                     email: email,
-                    administrator: status
-                },
-                dataType: 'json',
-                success: function () {
-                    document.location.reload(true);
-                }
-                }).fail(function () {
-                showErrorMessage('update failed');
-            });
-        });
-    }
-
-    function remove_user(email) {
-        showConfirmMessage('This will remove the user with email address  \
-            ' + email + ' from the system, but not remove their samples. \
-            You can always re-invite the user at a later date. \
-            Are you sure you wish to perform this action?');
-
-        $('#confirm').click(function () {
-            makeAdminRequest = $.ajax({
-                type: "POST",
-                url: "{{ url_for('remove_user') }}",
-                data: {
-                    email: email,
+                    status: status
                 },
                 dataType: 'json',
                 success: function () {
@@ -92,9 +70,31 @@
             }).fail(function () {
                 showErrorMessage('update failed');
             });
-        });
-    }
+        }
 
-    </script>
+        function remove_user(email) {
+            showConfirmMessage('This will remove the user with email address  \
+                ' + email + ' from the system, but not remove their samples. \
+                You can always re-invite the user at a later date. \
+                Are you sure you wish to perform this action?');
+
+            $('#confirm').click(function () {
+                makeAdminRequest = $.ajax({
+                    type: "POST",
+                    url: "{{ url_for('remove_user') }}",
+                    data: {
+                        email: email,
+                    },
+                    dataType: 'json',
+                    success: function () {
+                        document.location.reload(true);
+                    }
+                }).fail(function () {
+                    showErrorMessage('update failed');
+                });
+            });
+        }
+
+        </script>
     {% endif %}
 {% endblock %}
