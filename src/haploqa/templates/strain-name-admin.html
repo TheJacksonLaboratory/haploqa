@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block title %}HaploQA{% endblock %}
 {% block content %}
-    {% if g.user.std_des_admin != True %}
+    {% if g.user.administrator != True and g.user.curator != True %}
     <div>You are not authorized to view this page</div>
     {% else %}
     <script>
