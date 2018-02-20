@@ -226,6 +226,38 @@ def hap_cands():
         )
 
 
+@app.route('/get-hap-candidate-ts/<strain_id>')
+def get_hap_cand_ts(strain_id):
+    """
+    returns the basic sample data for the haplotype candidate for the strain id
+    :param strain_id: the id of the strain to look for the candidate in
+    :return: candidate sample data object
+    """
+
+    if strain_id is None:
+        return '{"status": "failure", "msg": "no strain id provided"}'
+
+    corrected_strain_id = strain_id.replace("@", "/")
+
+    db = mds.get_db()
+
+    sample = _find_one_and_anno_samples({
+            'standard_designation': corrected_strain_id,
+            'haplotype_candidate': True
+        }, {
+            'chromosome_data': 0,
+            'unannotated_snps': 0,
+            'viterbi_haplotypes': 0,
+            'contributing_strains': 0,
+            'properties': 0
+        }, db)
+
+    if sample is None:
+        flask.abort(400)
+
+    return flask.jsonify(sample)
+
+
 @app.route('/show-users.html')
 def show_users():
     '''
@@ -1809,7 +1841,7 @@ def update_sample(mongo_id):
         chr_ids = platform['chromosomes']
 
         if 'last_haplotyping' in form:
-            update_dict['last_haplotyping'] = form['last_haplotyping']
+            update_dict['last_haplotyping'] = ts
 
         if 'contributing_strains' in form:
             update_dict['contributing_strains'] = json.loads(form['contributing_strains'])
