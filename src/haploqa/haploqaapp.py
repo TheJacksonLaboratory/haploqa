@@ -942,7 +942,7 @@ def st_des_admin():
     """
 
     user = flask.g.user
-    if user is None or not user['administrator']:
+    if user is None or (user['administrator'] is not True and user['curator'] is not True):
         return flask.render_template('login-required.html')
 
     db = mds.get_db()
