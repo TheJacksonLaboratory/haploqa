@@ -13,7 +13,7 @@
         as GigaMUGA and MegaMUGA. <b style="text-decoration: underline">TODO: add more detail here about the types of use-cases that
         this application covers (e.g. haplotype reconstruction, annotating samples, working with GEMMs)</b>
     </p>
-
+    <!-- FIXME: Leave commented until the decision has been made as to if the source code will be made public and what the license will be
     <h2>Repository & License</h2>
 
     <p>
@@ -31,7 +31,7 @@
         distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See
         the License for the specific language governing permissions and limitations under the License.
     </pre>
-
+    -->
 
     <h2>Help</h2>
 
@@ -194,7 +194,7 @@
                 <b>% Het. Calls:</b> The percentage of probes for which heterozygous genotypes were called.
             </li>
             <li>
-                <b>%Hom. Calls:</b> The percentage of probes for which homozygous genotypes were called.
+                <b>% Hom. Calls:</b> The percentage of probes for which homozygous genotypes were called.
             </li>
             <li>
                 <b>% No Calls:</b> The percentage of probes for which genotypes calls could not be made due to probe
@@ -216,17 +216,18 @@
             <li>
                 <b>Engineered Target Positive Controls:</b> The GigaMUGA genotyping platform includes probes
                 representing the most commonly found genetically engineered alleles (e.g. cre, EGFP, etc.). HaploQA can
-                use intensity values from these probes to infer the likelihood that a genetically engineered is present
-                provided that sufficient control data exist. If the sample is known to harbor a particular genetically
-                engineered allele (for which a probe exists), then it can serve as an engineered allele positive control.
-                This field should include the name of the genetically engineered allele, therefore an understanding of
-                the existing engineered probe selection is needed. For more information see Morgan et al., 2015.
+                use intensity values from these probes to infer the likelihood that a genetically engineered allele is
+                present provided that sufficient control data exist. If the sample is known to harbor a particular
+                genetically engineered allele (for which a probe exists), then it can serve as an engineered allele
+                positive control. This field should include the name of the genetically engineered allele, therefore an
+                understanding of the existing engineered probe selection is needed. For more information see Morgan et
+                al., 2015.
             </li>
             <li>
                 <b>Engineered Target Negative Controls:</b> The GigaMUGA genotyping platform includes probes
                 representing the most commonly found genetically engineered alleles (e.g. cre, EGFP, etc.). HaploQA can
-                use intensity values from these probes to infer the likelihood that a genetically engineered is present
-                provided that sufficient control data exist. If the sample is known to NOT harbor a particular
+                use intensity values from these probes to infer the likelihood that a genetically engineered allele is
+                present provided that sufficient control data exist. If the sample is known to NOT harbor a particular
                 genetically engineered allele (for which a probe exists), then it can serve as an engineered allele
                 negative control. This field should include the name of the genetically engineered allele, therefore an
                 understanding of the existing engineered probe selection is needed. For more information see Morgan et
@@ -341,7 +342,7 @@
             information about the user as well.<br/>
             <br/>
             In general, all calculation runs are considered updates but not all updates will trigger the calculations.
-            So, for example, if a note is made on the sample, the last update timestamp will change but the calculation
+            For example, if a note is made on the sample, the last update timestamp will change but the calculation
             timestamp will remain the same.<br/><br/>
         </p>
 
@@ -352,31 +353,29 @@
 
         <h4>Notifications on Candidate Strain Updates</h4>
         <p>
-            If one of the reference sample’s contributing strains has been updated (like a new sample being marked as
-            the haplotype candidate for that strain) since the last haplotype probability calculations have been run, a
-            blue alert will appear in the lower right corner of the window, see Figure C. This notification will list
-            any/all contributing strains that have changed and each will be a link that will redirect you to the
-            strain’s list of samples. This alert is intended to let you know that if you run the calculations again, if
-            the strain’s reference sample has been changed, the calculated probabilities may change as a result and the
-            plots rendered on the current reference sample may change.<br/>
+            Occasionally the haplotype candidate representing a contributing strain will change. If one has been updated
+            for a given sample since the last time haplotype probability calculations have been run, then a blue alert
+            will appear in the lower right corner of the window, see Figure C. This notification will list any/all
+            contributing strains that have changed and each will be a link that will redirect you to the strain’s list
+            of samples. This alert is intended to let you know that if you run the calculations again, the calculated
+            probabilities may change and the plots rendered on the current reference sample may change.<br/>
             <br/><br/>
             <b>NOTE:</b><i> In this release, the notification will alert you to any updates to the candidate strains,
-            even if the change only consists of a small change, such as a new tag, for example. However, we hope to be
-            able to determine if the changes are major or trivial in the future. Until we improve this feature, if you
-            get this notification and wish to re-run the haplotype calculations on your sample but are worried the
-            changes to the candidate strain will affect the rendered plots, if you can, check with the user who made the
-            change.</i>
+            even if the change only consists of a small change, such as a new tag. However, we hope to be able to
+            determine if the changes are major or trivial in the future. Until we improve this feature, if you get this
+            notification and wish to re-run the haplotype calculations on your sample but are worried the changes to the
+            candidate strain will affect the rendered plots, email haploqa@jax.org.</i>
             <br/><br/><br/>
         </p>
 
         <h4>Using the Genome Karyotype Plot</h4>
         <p>
             The plot rendered in the Genome Karyotype Plot section of any sample page depicts the haplotype composition
-            of the sample genome, by chromosome, based on the Hidden Markov Model (HMM), see Figure D. The vertical axis
+            of the sample genome, by chromosome, based on a Hidden Markov Model (HMM), see Figure D. The vertical axis
             indicates the chromosome and the horizontal axis, chromosome location in Mb. Intervals that contain two
             different colored bars represents intervals where there are two possible contributing strains with high
             probabilities of being haplotypes over this interval rather than just one. Red vertical bars above the
-            haplotype bars indicate concordance over that interval.
+            haplotype bars indicate discordance over that interval.
         </p>
         <div class="img-inline-right col-md-8">
             <img src="{{ url_for('static', filename='img/karyotype_plot_diagram.png') }}">
@@ -422,10 +421,10 @@
             <br/>
             Another way to navigate through comparison samples, especially if you don't have one in mind and are just
             curious, is to use the arrows to the left (render the previous sample) and right (render the next sample) of
-            the comparison plot. The order that the comparison samples will render match the order they are listed in
-            the comparison sample select menu in the upper right.<br/>
+            the comparison plot. Comparison samples will render in the same order as they are listed in
+            the select menu in the upper right.<br/>
             <br/>
-            The interval plots are synced so interacting (e.g. panning or zooming) will change both of the plots.
+            The interval plots are synchronized so interacting (e.g. panning or zooming) will change both of the plots.
             Panning can be done by clicking and dragging left and right and zooming by using a scrolling mechanism, like
             a mouse wheel or a trackpad that supports scrolling. <i>We currently do not have buttons that achieve these
             interactions yet but hope to have this feature in a future release.</i> Hovering over contributing strains
@@ -453,8 +452,8 @@
             external link buttons below the plot(s) which will bring you to either Ensembl or UCSC to view the same
             interval there.<br/>
             <br/>
-            <!--If there is an issue with a sample, the associated plot will show "No data to show" over where the plot
-            should be. If one of your samples does this FIXME: We should have a contact for issues like this.-->
+            If there is an issue with a sample, the associated plot may show "No data to show" over where the plot
+            should be. If one of your samples does this email haploqa@jax.org
         </p>
 
         <h4>Candidate Haplotypes Table</h4>
@@ -482,17 +481,8 @@
             sample page, see 'Edit a Sample' section for more details. The Owner, Strain ID, Tags, and Contributing
             Strains, and Visibility fields can be bulk edited. See 'Breakdown of Sample Data Fields' or 'Edit a Sample'
             section for more information on what data is stored in each of these fields and how the data then affects
-            the sample.
-        </p>
-
-        <div class="img-inline-right col-md-8">
-            <img src="{{ url_for('static', filename='img/bulk_edit.png') }}">
-            <h5>
-                Figure F: Bulk editing with mode selects to the right for tags and contributing strains fields
-            </h5>
-        </div>
-
-        <p>
+            the sample.<br/>
+            <br/>
             In bulk editing, the Tags and Contributing Strains fields operate under three different 'modes' that can be
             selected from a select menu located to the right-hand side of the field. By default the bulk edit section
             will be in 'Add' mode where all tags or contributing strains entered in the field will be added to the
@@ -500,12 +490,20 @@
             all tags or contributing strains entered in the field will be removed from the current list of tags or
             contributing strains for all selected samples. Finally, the 'Set' mode will overwrite the all existing lists
             of tags or contributing strains for all selected samples with the tags or contributing strains in the field.
-            <br/>
-            <br/>
+        </p>
+
+        <div class="img-inline-right col-md-8">
+            <img src="{{ url_for('static', filename='img/bulk_edit.png') }}">
+            <h5>
+                Figure F: Bulk edit tool with the editing modes to the right for tags and contributing strains fields.
+            </h5>
+        </div>
+
+        <p>
             Editing visibility in the bulk edit feature allows you to keep all samples unchanged in visibility (the
             default) or you can make all selected samples public or private. Making the samples public will allow
-            everyone, including people not logged in, to see the samples where as making the samples private only allow
-            logged-in users to see the samples.<br/>
+            everyone, <b>including people not logged in</b>, to see the samples where as making the samples private only
+            allow logged-in users to see the samples.<br/>
             <br/>
             When finished editing, select the 'Save Edits' button to initiate the bulk editing. If, at any point, you
             decide not to make the changes, select the 'Cancel Edits' and all changes will be discarded. Leaving a field
@@ -520,8 +518,9 @@
             <br/>
             If you click on a strain name, you'll be brought to a list of all samples belonging to that strain. Above
             the list is a button that allows users to download a combined haplotype composition summary report which will
-            download a haplotype composition report for all samples in the list, in one file. If a sample doesn't have a
-            concordance value, it will not be included in the combined report as it doesn't have .<br/>
+            download a haplotype composition report for all samples in the list, in one file. If a sample is a candidate
+            for a contributing strain, it will not be included in the combined report as it won't have a haplotype
+            composition for the report.<br/>
             <br/>
             You can use the search field in the header to search for samples by tag, primary sample ID, secondary sample
             ID, strain name, strain ID, sex, or platform. For example, the term 'bxd' will locate samples with a primary
