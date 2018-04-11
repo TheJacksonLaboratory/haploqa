@@ -16,6 +16,42 @@
     margin-left: 1.5vw;
 }
 
+img {
+    border: 1px #bbb solid;
+    border-radius: 5px;
+    padding: 5px;
+    max-width:99%;
+    max-height:99%;
+}
+
+.img-float {
+    margin: 20px 0 20px 0;
+}
+
+.img-inline-left {
+    margin: 20px 25px 20px 0;
+}
+
+.img-inline-right {
+    float: right;
+    margin: 20px 0 20px 25px;
+}
+
+.tooltip {
+    padding: 5px;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+#user-status {
+    font-weight: bold;
+    color: #666666;
+    padding-left: 10px;
+    line-height: 30px;
+    border-bottom: 1px #666 solid;
+    margin-bottom: 5px;
+}
+
 select {
     height: 30px;
     width: 225px;
