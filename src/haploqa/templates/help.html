@@ -328,7 +328,7 @@
                 updated list of contributing strains.
             </li>
         </ul>
-        <p><br/></p>
+        <br/>
 
         <h4>Running Haplotype Calculations</h4>
         <p>
@@ -453,22 +453,30 @@
             interval there.<br/>
             <br/>
             If there is an issue with a sample, the associated plot may show "No data to show" over where the plot
-            should be. If one of your samples does this email haploqa@jax.org
+            should be. If one of your samples does this email haploqa@jax.org<br/>
+            <br/>
         </p>
 
         <h4>Candidate Haplotypes Table</h4>
         <p>
-            <!-- FIXME -->
-        </p>
-
-        <h4>GEMM Probabilities Table</h4>
-        <p>
-            <!-- FIXME -->
-        </p>
-
-        <h4>GEMM Intensity Plot</h4>
-        <p>
-            <!-- FIXME -->
+            The Candidate Haplotypes table is an exploratory interface that allows you to interrogate the genetic makeup
+            of a sample within the selected interval (the same interval used for the Genome Interval Plot). This table
+            will calculate a Negative Log Likelihood value for every possible combination of Candidate Haplotypes (note
+            that this list of combinations uses all available strains and so is not constrained by the currently
+            specified "Contributing Haplotype Strains" list). The Negative Log Likelihood calculation represents the
+            probability of observing the sequence of SNP values called for that interval given the assumption that the
+            haplotype for that interval is the haplotype indicated by the "Candidate Haplotype" column. Intuitively,
+            this gives you a measure of confidence that the indicated pair of strains (or single strain) indicated in
+            the Candidate Haplotype column are responsible for the genetic makeup of the current interval. Table rows
+            are sorted in order of most probable to least probable.<br/>
+            <br/>
+            This table can be useful to you in exploring regions where there may be errors or contamination. eg: If you
+            see an area where there is high discordance between the predicted haplotypes and the sample, you can check
+            to see if there is the possibility of contamination by looking at these probabilities within the interval of
+            interest. If you see that strain names are showing up in the table with a much smaller negative log
+            likelihood than the expected haplotypes this may indicate that there is a problem that should be
+            investigated further.<br/>
+            <br/>
         </p>
 
         <h3>Bulk Editing Samples</h3>
