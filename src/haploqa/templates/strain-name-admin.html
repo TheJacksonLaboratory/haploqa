@@ -62,27 +62,30 @@
             function addStDes() {
                 var postData = {};
                 var st_des = $('#st_des').val();
+                var col = $('#color').val();
 
                 if (st_des) {
-                        postData['st_des'] = st_des
-                        postData['color'] = $('#color').val();
-                        $.ajax({
-                            method: "POST",
-                            url: "/add-st-des.json",
-                            data: postData,
-                            success: function (data) {
+                        postData['st_des'] = st_des;
+                        if(col !== "") {
+                            postData['color'] = col;
+                            $.ajax({
+                                method: "POST",
+                                url: "/add-st-des.json",
+                                data: postData,
+                                success: function (data) {
+                                    console.log(data);
+                                    $('#msg').text('Strain Name added successfully');
+                                    setTimeout(function() {
+                                        location.reload();
+                                    }, 1500);
+                                }
+                            }).fail(function (data) {
+                                $('#msg').text('An error occurred while adding the strain name');
                                 console.log(data);
-                                $('#msg').text('Strain Name added successfully');
-                                setTimeout(function() {
-                                    location.reload();
-                                }, 1500);
-
-                            }
-                        }).fail(function (data) {
-                            $('#msg').text('An error occurred while adding the strain name');
-                            console.log(data);
-                        });
-
+                            });
+                        } else {
+                            $('#msg').text('Please enter a color value');
+                        }
                 } else {
                      $('#msg').text('Please enter a value for strain name');
                 }
