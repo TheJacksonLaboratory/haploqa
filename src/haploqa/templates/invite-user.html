@@ -17,13 +17,13 @@
 
 <form class="form-horizontal" method="post">
     <div class="form-group">
-        <label for="email" class="col-md-3 control-label">Email:</label>
+        <label for="email" class="col-md-3 control-label">Email: <b class="required">*</b> </label>
         <div class="col-md-6">
             <input type="email" size="50" class="form-control" data-minlength="3" required id="email" name="email" placeholder="name@example.com">
         </div>
     </div>
     <div class="form-group">
-        <label for="affiliation" class="col-md-3 control-label">Affiliation:</label>
+        <label for="affiliation" class="col-md-3 control-label">Affiliation: <b class="required">*</b> </label>
         <div class="col-md-6">
             <input type="text" size="50" class="form-control" data-minlength="3" required id="affiliation" name="affiliation">
             {% if msg %}<b style="color:red;">{{ msg }}</b><br>{% endif %}

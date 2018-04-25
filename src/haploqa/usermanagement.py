@@ -117,6 +117,7 @@ def invite_user(email_address, affiliation, db=None):
     '''
     invite regular user
     :param email_address:
+    :param affiliation
     :param db:
     :return:
     '''

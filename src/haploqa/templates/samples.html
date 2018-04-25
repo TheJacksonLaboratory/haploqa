@@ -301,9 +301,6 @@
                         <td data-display-when="sample-edit" style="display: none;"><input data-sample-id="{{ sample._id }}" type="checkbox" checked></td>
                         <td>
                             <a href="{{ url_for('sample_html', mongo_id=sample._id) }}">
-                                {% if sample.haplotype_candidate %}
-                                    <span id="sample-color-icon" class="fa fa-square" style="color: {{ strain_colors[sample.standard_designation] }};"></span>
-                                {% endif %}
                                 {{ sample.sample_id }}
                             </a>
                             {% if sample.other_ids %}
