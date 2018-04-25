@@ -324,7 +324,6 @@
             var updateIntervalDP = new DelayedPreemptable();
 
             function updateInterval(newInterval) {
-
                 if(interval === null || lastChr !== newInterval.chr) {
                     // get the snp data for the plots
                     getSNPData(sample._id, newInterval.chr, hapIntervalPlot);
@@ -1264,8 +1263,11 @@
             resetEdits();
             updateHaplotypeSVG();
 
-            // only if the user is logged in
+            // render snps
             getSNPData(sample._id, 1, hapIntervalPlot);
+
+            // update the interval with a default interval to activate candidate haplotype table and external link buttons
+            updateInterval({chr: "1", startPos: 0, endPos: 10000000, size: 10000000});
         });
     </script>
 {% endblock %}
