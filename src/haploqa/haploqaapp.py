@@ -403,10 +403,14 @@ def validate_reset(password_reset_id):
 
     if flask.request.method == 'POST':
         new_password = form['password']
+        new_password_confirm = form['password-confirm']
         if len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
             flask.flash('The given password is too short. It must contain at least {} characters.'.format(
                 HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']
             ))
+            return flask.render_template('validate-reset.html', reset_user=user_to_reset)
+        elif new_password != new_password_confirm:
+            flask.flash('The new password entered does not match.')
             return flask.render_template('validate-reset.html', reset_user=user_to_reset)
         else:
             new_salt = str(uuid.uuid4())
@@ -444,10 +448,14 @@ def change_password_html():
             form = flask.request.form
             old_password = form['old-password']
             new_password = form['new-password']
+            new_password_confirm = form['new-password-confirm']
             if len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
                 flask.flash('The given password is too short. It must contain at least {} characters.'.format(
                     HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']
                 ))
+                return flask.render_template('change-password.html')
+            elif new_password != new_password_confirm:
+                flask.flash('The new password entered does not match.')
                 return flask.render_template('change-password.html')
             else:
                 new_salt = str(uuid.uuid4())
@@ -471,7 +479,7 @@ def change_password_html():
                 if result.modified_count:
                     return flask.redirect(flask.url_for('index_html'), 303)
                 else:
-                    flask.flash('bad password. Please try again, or logout and reset via the forgotten password link.')
+                    flask.flash('Bad password. Please try again, or logout and reset via the forgotten password link.')
                     return flask.render_template('change-password.html')
         elif flask.request.method == 'GET':
             return flask.render_template('change-password.html')

@@ -65,6 +65,10 @@ th {
     font-size: 12px !important;
 }
 
+.required {
+    color: #ff0000;
+}
+
 .haplotype-plot {
     background: #e8e8e8;
     display: block;
