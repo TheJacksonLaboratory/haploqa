@@ -933,15 +933,16 @@
                      else {
 
                         if (strain_list.length > 1) {
-                            msg += '<br><b> - A haplotype candidate can only have one strain. Please update your sample accordingly.</b>';
+                            msg += '<br><b> - A haplotype candidate can only have one strain as it would be the ' +
+                                'representation for that strain. Please update your sample accordingly.</b>';
                             cancelUpdate = true;
                             //now we know we have only 1 strain name applied and can run the next check
                         } else {
                             /** we have only one strain name so we can check if
-                             * its been assigned to any other haplo candidate samples
+                             * its been assigned to any other haplotype candidate samples
                              * TODO: parse json */
 
-                            var pdata = {}
+                            var pdata = {};
                             pdata['strain_name'] = newStandardDesignation;
                             pdata['platform'] = '{{ sample.platform_id }}';
 
@@ -952,12 +953,14 @@
                                 data: pdata,
                                 dataType: 'json',
                                 success: function (data) {
-                                    if (data.results == 'none') {
-                                    } else {
-                                        msg += '<br>There are other sample(s) found which are designated as haplotype ' +
-                                            'candidates with this strain associated.<br>';
-                                        msg += 'Click on the links below to remove the haplotype candidate designation ' +
-                                            'from the samples before proceeding:<br>';
+                                    if (data.results != 'none') {
+                                        msg += '<br>There is already another sample found which is designated as ' +
+                                            'haplotype candidates for this strain with the {{ sample.platform_id }} ' +
+                                            'platform. If you wish to replace one of the following haplotype candidates, ' +
+                                            'you must remove the candidacy status of the sample you wish to replace.<br>';
+                                        msg += "Follow the link(s) below to the haplotype candidate's sample page to make " +
+                                            'changes before proceeding. If there are multiple links, this is due to there ' +
+                                            'being a male <i>and</i> a female with the same strain and platform.<br>';
 
                                         $.each(data.results, function(item) {
                                             msg += '<a href="/sample/'+data.results[item].sampleId+'.html" target="blank">' +
