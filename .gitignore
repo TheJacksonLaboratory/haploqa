@@ -20,3 +20,5 @@ haploqa.db
 erl_crash.dump
 /db/
 /scratch/
+/doc/
+/logs/
