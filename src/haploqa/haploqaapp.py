@@ -184,43 +184,43 @@ def hap_cands():
     """
 
     user = flask.g.user
-    if not user['administrator'] or not user['curator']:
-        return flask.render_template('login-required.html')
+    if user['administrator'] or user['curator']:
+        db = mds.get_db()
 
-    db = mds.get_db()
-
-    matching_samples = _find_and_anno_samples(
-        {'haplotype_candidate': True},
-        {
-            'chromosome_data': 0,
-            'unannotated_snps': 0,
-            'viterbi_haplotypes.chromosome_data': 0,
-            'contributing_strains': 0,
-        },
-        db=db,
-        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
-    )
-
-    matching_samples = list(matching_samples)
-    strain_map = _get_strain_map(db)
-
-    samples_out = []
-
-    for sample in matching_samples:
-        st_des = sample['standard_designation']
-        try:
-            sample['color'] = strain_map[st_des]['color']
-        ## more than one strain name associated with a sample
-        except KeyError:
-            pass
-
-        samples_out.append(sample)
-
-    return flask.render_template(
-        'hap-candidates.html',
-        samples=samples_out,
-        strain_colors=_get_strain_map(db),
+        matching_samples = _find_and_anno_samples(
+            {'haplotype_candidate': True},
+            {
+                'chromosome_data': 0,
+                'unannotated_snps': 0,
+                'viterbi_haplotypes.chromosome_data': 0,
+                'contributing_strains': 0,
+            },
+            db=db,
+            cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
         )
+
+        matching_samples = list(matching_samples)
+        strain_map = _get_strain_map(db)
+
+        samples_out = []
+
+        for sample in matching_samples:
+            st_des = sample['standard_designation']
+            try:
+                sample['color'] = strain_map[st_des]['color']
+            ## more than one strain name associated with a sample
+            except KeyError:
+                pass
+
+            samples_out.append(sample)
+
+        return flask.render_template(
+            'hap-candidates.html',
+            samples=samples_out,
+            strain_colors=_get_strain_map(db),
+            )
+    else:
+        return flask.render_template('login-required.html')
 
 
 @app.route('/get-hap-candidate-ts/<strain_id>')
