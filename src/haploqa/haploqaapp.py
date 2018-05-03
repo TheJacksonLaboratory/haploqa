@@ -1045,7 +1045,6 @@ def index_html():
         {'$sort': SON([('count', -1), ('_id', -1)])},
     ]
 
-    # TODO: needs to show correct count for regular users
     if user is None:
         # anonymous users should only be given access to public samples
         pipeline.insert(0, {'$match': {'is_public': True}})
@@ -1059,21 +1058,20 @@ def index_html():
             user_is_admin = user['administrator']
         except KeyError:
             user_is_admin = False
+
         if user_is_admin or user_is_curator:
             sample_count = db.samples.count({})
         # we have a regular user, only return public samples and
         # samples owned by them
         else:
             query = {
-                '$and': [
-                    {'owner': user['email_address_lowercase']},
-                ],
                 '$or': [
                     {'is_public': True},
+                    {'owner': user['email_address_lowercase']}
                 ]
             }
-            pipeline.insert(0, {'$match': {'owner': user['email_address_lowercase']}})
-            sample_count = db.samples.count({'owner': user['email_address_lowercase']})
+            pipeline.insert(0, {'$match': query})
+            sample_count = db.samples.count(query)
 
     tags = db.samples.aggregate(pipeline)
     tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
@@ -1238,12 +1236,11 @@ def _find_and_anno_samples(query, projection, db=None, require_write_perms=False
         # samples owned by them
         else:
             query = {
-                '$and': [
-                    {'owner': user_email},
-                    query,
-                ],
                 '$or': [
+                    {'owner': user_email},
                     {'is_public': True},
+                ],
+                '$and': [
                     query,
                 ]
             }
