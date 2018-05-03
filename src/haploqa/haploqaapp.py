@@ -183,45 +183,44 @@ def hap_cands():
     :return:
     """
 
-    # TODO: check for admin or curator
     user = flask.g.user
-    if user is None or not user['administrator'] and not user['curator']:
-        return flask.render_template('login-required.html')
+    if user['administrator'] or user['curator']:
+        db = mds.get_db()
 
-    db = mds.get_db()
-
-    matching_samples = _find_and_anno_samples(
-        {'haplotype_candidate': True},
-        {
-            'chromosome_data': 0,
-            'unannotated_snps': 0,
-            'viterbi_haplotypes.chromosome_data': 0,
-            'contributing_strains': 0,
-        },
-        db=db,
-        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
-    )
-
-    matching_samples = list(matching_samples)
-    strain_map = _get_strain_map(db)
-
-    samples_out = []
-
-    for sample in matching_samples:
-        st_des = sample['standard_designation']
-        try:
-            sample['color'] = strain_map[st_des]['color']
-        ## more than one strain name associated with a sample
-        except KeyError:
-            pass
-
-        samples_out.append(sample)
-
-    return flask.render_template(
-        'hap-candidates.html',
-        samples=samples_out,
-        strain_colors=_get_strain_map(db),
+        matching_samples = _find_and_anno_samples(
+            {'haplotype_candidate': True},
+            {
+                'chromosome_data': 0,
+                'unannotated_snps': 0,
+                'viterbi_haplotypes.chromosome_data': 0,
+                'contributing_strains': 0,
+            },
+            db=db,
+            cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
         )
+
+        matching_samples = list(matching_samples)
+        strain_map = _get_strain_map(db)
+
+        samples_out = []
+
+        for sample in matching_samples:
+            st_des = sample['standard_designation']
+            try:
+                sample['color'] = strain_map[st_des]['color']
+            ## more than one strain name associated with a sample
+            except KeyError:
+                pass
+
+            samples_out.append(sample)
+
+        return flask.render_template(
+            'hap-candidates.html',
+            samples=samples_out,
+            strain_colors=_get_strain_map(db),
+            )
+    else:
+        return flask.render_template('login-required.html')
 
 
 @app.route('/get-hap-candidate-ts/<strain_id>')
@@ -307,13 +306,11 @@ def invite_user_html():
     """
     Invite a new user to the application using their email address. Upon get
     the invite-user template is rendered. Upon successful POST the
-    invite email is sent out and the browser is redirected to index.html
+    invite email is sent out and message displayed about invite being sent
     """
 
     user = flask.g.user
-    if user is None or not user['administrator']:
-        return flask.render_template('login-required.html')
-    else:
+    if user['administrator'] or user['curator']:
         if flask.request.method == 'GET':
             return flask.render_template('invite-user.html')
         elif flask.request.method == 'POST':
@@ -326,6 +323,8 @@ def invite_user_html():
                 return flask.render_template(
                     'invite-user.html',
                     msg='That user already exists, please try again')
+    else:
+        return flask.render_template('login-required.html')
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])
 def reset_password_html():
@@ -538,31 +537,31 @@ def sample_import_status_json(task_id):
 def sample_data_export_html():
 
     user = flask.g.user
-    if user['administrator'] is not True:
+    if user['administrator'] or user['curator']:
+        db = mds.get_db()
+        samples = _find_and_anno_samples(
+            {'owner': flask.g.user['email_address_lowercase']},
+            {
+                'chromosome_data': 0,
+                'unannotated_snps': 0,
+                'viterbi_haplotypes.chromosome_data': 0,
+                'contributing_strains': 0,
+            },
+            db=db,
+            cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
+        )
+        samples = list(samples)
+        platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
+        all_tags = db.samples.distinct('tags')
+
+        return flask.render_template(
+                'sample-data-export.html',
+                samples=samples,
+                all_tags=all_tags,
+                platform_ids=platform_ids,
+        )
+    else:
         return flask.render_template('login-required.html')
-
-    db = mds.get_db()
-    samples = _find_and_anno_samples(
-        {'owner': flask.g.user['email_address_lowercase']},
-        {
-            'chromosome_data': 0,
-            'unannotated_snps': 0,
-            'viterbi_haplotypes.chromosome_data': 0,
-            'contributing_strains': 0,
-        },
-        db=db,
-        cursor_func=lambda c: c.sort('sample_id', pymongo.ASCENDING),
-    )
-    samples = list(samples)
-    platform_ids = [x['platform_id'] for x in db.platforms.find({}, {'platform_id': 1})]
-    all_tags = db.samples.distinct('tags')
-
-    return flask.render_template(
-            'sample-data-export.html',
-            samples=samples,
-            all_tags=all_tags,
-            platform_ids=platform_ids,
-    )
 
 
 @app.route('/sample-data-export.txt', methods=['POST'])

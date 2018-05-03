@@ -186,9 +186,9 @@
                                 <li><a href="{{ url_for('hap_cands') }}">Haplotype Candidate Samples</a></li>
                                 <li><a href="{{ url_for('st_des_admin') }}">Strain Name Admin</a></li>
                                 <li><a href="{{ url_for('invite_user_html') }}">Invite New User</a></li>
+                                <li><a href="{{ url_for('sample_data_export_html') }}">Sample Data Export</a></li>
                             {% endif %}
                             {% if g.user.administrator == True %}
-                                <li><a href="{{ url_for('sample_data_export_html') }}">Sample Data Export</a></li>
                                 <li><a href="{{ url_for('show_users') }}">User Admin</a></li>
                             {% endif %}
                             <li><a href="{{ url_for('user_tags') }}">My Samples</a></li>
