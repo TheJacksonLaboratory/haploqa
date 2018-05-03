@@ -1282,7 +1282,7 @@
     {% if g.user %}
     <div style="margin-bottom: 10px;">
         <!-- only allow admin or owner to edit a sample -->
-        {% if (g.user.email_address == sample.owner) or (g.user.administrator == True) %}
+        {% if (g.user.email_address == sample.owner) or (g.user.administrator == True) or (g.user.curator == True) %}
         <span data-display-when="sample-readonly">
             <button id="edit-sample-button" type="button" class="btn btn-primary">
                 <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit Sample
