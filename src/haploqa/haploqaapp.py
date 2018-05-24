@@ -513,24 +513,24 @@ def sample_import_status_json(task_id):
 
     async_result = sample_data_import_task.AsyncResult(task_id)
 
-    # TODO check that user is logged in
+    user = flask.g.user
+    if user is not None:
+        msg_dict = {
+            'ready': async_result.ready(),
+            'failed': async_result.failed(),
+        }
+        if async_result.failed():
+            msg_dict['error_message'] = str(async_result.result)
+            response = flask.jsonify(**msg_dict)
 
-    msg_dict = {
-        'ready': async_result.ready(),
-        'failed': async_result.failed(),
-    }
-    if async_result.failed():
-        msg_dict['error_message'] = str(async_result.result)
-        response = flask.jsonify(**msg_dict)
+            # server error code
+            response.status_code = 500
 
-        # server error code
-        response.status_code = 500
+            return response
+        else:
+            msg_dict['result_tag'] = async_result.result
 
-        return response
-    else:
-        msg_dict['result_tag'] = async_result.result
-
-        return flask.jsonify(**msg_dict)
+            return flask.jsonify(**msg_dict)
 
 
 @app.route('/sample-data-export.html')
@@ -634,7 +634,7 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
-            if (files['sample-map-file'].filename == '') or (files['final-report-file'].filename == ''):
+            if (form['sample-map-file'] == '') or (form['final-report-file'] == ''):
                 return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
                                              msg='Error: you must provide both files in order to process your request')
             else:
