@@ -1072,10 +1072,20 @@ def index_html():
             pipeline.insert(0, {'$match': query})
             sample_count = db.samples.count(query)
 
-    tags = db.samples.aggregate(pipeline)
-    tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+        tags = db.samples.aggregate(pipeline)
+        tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
 
-    return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
+        my_tags_pipeline = [
+            {'$unwind': '$tags'},
+            {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
+            {'$sort': SON([('count', -1), ('_id', -1)])},
+        ]
+        my_tags_query = {'owner': user['email_address_lowercase']}
+        my_tags_pipeline.insert(0, {'$match': my_tags_query})
+        my_tags = db.samples.aggregate(my_tags_pipeline)
+        my_tags = [{'name': my_tag['_id'], 'sample_count': my_tag['count']} for my_tag in my_tags]
+
+    return flask.render_template('index.html', tags=tags, my_tags=my_tags, total_sample_count=sample_count)
 
 @app.route('/user-tags.html')
 def user_tags():
