@@ -883,7 +883,7 @@ def add_st_des():
     :return: 
     """
     user = flask.g.user
-    if user is None or not user['administrator']:
+    if not user['administrator'] and not user['curator']:
         return '{"status": "failure", "msg": "not authorized"}'
 
     try:
@@ -950,7 +950,7 @@ def st_des_admin():
     """
 
     user = flask.g.user
-    if user is None or (user['administrator'] is not True and user['curator'] is not True):
+    if not user['administrator'] and not user['curator']:
         return flask.render_template('login-required.html')
 
     db = mds.get_db()
