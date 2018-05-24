@@ -284,6 +284,7 @@
                 <tr>
                     <th data-display-when="sample-edit" style="display: none;"><input id="select-all-checkbox" type="checkbox" checked></th>
                     <th>ID (Secondary IDs)</th>
+                    <th>Haplotype Candidate</th>
                     <th>Strain Name</th>
                     <th>Strain ID</th>
                     <th>Sex</th>
@@ -306,6 +307,9 @@
                             {% if sample.other_ids %}
                                 ({% for other_id in sample.other_ids %}{{ other_id }}{% if not loop.last %}, {% endif %}{% endfor %})
                             {% endif %}
+                        </td>
+                        <td>
+                            {{ sample.haplotype_candidate }}
                         </td>
                         <td>
                             {% if sample.standard_designation %}
