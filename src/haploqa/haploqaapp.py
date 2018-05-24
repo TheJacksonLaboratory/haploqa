@@ -918,7 +918,7 @@ def update_st_des_color(st_des_id):
         return '{"status": "failure", "msg": "invalid objectID"}'
 
     user = flask.g.user
-    if user is None or not user['administrator']:
+    if not user['administrator'] and not user['curator']:
         return '{"status": "failure", "msg": "not authorized"}'
 
     try:
