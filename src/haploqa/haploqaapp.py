@@ -516,24 +516,24 @@ def sample_import_status_json(task_id):
 
     async_result = sample_data_import_task.AsyncResult(task_id)
 
-    # TODO check that user is logged in
+    user = flask.g.user
+    if user is not None:
+        msg_dict = {
+            'ready': async_result.ready(),
+            'failed': async_result.failed(),
+        }
+        if async_result.failed():
+            msg_dict['error_message'] = str(async_result.result)
+            response = flask.jsonify(**msg_dict)
 
-    msg_dict = {
-        'ready': async_result.ready(),
-        'failed': async_result.failed(),
-    }
-    if async_result.failed():
-        msg_dict['error_message'] = str(async_result.result)
-        response = flask.jsonify(**msg_dict)
+            # server error code
+            response.status_code = 500
 
-        # server error code
-        response.status_code = 500
+            return response
+        else:
+            msg_dict['result_tag'] = async_result.result
 
-        return response
-    else:
-        msg_dict['result_tag'] = async_result.result
-
-        return flask.jsonify(**msg_dict)
+            return flask.jsonify(**msg_dict)
 
 
 @app.route('/sample-data-export.html')
@@ -637,7 +637,7 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
-            if (files['sample-map-file'].filename == '') or (files['final-report-file'].filename == ''):
+            if (form['sample-map-file'] == '') or (form['final-report-file'] == ''):
                 return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
                                              msg='Error: you must provide both files in order to process your request')
             else:
@@ -1075,10 +1075,20 @@ def index_html():
             pipeline.insert(0, {'$match': query})
             sample_count = db.samples.count(query)
 
-    tags = db.samples.aggregate(pipeline)
-    tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+        tags = db.samples.aggregate(pipeline)
+        tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
 
-    return flask.render_template('index.html', tags=tags, total_sample_count=sample_count)
+        my_tags_pipeline = [
+            {'$unwind': '$tags'},
+            {'$group': {'_id': '$tags', 'count': {'$sum': 1}}},
+            {'$sort': SON([('count', -1), ('_id', -1)])},
+        ]
+        my_tags_query = {'owner': user['email_address_lowercase']}
+        my_tags_pipeline.insert(0, {'$match': my_tags_query})
+        my_tags = db.samples.aggregate(my_tags_pipeline)
+        my_tags = [{'name': my_tag['_id'], 'sample_count': my_tag['count']} for my_tag in my_tags]
+
+    return flask.render_template('index.html', tags=tags, my_tags=my_tags, total_sample_count=sample_count)
 
 @app.route('/user-tags.html')
 def user_tags():

@@ -177,9 +177,9 @@ def hap_cands_by_strain(strain_name, platform, db=None):
                                 'haplotype_candidate': True,
                                 'platform_id': platform}))
     # we don't need to worry about no results here because the front end is validating the form
-    if len(res) <= 1:
+    if len(res) < 1:
         return 'none'
-    if len(res) > 1:
+    elif len(res) >= 1:
         samples = []
         for sample in res:
             name = str(sample['sample_id'])

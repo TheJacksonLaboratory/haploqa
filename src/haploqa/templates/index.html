@@ -6,7 +6,39 @@
     <div class="page-header">
         <h1>HaploQA</h1>
     </div>
+    <div class="page-header">
+        <h2>My Samples</h2>
+    </div>
 
+    <div class="row">
+        {% if my_tags %}
+        <div class="col-md-12">
+            Select any of the following tags to view or edit samples:
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Sample Tag</th>
+                        <th>Sample Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for my_tag in my_tags %}
+                    <tr>
+                        <td><a href="{{ url_for('owner_tags', tag_id=my_tag.name) }}">{{ my_tag.name }}</a></td>
+                        <td>{{ my_tag.sample_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        You do not have any samples
+        {% endif %}
+    </div>
+
+    <div class="page-header">
+        <h2>All Samples</h2>
+    </div>
     <div class="row">
         <div class="col-md-12">
             Select any of the following tags to view or edit samples:
