@@ -448,7 +448,10 @@ def change_password_html():
             old_password = form['old-password']
             new_password = form['new-password']
             new_password_confirm = form['new-password-confirm']
-            if len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
+            if len(old_password) == 0 or len(new_password) == 0 or len(new_password_confirm) == 0:
+                flask.flash('Please enter values for all required fields.')
+                return flask.render_template('change-password.html')
+            elif len(new_password) < HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']:
                 flask.flash('The given password is too short. It must contain at least {} characters.'.format(
                     HAPLOQA_CONFIG['MIN_PASSWORD_LENGTH']
                 ))
@@ -880,7 +883,7 @@ def add_st_des():
     :return: 
     """
     user = flask.g.user
-    if user is None or not user['administrator']:
+    if not user['administrator'] and not user['curator']:
         return '{"status": "failure", "msg": "not authorized"}'
 
     try:
@@ -915,7 +918,7 @@ def update_st_des_color(st_des_id):
         return '{"status": "failure", "msg": "invalid objectID"}'
 
     user = flask.g.user
-    if user is None or not user['administrator']:
+    if not user['administrator'] and not user['curator']:
         return '{"status": "failure", "msg": "not authorized"}'
 
     try:
@@ -947,7 +950,7 @@ def st_des_admin():
     """
 
     user = flask.g.user
-    if user is None or (user['administrator'] is not True and user['curator'] is not True):
+    if not user['administrator'] and not user['curator']:
         return flask.render_template('login-required.html')
 
     db = mds.get_db()
