@@ -42,7 +42,7 @@ def import_final_report(user_email, generate_ids, on_duplicate, final_report_fil
             else:
                 samp['other_ids'] = []
 
-            mds.post_proc_sample(samp)
+            mds.post_proc_sample(samp, user_email)
 
             samp['owner'] = user_email
 

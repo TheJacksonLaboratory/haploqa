@@ -210,7 +210,7 @@ def get_snps(platform_id, chromosome, db=None):
     ])
 
 
-def post_proc_sample(sample):
+def post_proc_sample(sample, user_email):
     """
     Post-process a sample dict after it's loaded from a data source but before it's inserted into the DB. This adds some
     default values and performs some simple calculations. This function will modify the sample by adding new attributes.
@@ -219,6 +219,7 @@ def post_proc_sample(sample):
     print('post-processing sample: ' + sample['sample_id'])
 
     sample['last_update'] = '{:%m/%d/%Y %H:%M %p} EST'.format(datetime.now())
+    sample['updated_by'] = user_email
 
     sample['homozygous_count'] = 0
     sample['heterozygous_count'] = 0

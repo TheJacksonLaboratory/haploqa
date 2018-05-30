@@ -1361,7 +1361,8 @@
                                 Last Update
                             </th>
                             <td id="lastupdate">
-                                {% if sample.last_update %}{{ sample.last_update }} by {{ sample.updated_by }}{% else %}N/A{% endif %}
+                                {% if sample.last_update %}{{ sample.last_update }}
+                                    {% if sample.updated_by %}by {{ sample.updated_by }}{% endif %}{% else %}N/A{% endif %}
                             </td>
                         </tr>
                         {% if not sample.haplotype_candidate %}
