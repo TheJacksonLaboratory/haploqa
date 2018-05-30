@@ -1,5 +1,6 @@
 import haploqa.mongods as mds
 import pymongo
+from datetime import datetime, timedelta
 
 
 def upgrade_from_0_0_0(db):
@@ -145,10 +146,54 @@ def upgrade_from_0_0_2(db):
     )
 
 
+def upgrade_from_0_0_3(db):
+    """
+    Adds timestamps for last_update field for samples without the field
+    :param db: database
+    :return: none
+    """
+
+    upgrade_to_schema_version = 0, 0, 4
+    # Check if there are any samples that don't have a last_update entry (if not, nothing needs to be done here)
+    if db.samples.find({'last_update': {'$exists': False}}).count() > 0:
+        oldest_ts = None
+        oldest_dt = None
+
+        # Iterate through the samples to find the oldest last_update entry so we can set the default last_update entry
+        # to a day prior. If we set the default to datetime.now or something similar, samples might get a notification
+        # about contributing strains being updated when they haven't really been updated
+        for sample in db.samples.find({'last_update': {'$exists': True}}):
+            this_ts = sample['last_update']
+            this_dt = datetime.strptime(this_ts.split()[0], '%m/%d/%Y')
+            # if the oldest timestamp hasn't been set it, just make this one the oldest
+            if not oldest_ts:
+                oldest_ts = this_ts
+                oldest_dt = this_dt
+            else:
+                # check if the oldest timestamp should be updated with current
+                if this_dt < oldest_dt:
+                    oldest_ts = this_ts
+                    oldest_dt = this_dt
+
+        update_dt = '{:%m/%d/%Y %H:%M %p} EST'.format(oldest_dt - timedelta(days=1))
+
+        db.samples.update_many(
+            {'last_update': {'$exists': False}},
+            {'$set': {'last_update': update_dt}}
+        )
+
+    # Make the update official up updating the schema version in meta
+    db.meta.update_one(
+        {},
+        {'$set': {'schema_version': upgrade_to_schema_version}},
+    )
+
+
 SCHEMA_UPGRADE_FUNCTIONS = [
     ((0, 0, 0), upgrade_from_0_0_0),
     ((0, 0, 1), upgrade_from_0_0_1),
     ((0, 0, 2), upgrade_from_0_0_2),
+    ((0, 0, 3), upgrade_from_0_0_3)
 ]
 
 
