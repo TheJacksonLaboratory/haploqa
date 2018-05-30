@@ -1,5 +1,6 @@
 import pymongo
 from haploqa.config import HAPLOQA_CONFIG
+from datetime import datetime
 
 DB_NAME = 'haploqa'
 SCHEMA_VERSION = 0, 0, 3
@@ -216,6 +217,8 @@ def post_proc_sample(sample):
     :param sample: the sample dict to modify
     """
     print('post-processing sample: ' + sample['sample_id'])
+
+    sample['last_update'] = '{:%m/%d/%Y %H:%M %p} EST'.format(datetime.now())
 
     sample['homozygous_count'] = 0
     sample['heterozygous_count'] = 0
