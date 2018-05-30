@@ -165,7 +165,7 @@ def upgrade_from_0_0_3(db):
         for sample in db.samples.find({'last_update': {'$exists': True}}):
             this_ts = sample['last_update']
             this_dt = datetime.strptime(this_ts.split()[0], '%m/%d/%Y')
-            # if the oldest timestamp hasn't been set it, just make this one the oldest
+            # if the oldest timestamp hasn't been set, just make this one the oldest
             if not oldest_ts:
                 oldest_ts = this_ts
                 oldest_dt = this_dt
