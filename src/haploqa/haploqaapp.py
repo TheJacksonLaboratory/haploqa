@@ -637,7 +637,7 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
-            if (form['sample-map-file'] == '') or (form['final-report-file'] == ''):
+            if len(files) < 2:
                 return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
                                              msg='Error: you must provide both files in order to process your request')
             else:
@@ -1051,6 +1051,10 @@ def index_html():
         # anonymous users should only be given access to public samples
         pipeline.insert(0, {'$match': {'is_public': True}})
         sample_count = db.samples.count({'is_public': True})
+        tags = db.samples.aggregate(pipeline)
+        tags = [{'name': tag['_id'], 'sample_count': tag['count']} for tag in tags]
+
+        my_tags = None
     else:
         try:
             user_is_curator = user['curator']
@@ -1088,7 +1092,7 @@ def index_html():
         my_tags = db.samples.aggregate(my_tags_pipeline)
         my_tags = [{'name': my_tag['_id'], 'sample_count': my_tag['count']} for my_tag in my_tags]
 
-    return flask.render_template('index.html', tags=tags, my_tags=my_tags, total_sample_count=sample_count)
+    return flask.render_template('index.html', user=user, tags=tags, my_tags=my_tags, total_sample_count=sample_count)
 
 @app.route('/user-tags.html')
 def user_tags():
