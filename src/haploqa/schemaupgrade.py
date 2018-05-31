@@ -175,7 +175,14 @@ def upgrade_from_0_0_3(db):
                     oldest_ts = this_ts
                     oldest_dt = this_dt
 
-        update_dt = '{:%m/%d/%Y %H:%M %p} EST'.format(oldest_dt - timedelta(days=1))
+        update_dt = None
+
+        # If there were timestamps to take into consideration, make timestamp 1 day earlier
+        if oldest_dt:
+            update_dt = '{:%m/%d/%Y %H:%M %p} EST'.format(oldest_dt - timedelta(days=1))
+        # Otherwise, just set the timestamp to now
+        else:
+            update_dt = '{:%m/%d/%Y %H:%M %p} EST'.format(datetime.now())
 
         db.samples.update_many(
             {'last_update': {'$exists': False}},
