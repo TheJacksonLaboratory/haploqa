@@ -958,7 +958,11 @@
                                     data: pdata,
                                     dataType: 'json',
                                     success: function(data) {
-                                        if (data.results !== 'none') {
+                                        var changedToHapCand = (hcChanged && hapCandidate);
+                                        // results will be non-empty if this sample was a haplotype candidate prior to
+                                        // updating so we have to check whether the sample was just changed to be a
+                                        // haplotype candidate
+                                        if (data.results !== 'none' && changedToHapCand) {
                                             msg += '<br>There is already another sample found which is designated as ' +
                                                 'haplotype candidate for <b>{{ sample.standard_designation }}</b> with the ' +
                                                 '<b>{{ sample.platform_id }}</b> platform. If you wish to replace one of the ' +
@@ -980,7 +984,8 @@
                                 });
                             }
                         }
-                        if(newSex != 'female') {
+                        // only show this message if the sex is being changed to female
+                        if(newSex != 'female' && sexChanged) {
                             msg += "<br><b> - Your sample's sex must be female in order to designate or keep it as a haplotype candidate</b>";
                             cancelUpdate = true;
                         }
