@@ -604,6 +604,10 @@
 
             updateNotes(sample.notes);
 
+            function updateHaplotypeCandidacy(status) {
+                sample.haplotype_candidate = status;
+            }
+
             var contribStrainTokensInput = $('#contrib-strains-tokens');
 
             contribStrainTokensInput.tokenfield({
@@ -816,7 +820,7 @@
                         updateHaplotypeSVG();
                     }
                 }).fail(function() {
-                    showErrorMessage('An error occurred while saving sample.');
+                    showErrorMessage('We ran into something while running the haplotype calculations. Please try again.');
                 }).always(function() {
                     saveTagRequest = null;
                     sampleUpdateSpinner.css('display', 'none');
@@ -875,7 +879,7 @@
                         return tok.value
                     }));
                     newContribStrains.sort();
-                    var contribStrainsChanged = !arraysEq(newContribStrains, sample.contributing_strains);
+                    var contribStrainsChanged = !arraysEq(newContribStrains, sample.contributing_strains.sort());
                     var haplotyping_timestamp = new Date(Date.now());
                     if(contribStrainsChanged) {
                         postData['contributing_strains'] = JSON.stringify(newContribStrains);
@@ -903,45 +907,30 @@
                         postData['sex'] = newSex;
                     }
 
-                    var hapCandidate = $('#hap-candidate-checkbox').prop('checked');
-                    var hcChanged = hapCandidate !== sample.haplotype_candidate;
-                    if(hcChanged) {
-                        postData['hap_cand'] = hapCandidate;
-                    }
-
                     var newStandardDesignation = editStandardDesignationInput.val();
                     var standardDesignationChanged = newStandardDesignation != sample.standard_designation;
                     if(standardDesignationChanged) {
                         postData['standard_designation'] = newStandardDesignation;
                     }
 
-                    /**
-                     *  if hap cand true:
-                     *  noOtherSamplesHapCandbyStrainName (ajax - need two endpoints?)
-                     *  TODO: need a way to put messages below edit button
-                     *  TODO: prevent form submit if conditions fail
-                     */
+                    var hapCandidate = $('#hap-candidate-checkbox').prop('checked');
+                    var hcChanged = hapCandidate !== sample.haplotype_candidate;
+                    if(hcChanged) {
+                        postData['hap_cand'] = hapCandidate;
+                    }
 
-                    var cancelUpdate = false;
-
-                    if(hapCandidate == true) {
-
-                        var msg = '';
-
+                    var allowUpdate = true;
+                    if(hapCandidate === true) {
                         //make sure there is at least one, and only one strain name applied
-                        var strain_list = newStandardDesignation.split(",");
-
-                        if(newStandardDesignation.length == 0) {
-                            msg += '<br><b> - A Haplotype candidate must have at least one strain name</b>';
-                            cancelUpdate = true;
-                        }
-                        else {
-
-                            if(strain_list.length > 1) {
-                                msg += '<br><b> - A haplotype candidate can only have one strain as it would be the ' +
-                                    'representation for that strain. Please update your sample accordingly.</b>';
-                                cancelUpdate = true;
-                                //now we know we have only 1 strain name applied and can run the next check
+                        var strainList = newStandardDesignation.split(",");
+                        if(strainList.length !== 1 || strainList[0] === '') {
+                            showErrorMessage('A haplotype candidate must have one strain name');
+                            allowUpdate = false;
+                        } else {
+                            // only show this message the sample is being assigned as a haplotype candidate and has unknown sex
+                            if(newSex === 'unknown' && (hcChanged && hapCandidate)) {
+                                showErrorMessage("Your sample's sex must be set to either male or female in order to be considered as a haplotype candidate.");
+                                allowUpdate = false;
                             } else {
                                 /** we have only one strain name so we can check if
                                  * its been assigned to any other haplotype candidate samples
@@ -963,37 +952,23 @@
                                         // updating so we have to check whether the sample was just changed to be a
                                         // haplotype candidate
                                         if (data.results !== 'none' && changedToHapCand) {
-                                            msg += '<br>There is already another sample found which is designated as ' +
-                                                'haplotype candidate for <b>{{ sample.standard_designation }}</b> with the ' +
+                                            var tempMsg = 'There is already another sample found which is designated as ' +
+                                                'haplotype candidate for <b>' + newStandardDesignation + '</b> with the ' +
                                                 '<b>{{ sample.platform_id }}</b> platform. If you wish to replace one of the ' +
                                                 'following haplotype candidates, you must remove the candidacy status of the ' +
-                                                'sample you wish to replace. Follow the link(s) below to the existing haplotype' +
-                                                " candidate's sample page to make changes before proceeding.<br>";
-                                            // TODO: Once we know that the correct check is ONE sample per strain name and platform regardless of sex, remove this
-                                            //msg += "Follow the link(s) below to the haplotype candidate's sample page to make " +
-                                            //    'changes before proceeding. If there are multiple links, this is due to there ' +
-                                            //    'being a male <i>and</i> a female with the same strain and platform.<br>';
-
+                                                'sample you wish to replace. Follow the link below to the existing haplotype' +
+                                                " candidate's sample page to make changes before proceeding.<br><br>";
                                             $.each(data.results, function(item) {
-                                                msg += '<a href="/sample/' + data.results[item].sampleId + '.html" target="blank">' +
+                                                tempMsg += '<a href="/sample/' + data.results[item].sampleId + '.html" target="blank">' +
                                                     'Sample: ' + data.results[item].sampleName + '</a><br>';
                                             });
-                                            cancelUpdate = true;
+                                            showErrorMessage(tempMsg);
+                                            allowUpdate = false;
                                         }
                                     }
                                 });
                             }
                         }
-                        // only show this message if the sex is being changed to female
-                        if(newSex != 'female' && sexChanged) {
-                            msg += "<br><b> - Your sample's sex must be female in order to designate or keep it as a haplotype candidate</b>";
-                            cancelUpdate = true;
-                        }
-                        if(cancelUpdate == true) {
-                            $('#msg').html(msg);
-                            $('#warning').show();
-                        }
-
                     }
 
                     var newNotes = editNotesInput.val();
@@ -1008,7 +983,7 @@
                         postData['is_public'] = newSampleIsPublic;
                     }
 
-                    if(!cancelUpdate) {
+                    if(allowUpdate) {
                         saveTagRequest = $.ajax({
                             type: "POST",
                             url: "{{ url_for('update_sample', mongo_id=sample._id) }}",
@@ -1040,6 +1015,7 @@
                                     updateSampleID(newSampleID);
                                 }
                                 if(hcChanged) {
+                                    updateHaplotypeCandidacy(hapCandidate);
                                     $('#hap-candidate').text(hapCandidate);
                                     $('#hap-candidate-checkbox').prop('checked', hapCandidate);
                                 }
@@ -1059,7 +1035,6 @@
                                     updateSex(newSex);
                                     updateHaplotypeSVG();
                                 }
-
                             }
                         }).fail(function() {
                             showErrorMessage('An error occurred while saving sample.');
@@ -1067,10 +1042,9 @@
                             saveTagRequest = null;
                             sampleUpdateSpinner.css('display', 'none');
                         });
-
+                        
+                        switchEditSampleView(false);
                     }
-
-                    switchEditSampleView(false);
                 }
             });
 
@@ -1354,7 +1328,7 @@
                         <td>
                             {% if g.user.administrator == True %}
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}" placeholder="1 owner only"/>
+                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}"/>
                             </span>
                             {% endif %}
                             <span id="readonly-owner" data-display-when="sample-readonly">{{ sample.owner }}</span>
@@ -1452,8 +1426,7 @@
                                     data-toggle="tooltip"
                                     data-placement="top"
                                     title="The sex of the animal from which the sample was collected can be provided
-                                    here. Note that the inbred strain standard samples that are used for haplotype
-                                    calculations are always female">
+                                    here.">
                             </span>
                         </th>
                         <td>
@@ -1572,8 +1545,7 @@
                                     data-placement="top"
                                     title="If this sample is a ‘control’ sample representing a potential contributing
                                     strain background, then choosing “true” will allow it to be used as a contributing
-                                    strain for haplotype construction. Currently, only female samples can serve as
-                                    haplotype candidates.">
+                                    strain for haplotype construction.">
                             </span>
                         </th>
                         <td>
