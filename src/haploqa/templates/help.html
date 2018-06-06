@@ -251,8 +251,7 @@
                     ID can be used. The Strain ID can be bulk edited in the previous page for any samples that share a tag.
                 </li>
                 <li>
-                    <b>Sex:</b> The sex of the animal from which the sample was collected can be provided here. Note that
-                    the inbred strain standard samples that are used for haplotype calculations are always female.
+                    <b>Sex:</b> The sex of the animal from which the sample was collected can be provided here.
                 </li>
                 <li>
                     <b>Platform:</b> The current version of HaploQA uses either MegaMUGA or GigaMUGA genotyping array
@@ -280,7 +279,7 @@
                 <li>
                     <b>Haplotype Candidate:</b> If this sample is a ‘control’ sample representing a potential contributing
                     strain background, then choosing “true” will allow it to be used as a contributing strain for haplotype
-                    construction. Currently, only female samples can serve as haplotype candidates.
+                    construction.
                 </li>
                 <li>
                     <b>Engineered Target Positive Controls:</b> The GigaMUGA genotyping platform includes probes
@@ -357,10 +356,7 @@
                     substitute strain ID can be used. This field is one that can be bulk edited.
                 </li>
                 <li>
-                    <b>Sex:</b> Sex can be changed, though if the sample is a haplotype candidate, sex is female only. If you
-                    attempt to make a haplotype candidate male, the edits, <i style="color: red;">including any other unsaved
-                    changes</i>, will not be saved and a notification will appear informing the user that the sex cannot be
-                    male.
+                    <b>Sex:</b> Sex can be changed to male, female, or unknown.
                 </li>
                 <li>
                     <b>Tags:</b> Add or delete enter-separated tags in this field. Tags can be search terms and each tag
@@ -370,9 +366,9 @@
                     <b>Haplotype Candidate:</b> This is a option only available to an owner with curator status or
                     administrators. If this sample is a ‘control’ sample representing a potential contributing strain
                     background, then choosing “true” will allow it to be used as a contributing strain for haplotype
-                    construction. <b>In order to be considered for haplotype candidacy, the sample must be female and be
-                    assigned strictly ONE strain name which cannot have been assigned to any other haplotype candidates in
-                    the same platform</b>
+                    construction. <b>In order to be considered for haplotype candidacy, the sample cannot have an
+                    'unknown' sex and can only be assigned strictly ONE strain name which cannot have been assigned to
+                    any other haplotype candidates in the same platform</b>
                 </li>
                 <li>
                     <b>Engineered Target Positive Controls:</b> Add or delete names of genetically engineered alleles that
