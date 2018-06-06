@@ -1328,7 +1328,7 @@
                         <td>
                             {% if g.user.administrator == True %}
                             <span class="form-group" data-display-when="sample-edit" style="display: none;">
-                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}"/>
+                                <input id="edit-owner-input" type="text" class="form-control" value="{{ sample.owner }}" placeholder="1 owner only"/>
                             </span>
                             {% endif %}
                             <span id="readonly-owner" data-display-when="sample-readonly">{{ sample.owner }}</span>
