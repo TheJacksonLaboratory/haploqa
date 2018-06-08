@@ -10,7 +10,7 @@ A public instance of the HaploQA web application is available at [https://haploq
 available under an [MIT license](LICENSE.txt).
 
 Major Contributions:
-* Laura Reinhold
+* Laura Reinholdt
 * [Keith Sheppard](https://github.com/keithshep)
 * [Gary Churchill](https://github.com/churchill-lab)
 * [Dan Gatti](https://github.com/dmgatti)
