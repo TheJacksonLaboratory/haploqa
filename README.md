@@ -1,12 +1,23 @@
 # HaploQA
 
-# External Library Credits
+## Overview
 
-saveSvgAsPng.js: script to save a D3 plot (svg) as a png. MIT license - author Eric Shull (github.com/exupero/saveSvgAsPng)
+The HaploQA web application was developed at the [Jackson Laboratory](http://www.jax.org) with support from the Mutant Mouse Regional Resource Centers (NIH OD010921) 
+and the Jackson Laboratory Genetic Resource Science group.  The purpose of the tool is to facilitate genetic quality assurance of mice using genotype data derived from 
+genotyping platforms such as GigaMUGA and MegaMUGA. The application was originally developed by [Keith Sheppard](https://github.com/keithshep) 
+as part of the Jackson Laboratory's [Computational Sciences](https://www.jax.org/research-and-faculty/tools/scientific-research-services/computational-sciences) group.  
+A public instance of the HaploQA web application is available at [https://haploqa.jax.org](https://haploqa.jax.org/) and the source code is made 
+available under an [MIT license](LICENSE.txt).
 
-d3.tip.v0.6.3.js: script to create tooltips. - author Justin Palmer (http://labratrevenge.com/d3-tip/)
-
-TODO description of what this app does
+Major Contributions:
+* Laura Reinholdt
+* [Keith Sheppard](https://github.com/keithshep)
+* [Gary Churchill](https://github.com/churchill-lab)
+* [Dan Gatti](https://github.com/dmgatti)
+* [Anna Lamoureux](https://github.com/anna-lamoureux)
+* Ben Robinson
+* Vinita Sinha
+* [Dave Walton](https://github.com/obwalton)
 
 ## Installation
 
@@ -55,8 +66,9 @@ Instructions fro starting are below.
 
 ## Running a local (development) instance
 
-> NOTE:  If you are running Mongo 3.2 or greater in your development I highly recommend you launch Mongo using the MMAPV1 Storage Engine.  Especially if you plan to load a back-up of the production database to your development environment.  Production is currently running on a 3.0.2  version of Mongo, which has a default storage engine of MMAPV1.  In 3.2 the storage engine changed to the WiredTiger Storage Engine.  I've found the performance of this storage engine to be abysmal on my Mac.  It's likely our configuration, indices and the size of our database.  At some point in the future we should put more energy into optimizing our database for WiredTiger.  Otherwise we'll need to change the production system to run with MMAPV1 when we upgrade Mongo on that server.
->        In order to run using MMAPV1 in Mongo 3.2 or greater you'll need to start Mongo the first time using the following command:
+> NOTE:  If you are running Mongo 3.2 or greater in your development we highly recommend you launch Mongo using the MMAPV1 Storage Engine.  MMAPV1 is recommended because the default of WiredTiger 
+> shows significant performance degradation for our database when it becomes large.
+> In order to run using MMAPV1 in Mongo 3.2 or greater you'll need to start Mongo the first time using the following command:
 >
 >       mongod --dbpath db --storageEngine mmapv1
 
@@ -111,3 +123,9 @@ From the project root directory (where src is a subdirectory), run the following
     PYTHONPATH=src python src/haploqa/usermanagement.py
     
 You will be prompted for an email address and a password.
+
+## External Library Credits
+
+saveSvgAsPng.js: script to save a D3 plot (svg) as a png. MIT license - author Eric Shull (github.com/exupero/saveSvgAsPng)
+
+d3.tip.v0.6.3.js: script to create tooltips. - author Justin Palmer (http://labratrevenge.com/d3-tip/)
