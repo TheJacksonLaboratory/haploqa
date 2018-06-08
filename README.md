@@ -12,12 +12,12 @@ available under an [MIT license](LICENSE.txt).
 Major Contributions:
 * Laura Reinhold
 * [Keith Sheppard](https://github.com/keithshep)
-* Gary Churchill
-* Dan Gatti
-* Anna Lamoureux
+* [Gary Churchill](https://github.com/churchill-lab)
+* [Dan Gatti](https://github.com/dmgatti)
+* [Anna Lamoureux](https://github.com/anna-lamoureux)
 * Ben Robinson
 * Vinita Sinha
-* Dave Walton
+* [Dave Walton](https://github.com/obwalton)
 
 ## Installation
 
