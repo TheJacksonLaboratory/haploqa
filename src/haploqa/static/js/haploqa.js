@@ -47,7 +47,7 @@ function showErrorMessage(msg) {
     var modalDialog = $('#error-modal');
     var errorModalMessage = $('#error-modal-message');
     modalDialog.modal();
-    errorModalMessage.text(msg);
+    errorModalMessage.html(msg);
 }
 
 function anyResultsPending(haploData) {
