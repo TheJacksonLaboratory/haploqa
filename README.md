@@ -9,7 +9,7 @@ as part of the Jackson Laboratory's [Computational Sciences](https://www.jax.org
 A public instance of the HaploQA web application is available at [https://haploqa.jax.org](https://haploqa.jax.org/) and the source code is made 
 available under an [MIT license](LICENSE.txt).
 
-### Major Contributions
+Major Contributions:
 * Laura Reinhold
 * Keith Sheppard
 * Gary Churchill
