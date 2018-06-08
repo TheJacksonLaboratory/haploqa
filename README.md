@@ -11,7 +11,7 @@ available under an [MIT license](LICENSE.txt).
 
 Major Contributions:
 * Laura Reinhold
-* Keith Sheppard
+* [Keith Sheppard](https://github.com/keithshep)
 * Gary Churchill
 * Dan Gatti
 * Anna Lamoureux
