@@ -2,11 +2,9 @@
 
 # Overview
 
-The HaploQA web application was developed at the [Jackson Laboratory](http://www.jax.org) for 
-[Dr. Laura Reinholdt](https://www.jax.org/research-and-faculty/faculty/research-scientists/laura-reinholdt) 
-and the [Genetic Resource Science (GRS)](https://www.jax.org/research-and-faculty/tools/genetic-resource-science) 
-group.  The purpose of the tool is to facilitate genetic quality assurance of mice using genotype data derived 
-from genotyping platforms such as GigaMUGA and MegaMUGA.  The application was originally developed by [Keith Sheppard](https://github.com/keithshep) 
+The HaploQA web application was developed at the [Jackson Laboratory](http://www.jax.org) with support from the Mutant Mouse Regional Resource Centers (NIH OD010921) 
+and the Jackson Laboratory Genetic Resource Science group.  The purpose of the tool is to facilitate genetic quality assurance of mice using genotype data derived from 
+genotyping platforms such as GigaMUGA and MegaMUGA. The application was originally developed by [Keith Sheppard](https://github.com/keithshep) 
 as part of the Jackson Laboratory's [Computational Sciences](https://www.jax.org/research-and-faculty/tools/scientific-research-services/computational-sciences) group.  
 A public instance of the HaploQA web application is available at [https://haploqa.jax.org](https://haploqa.jax.org/) and the source code is made 
 available under an [MIT license](LICENSE.txt).
