@@ -15,8 +15,8 @@ Major Contributions:
 * [Gary Churchill](https://github.com/churchill-lab)
 * [Dan Gatti](https://github.com/dmgatti)
 * [Anna Lamoureux](https://github.com/anna-lamoureux)
-* Ben Robinson
-* Vinita Sinha
+* [Ben Robinson](https://www.linkedin.com/in/gnotek/)
+* [Vinita Sinha]( https://www.linkedin.com/in/vinita-sinha-219a60b2/)
 * [Dave Walton](https://github.com/obwalton)
 
 ## Installation
