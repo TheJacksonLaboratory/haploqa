@@ -26,26 +26,22 @@
     <br/>
 
     {% if not user %}
-        <p class="intro">
-            <b>
-                To get started with HaploQA, you may browse the public data listed below. However, if you wish to
-                upload your own data, you'll need to have an account. If you already have one set up, you can login
-                in the upper right corner. If you don't have one, please send an email to
-                <a href="mailto:haploqa@jax.org" target="_top">haploqa@jax.org</a> to have one set up.
-            </b>
-        </p>
+        <p class="intro"><b>
+            To get started with HaploQA, you may browse the public data listed below. However, if you wish to upload your
+            own data, you'll need to have an account. You can login in the upper right corner if you already have one;
+            otherwise, please send an email to <a href="mailto:haploqa@jax.org" target="_top">haploqa@jax.org</a> to have
+            one set up for you.
+        </b></p>
         <br/>
     {% endif %}
 
     {% if user %}
-        <p class="intro">
-            <b>
-                To get started, use the “Import Sample Data” link in the header or
-                <a href="{{ url_for('sample_data_import_html') }}">click here</a> to the data upload page. From here
-                you can directly upload the “Sample_Map.txt” and “…_FinalReport.txt” files provided to you by your
-                MUGA genotyping provider (Neogen).
-            </b>
-        </p>
+        <p class="intro"><b>
+            To get started, use the “Import Sample Data” link in the header or
+            <a href="{{ url_for('sample_data_import_html') }}">click here</a> to the data upload page. From here
+            you can directly upload the “Sample_Map.txt” and “…_FinalReport.txt” files provided to you by your
+            MUGA genotyping provider (Neogen).
+        </b></p>
         <br/>
 
         <div class="page-header">
