@@ -76,7 +76,7 @@ def save_zip(zip_file, zip_filename):
     Extracts and reads data from a zip file and copies it into a celery-readable file
     :param zip_file: a FileStorage object (due to Flask requests library) of the file that was uploaded
     :param zip_filename: the desired name of the file; in this case, its 'tmp/<uuid>'
-    :return: None
+    :return:
     """
     zf = ZipFile(io.BytesIO(zip_file.stream.read()))
     txt_element = zf.namelist()[0]
