@@ -15,6 +15,9 @@ import tempfile
 import traceback
 import uuid
 from werkzeug.routing import BaseConverter
+from zipfile import ZipFile
+import io
+import csv
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -66,6 +69,34 @@ def unescape_forward_slashes(s):
     :return: the unescaped string
     """
     return s.replace('\\f', '/').replace('\\b', '\\')
+
+
+def save_zip(zip_file, zip_filename):
+    """
+    Extracts and reads data from a zip file and copies it into a celery-readable file
+    :param zip_file: a FileStorage object (due to Flask requests library) of the file that was uploaded
+    :param zip_filename: the desired name of the file; in this case, its 'tmp/<uuid>'
+    :return: None
+    """
+    zf = ZipFile(io.BytesIO(zip_file.stream.read()))
+    txt_element = zf.namelist()[0]
+
+    i_map = io.TextIOWrapper(zf.open(txt_element, 'r'))
+    o_map = open(zip_filename, 'w')
+
+    reader = csv.reader(i_map, delimiter='\t')
+    writer = csv.writer(o_map, delimiter='\t')
+
+    # get the header
+    header = next(reader)
+    writer.writerow(header)
+
+    # write the rest
+    for line in reader:
+        writer.writerow(line)
+
+    i_map.close()
+    o_map.close()
 
 
 class EscForwardSlashConverter(BaseConverter):
@@ -642,11 +673,20 @@ def sample_data_import_html():
                                              msg='Error: you must provide both files in order to process your request')
             else:
                 sample_map_filename = _unique_temp_filename()
-                files['sample-map-file'].save(sample_map_filename)
+                sample_map_file = files['sample-map-file']
+                # if the sample map is a .zip, extract the data
+                if sample_map_file.filename.endswith('.zip'):
+                    save_zip(sample_map_file, sample_map_filename)
+                else:
+                    sample_map_file.save(sample_map_filename)
 
                 final_report_filename = _unique_temp_filename()
                 final_report_file = files['final-report-file']
-                final_report_file.save(final_report_filename)
+                # if the final report is a .zip, extract the data
+                if final_report_file.filename.endswith('.zip'):
+                    save_zip(final_report_file, final_report_filename)
+                else:
+                    final_report_file.save(final_report_filename)
 
                 generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
                 on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
