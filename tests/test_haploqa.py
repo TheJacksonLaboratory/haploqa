@@ -2,6 +2,10 @@ import unittest
 import haploqa.haploqaapp as hqa
 import haploqa.mongods as mdb
 from bson import ObjectId
+import os
+import distutils.dir_util as dir_util
+from zipfile import BadZipFile
+
 
 class TestHaploQA(unittest.TestCase):
     """
@@ -79,8 +83,8 @@ class TestHaploQA(unittest.TestCase):
             sess['user_email_address'] = email
             sess['administrator'] = admin
             # set to 127.0.0.1 if testing locally
-            sess['remote_addr'] = None
-            #sess['remote_addr'] = '127.0.0.1'
+            #sess['remote_addr'] = None
+            sess['remote_addr'] = '127.0.0.1'
 
     def _switch_sample(self, public=True, owner=None):
         """
@@ -316,3 +320,148 @@ class TestHaploQA(unittest.TestCase):
             print("sample id: {}, visibility: {}, owner: {}".format(sample['_id'], sample['is_public'], sample['owner']))
         else:
             print("no test sample found!")
+
+
+class TestZipFileExtraction(unittest.TestCase):
+    TEMP_DIR = 'tests/data/'
+    TEST_DATA_DIR = 'tests/test_files/'
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Since the zip file extraction function assumes the zip file is already
+        saved, should try to extract the zip file content, rename the content and
+        remove the original file, we don't want to lose the static testing files,
+        so prior to all of the tests, make a complete copy of the testing files
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+        test_data_dir = TestZipFileExtraction.TEST_DATA_DIR
+
+        if not os.path.exists(temp_dir):
+            print("Creating temp directory")
+            # make a temp directory with a copy of the static test files
+            os.makedirs(temp_dir)
+            if os.path.exists(temp_dir):
+                print("Temp directory exists")
+            else:
+                print("Temp directory is missing")
+            if os.path.exists(test_data_dir):
+                print("Copying test files into temp directory")
+                dir_util.copy_tree(test_data_dir, temp_dir)
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Remove the testing temp directory and all of its contents at the end of
+        the test running
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+        if os.path.exists(temp_dir):
+            print("Removing temp directory")
+            # remove the temp directory and all of the contents
+            dir_util.remove_tree(temp_dir)
+
+    def test_good_zip(self):
+        """
+        Tests that a valid zip file with a single text file as content can be
+        extracted and the zip file that is extracted from gets removed
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+        hqa.extract_zip_file("{}good.zip".format(temp_dir),
+                             "{}good_result".format(temp_dir),
+                             temp_dir)
+
+        # check that extracted file exists and is named as specified
+        self.assertTrue(os.path.exists("{}good_result".format(temp_dir)))
+        # check that zip file has been removed
+        self.assertFalse(os.path.exists("{}good.zip".format(temp_dir)))
+
+    def test_nonexistent_file(self):
+        """
+        Tests that an incorrect filename that the function looks for triggers a
+        FileNotFoundError with the proper message
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(FileNotFoundError) as context:
+            hqa.extract_zip_file("{}nonexistent.zip".format(temp_dir),
+                                 "{}nonexistent".format(temp_dir),
+                                 temp_dir)
+
+            self.assertTrue('OOPS! We seem to have misplaced the zip file'
+                            in context.exception)
+
+    def test_empty_zip(self):
+        """
+        Tests that an empty zip file triggers a Exception with the proper message
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(Exception) as context:
+            hqa.extract_zip_file("{}empty.zip".format(temp_dir),
+                                 "{}empty_result".format(temp_dir),
+                                 temp_dir)
+
+            self.assertTrue('Somehow the zip is empty' in context.exception)
+
+    def test_fake_zip(self):
+        """
+        Tests that a fake zip file (a non-zip file but with a changed extension
+        to .zip) triggers a BadZipFile error
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(BadZipFile):
+            hqa.extract_zip_file("{}fake.zip".format(temp_dir),
+                                 "{}fake_result".format(temp_dir),
+                                 temp_dir)
+
+    def test_file_not_zip(self):
+        """
+        Tests that a txt file triggers a BadZipFile error
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(BadZipFile):
+            hqa.extract_zip_file("{}not_zip.txt".format(temp_dir),
+                                 "{}not_zip".format(temp_dir),
+                                 temp_dir)
+
+    def test_zip_content_not_txt(self):
+        """
+        Tests that a zip file that contains a file that isn't a .txt file
+        triggers a Exception with the proper message
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(Exception) as context:
+            hqa.extract_zip_file("{}file_not_txt.zip".format(temp_dir),
+                                 "{}not_text".format(temp_dir),
+                                 temp_dir)
+
+            self.assertTrue('The file in the zip file needs to be a .txt'
+                            in context.exception)
+
+    def test_zip_contains_multiple_txts(self):
+        """
+        Tests that a zip file that contains a file that isn't a .txt file
+        triggers a Exception with the proper message
+        :return:
+        """
+        temp_dir = TestZipFileExtraction.TEMP_DIR
+
+        with self.assertRaises(Exception) as context:
+            hqa.extract_zip_file("{}2_txts.zip".format(temp_dir),
+                                 "{}2_txts".format(temp_dir),
+                                 temp_dir)
+
+            self.assertTrue('The zip file needs to only contain 1 file but 2 were found'
+                            in context.exception)

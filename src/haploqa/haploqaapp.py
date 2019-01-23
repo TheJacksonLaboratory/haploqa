@@ -539,14 +539,14 @@ def extract_zip_file(zip_saved_filename, new_filename, temp_dir):
             else:
                 # catching alternative states and raising respective errors
                 if len(contents) > 1:
-                    raise Exception('The final report zip file needs to only contain '
-                                    '1 txt file but {} were found'.format(len(contents)))
+                    raise Exception('The zip file needs to only contain '
+                                    '1 file but {} were found'.format(len(contents)))
                 elif len(contents) == 0:
-                    raise Exception('Somehow the final report zip is empty')
+                    raise Exception('Somehow the zip is empty')
                 elif not contents[0].endswith('.txt'):
-                    raise Exception('The final report in the zip file needs to be a txt file')
+                    raise Exception('The file in the zip file needs to be a .txt')
     else:
-        raise FileNotFoundError('OOPS: We seem to have misplaced the final report')
+        raise FileNotFoundError('OOPS! We seem to have misplaced the zip file')
 
 
 def _unique_temp_filename():
@@ -681,6 +681,7 @@ def sample_data_export_file():
 
     return resp
 
+
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
     """
@@ -789,7 +790,7 @@ def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report
         if f_report_is_zip:
             # This could take a while depending on the size
             try:
-                extract_zip(final_report_temp_filename, final_report_filename, temp_dir)
+                extract_zip_file(final_report_temp_filename, final_report_filename, temp_dir)
             except BadZipFile:
                 raise BadZipFile('Error: The final report you provided is a bad zipfile')
             except Exception:
