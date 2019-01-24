@@ -23,8 +23,8 @@
                 importTaskProgressBar.text('data import failed');
                 importTaskProgressBar.removeClass('active progress-bar-striped');
                 importTaskProgressBar.addClass('progress-bar-danger');
-                if(data.error_message) {
-                    errorAlertMessage.text(data.error_message);
+                if(data.responseJSON) {
+                    errorAlertMessage.text(data.responseJSON.error_message);
                 } else {
                     errorAlertMessage.text('Unknown server error: make sure your mapping and report files are correctly ' +
                         'selected. If this error persists, please contact us at haploqa@jax.org with an in-depth description of what the issue is');
@@ -62,9 +62,11 @@
     </div>
 
     <p>
-        This page gives status for the sample data upload. It will typically require about two or three seconds
-        per GigaMUGA sample for import to complete. MegaMUGA imports should progress significantly faster. Once the import
-        is complete this page will display a link which allows you to edit and analyze the samples which have been uploaded.
+        This page gives status for the sample data upload. If you uploaded your final report file as a .zip, this process
+        will take extra time as the file needs to be extracted. Once the import begins, it will typically require about
+        two or three seconds per GigaMUGA sample for import to complete. MegaMUGA imports should progress significantly
+        faster, and MUGA imports should be fairly quick. Once the import is complete this page will display a link which
+        allows you to edit and analyze the samples which have been uploaded.
     </p>
 
     <!-- a bootstrap progress bar for the import -->

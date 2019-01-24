@@ -25,4 +25,13 @@ HAPLOQA_CONFIG = {
     'SMTP_PORT': 25,
 
     'MIN_PASSWORD_LENGTH': 8,
+    # If running on a server, USE_DEFAULT_TMP should be set to False, as the
+    # default tmp/ directory on the VMs doesn't have enough allocated memory
+    # to support large import files. In the case of being run on a server,
+    # ensure that there is a replacement directory in a location that has ample
+    # space for tmp files (they will be removed once the samples are imported)
+    # and change 'TMP_DIRECTORY' to the absolute path of that directory. If
+    # running locally, it may be easier to set this to True
+    'USE_DEFAULT_TMP': True,
+    'TMP_DIRECTORY_': '/data/data_upload/'
 }

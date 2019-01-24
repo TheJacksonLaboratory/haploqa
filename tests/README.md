@@ -4,7 +4,7 @@
     Currently the tests folder in the HaploQA project includes only tests that can be run using the python
     unittest tool.
 
-    You will run these tests from the project src directory (so that tests is a subdirectory).
+    You will run these tests from the project root directory (so that tests/ and src/ are subdirectories).
 
     Before you can run these tests, you'll need to put the 'src' directory into your python path:
 * * *
@@ -12,7 +12,7 @@
     export PYTHONPATH=src/
 
     If testing locally make sure and set your remote address to 127.0.0.1 instead of the default of None.
-    (see the _set_session() method of test_haploqa.py for where to do this)
+    (see the _set_session() method of test_haploqa.py for where to do this) and that you have MongoDB running as well.
 
 ## Syntax for running tests
 ______________________
@@ -21,7 +21,7 @@ ______________________
 
     python -m unittest tests.test_haploqa
 
-### Run in verbose mode *(recommended,  as this shows the test name being run and its relevant comments):*
+### Run in verbose mode *(recommended, as this shows the test name being run and its relevant comments)*
 
     python -m unittest -v tests.test_haploqa
 

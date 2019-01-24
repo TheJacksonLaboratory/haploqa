@@ -15,6 +15,8 @@ import tempfile
 import traceback
 import uuid
 from werkzeug.routing import BaseConverter
+from zipfile import ZipFile
+from zipfile import BadZipFile
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -490,10 +492,70 @@ def change_password_html():
 #####################################################################
 # DATA IMPORT FUNCTIONS
 #####################################################################
+def get_temp_directory():
+    """
+    Returns the temp directory for the app
+    :return: the temp directory's absolute path
+    """
+    # if the config specifies that we're not using the default temp directory,
+    # use the temp directory specified in the config, otherwise, use Flask's temp
+    # directory location
+    if not HAPLOQA_CONFIG['USE_DEFAULT_TMP']:
+        return HAPLOQA_CONFIG['TMP_DIRECTORY']
+    else:
+        return tempfile.tempdir
+
+
+def extract_zip_file(zip_saved_filename, new_filename, temp_dir):
+    """
+    Extracts the specified zip file at the zip_saved_filename path, saving the
+    text file under the filename the import celery task will look for (new_filename)
+    :param zip_saved_filename: the absolute filename of the saved zip file
+    :param new_filename: the filename to save the extracted file as
+    :param temp_dir: the absolute path of the temp directory for the app
+    :return:
+    """
+
+    # check that the saved zip file exists
+    if os.path.exists(zip_saved_filename):
+        with ZipFile(zip_saved_filename) as zip_ref:
+            # take a look at the contents of the zip
+            contents = zip_ref.namelist()
+            # the zip file should contain a single txt file
+            if len(contents) == 1 and contents[0].endswith('.txt'):
+                raw_filename = contents[0]
+                # extract the file to the temp directory
+                zip_ref.extractall(temp_dir)
+                zip_ref.close()
+
+                # since the extracted file will have its own name, rename it
+                # with the non-temporary filename
+                os.rename(os.path.join(temp_dir, raw_filename), new_filename)
+
+                # remove the zip file since we don't need it anymore
+                if os.path.isfile(zip_saved_filename):
+                    os.remove(zip_saved_filename)
+
+            else:
+                # catching alternative states and raising respective errors
+                if len(contents) > 1:
+                    raise Exception('The zip file needs to only contain '
+                                    '1 file but {} were found'.format(len(contents)))
+                elif len(contents) == 0:
+                    raise Exception('Somehow the zip is empty')
+                elif not contents[0].endswith('.txt'):
+                    raise Exception('The file in the zip file needs to be a .txt')
+    else:
+        raise FileNotFoundError('OOPS! We seem to have misplaced the zip file')
 
 
 def _unique_temp_filename():
-    return os.path.join(tempfile.tempdir, str(uuid.uuid4()))
+    """
+    Returns a path to the apps temp directory (where the file will be saved) plus
+    a generated uuid (what the file will be named)
+    :return: the absolute path filename for a file
+    """
+    return os.path.join(get_temp_directory(), str(uuid.uuid4()))
 
 
 @app.route('/sample-import-status/<task_id>.html')
@@ -619,6 +681,7 @@ def sample_data_export_file():
 
     return resp
 
+
 @app.route('/sample-data-import.html', methods=['GET', 'POST'])
 def sample_data_import_html():
     """
@@ -637,16 +700,57 @@ def sample_data_import_html():
 
         if flask.request.method == 'POST':
             platform_id = form['platform-select']
+            no_errors = True
+            error_msg = ''
+            f_report_is_zip = False
+            s_map_is_zip = False
+
             if len(files) < 2:
                 return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
-                                             msg='Error: you must provide both files in order to process your request')
+                                             msg='Error: You must provide both a sample map and final report in order to import samples')
             else:
                 sample_map_filename = _unique_temp_filename()
-                files['sample-map-file'].save(sample_map_filename)
+                sample_map_file = files['sample-map-file']
+                sample_map_temp_filename = sample_map_filename + '_temp'
+
+                # if the sample map is a .zip, try to extract and save the content
+                if sample_map_file.filename.endswith('.zip'):
+                    # if it isn't a true zip, we'll catch it later
+                    s_map_is_zip = True
+
+                # save the file and if it's a zip file, extract it
+                try:
+                    if s_map_is_zip:
+                        sample_map_file.save(sample_map_temp_filename)
+                        extract_zip_file(sample_map_temp_filename, sample_map_filename, get_temp_directory())
+                    else:
+                        sample_map_file.save(sample_map_filename)
+                except BadZipFile:
+                    no_errors = False
+                    error_msg = 'Error: The sample map you provided is a bad zipfile'
+                except Exception:
+                    no_errors = False
+                    error_msg = 'Error: There was an issue with your sample map zip file'
 
                 final_report_filename = _unique_temp_filename()
                 final_report_file = files['final-report-file']
-                final_report_file.save(final_report_filename)
+                final_report_temp_filename = final_report_filename + '_temp'
+
+                # if the final report is a .zip, try to extract and save the content
+                if final_report_file.filename.endswith('.zip'):
+                    # if it isn't a true zip, we'll catch it later
+                    f_report_is_zip = True
+
+                # save the file here, regardless of whether it's a zip or not,
+                # we'll extract it in the celery task if it's a zip
+                try:
+                    if f_report_is_zip:
+                        final_report_file.save(final_report_temp_filename)
+                    else:
+                        final_report_file.save(final_report_filename)
+                except Exception:
+                    no_errors = False
+                    error_msg = 'Error: There was an issue saving your final report file'
 
                 generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
                 on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
@@ -658,29 +762,45 @@ def sample_data_import_html():
                     user_email,
                     generate_ids,
                     on_duplicate,
-                    final_report_filename,
+                    final_report_temp_filename, final_report_filename,
                     sample_map_filename,
                     platform_id,
-                    sample_group_name,
+                    sample_group_name, f_report_is_zip, get_temp_directory()
                 )
 
                 # perform a 303 redirect to the URL that uniquely identifies this run
-                new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
-                return flask.redirect(new_location, 303)
+                if no_errors is True:
+                    new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
+                    return flask.redirect(new_location, 303)
+                else:
+                    return flask.render_template('sample-data-import.html',
+                                                 platform_ids=platform_ids,
+                                                 msg=error_msg)
         else:
             return flask.render_template('sample-data-import.html', platform_ids=platform_ids)
 
 
 @celery.task(name='sample_data_import_task')
-def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report_filename, sample_map_filename, platform_id, sample_group_name):
+def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report_temp_filename, final_report_filename,
+                            sample_map_filename, platform_id, sample_group_name, f_report_is_zip, temp_dir):
     """
     Our long-running import task, triggered from the import page of the app
     """
     try:
+        if f_report_is_zip:
+            # This could take a while depending on the size
+            try:
+                extract_zip_file(final_report_temp_filename, final_report_filename, temp_dir)
+            except BadZipFile:
+                raise BadZipFile('Error: The final report you provided is a bad zipfile')
+            except Exception:
+                raise Exception('Error: There was an issue extracting your final report file')
+
         db = mds.get_db()
         tags = [sample_group_name, platform_id]
         sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
-        finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename, sample_anno_dicts, platform_id, tags, db)
+        finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename,
+                                    sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
         try:
