@@ -5,6 +5,9 @@ from bson import ObjectId
 import os
 import distutils.dir_util as dir_util
 from zipfile import BadZipFile
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 class TestHaploQA(unittest.TestCase):
@@ -27,12 +30,12 @@ class TestHaploQA(unittest.TestCase):
         db.users.insert_one(test_user)
         # make the user id available to the tests
         cls._uid = uid
-        print("Setup: Created test user {}".format(uid))
+        logging.debug("Setup: Created test user {}".format(uid))
         # find a private sample not owned by the test user
         sample = db.samples.find_one({'sample_id': "32C"})
         sample2 = sample
         sample_id = ObjectId()
-        print("Setup: test sample id is {}".format(sample_id))
+        logging.debug("Setup: test sample id is {}".format(sample_id))
         sample2['_id'] = sample_id
         #make the id available to the tests
         cls._sample_id = sample_id
@@ -41,7 +44,7 @@ class TestHaploQA(unittest.TestCase):
         sample2['is_public'] = True
         sample2['owner'] = tester_email
         db.samples.insert_one(sample2)
-        print("Setup: creating test client")
+        logging.debug("Setup: creating test client")
         client = hqa.app.test_client()
         # make the flask test client available for the tests
         cls._client = client
@@ -55,9 +58,9 @@ class TestHaploQA(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._db.samples.delete_one({"sample_id": "unit_tester"})
-        print("Teardown: removed test sample")
+        logging.debug("Teardown: removed test sample")
         cls._db.users.delete_one({"email_address_lowercase": cls._tester_email})
-        print("Teardown: removed test user")
+        logging.debug("Teardown: removed test user")
 
     def setUp(self):
         # clear the session
@@ -83,8 +86,7 @@ class TestHaploQA(unittest.TestCase):
             sess['user_email_address'] = email
             sess['administrator'] = admin
             # set to 127.0.0.1 if testing locally
-            #sess['remote_addr'] = None
-            sess['remote_addr'] = '127.0.0.1'
+            sess['remote_addr'] = None
 
     def _switch_sample(self, public=True, owner=None):
         """
@@ -317,9 +319,10 @@ class TestHaploQA(unittest.TestCase):
         db = mdb.get_db()
         sample = db.samples.find_one({'sample_id': "unit_tester"})
         if sample:
-            print("sample id: {}, visibility: {}, owner: {}".format(sample['_id'], sample['is_public'], sample['owner']))
+            logging.debug("sample id: {}, visibility: {}, owner: {}"
+                          .format(sample['_id'], sample['is_public'], sample['owner']))
         else:
-            print("no test sample found!")
+            logging.debug("no test sample found!")
 
 
 class TestZipFileExtraction(unittest.TestCase):
@@ -339,15 +342,15 @@ class TestZipFileExtraction(unittest.TestCase):
         test_data_dir = TestZipFileExtraction.TEST_DATA_DIR
 
         if not os.path.exists(temp_dir):
-            print("Creating temp directory")
+            logging.debug("Creating temp directory")
             # make a temp directory with a copy of the static test files
             os.makedirs(temp_dir)
             if os.path.exists(temp_dir):
-                print("Temp directory exists")
+                logging.debug("Temp directory exists")
             else:
-                print("Temp directory is missing")
+                logging.debug("Temp directory is missing")
             if os.path.exists(test_data_dir):
-                print("Copying test files into temp directory")
+                logging.debug("Copying test files into temp directory")
                 dir_util.copy_tree(test_data_dir, temp_dir)
 
     @classmethod
@@ -359,7 +362,7 @@ class TestZipFileExtraction(unittest.TestCase):
         """
         temp_dir = TestZipFileExtraction.TEMP_DIR
         if os.path.exists(temp_dir):
-            print("Removing temp directory")
+            logging.debug("Removing temp directory")
             # remove the temp directory and all of the contents
             dir_util.remove_tree(temp_dir)
 
