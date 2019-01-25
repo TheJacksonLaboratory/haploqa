@@ -33,5 +33,5 @@ HAPLOQA_CONFIG = {
     # and change 'TMP_DIRECTORY' to the absolute path of that directory. If
     # running locally, it may be easier to set this to True
     'USE_DEFAULT_TMP': True,
-    'TMP_DIRECTORY_': '/data/data_upload/'
+    'TMP_DIRECTORY': '/data/data_upload/'
 }
