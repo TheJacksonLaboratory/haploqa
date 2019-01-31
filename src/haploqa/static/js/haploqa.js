@@ -38,16 +38,13 @@ function deepCopyObj(obj) {
 }
 
 function showConfirmMessage(msg) {
-    var modalDialog = $('#confirm-modal');
-    modalDialog.modal();
+    $('#confirm-modal').modal();
     $('#confirm-modal-message').text(msg);
 }
 
 function showErrorMessage(msg) {
-    var modalDialog = $('#error-modal');
-    var errorModalMessage = $('#error-modal-message');
-    modalDialog.modal();
-    errorModalMessage.html(msg);
+    $('#error-modal').modal();
+    $('#error-modal-message').text(msg);
 }
 
 function anyResultsPending(haploData) {

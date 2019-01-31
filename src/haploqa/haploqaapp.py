@@ -303,30 +303,22 @@ def remove_user():
         return flask.jsonify({'success': False})
 
 
-@app.route('/invite-user.html', methods=['GET', 'POST'])
-def invite_user_html():
+@app.route('/create-account.html', methods=['GET', 'POST'])
+def create_account_html():
     """
-    Invite a new user to the application using their email address. Upon get
-    the invite-user template is rendered. Upon successful POST the
-    invite email is sent out and message displayed about invite being sent
+    Creates a new account for the application. Upon get the create-account
+    template is rendered. Upon successful POST the validation email is sent out
+    and message displayed about invite being sent
     """
+    if flask.request.method == 'GET':
+        return flask.render_template('create-account.html')
+    elif flask.request.method == 'POST':
+        form = flask.request.form
+        if (usrmgmt.create_account(form['email'], form['password'], form['affiliation'])) is not None:
+            return flask.jsonify({'success': True})
+        else:
+            return flask.jsonify({'success': False, 'msg': 'user already exists'})
 
-    user = flask.g.user
-    if user['administrator'] or user['curator']:
-        if flask.request.method == 'GET':
-            return flask.render_template('invite-user.html')
-        elif flask.request.method == 'POST':
-            form = flask.request.form
-            if (usrmgmt.invite_user(form['email'], form['affiliation'])) is not None:
-                return flask.render_template(
-                    'invite-user.html',
-                    msg='Your invite has been sent')
-            else:
-                return flask.render_template(
-                    'invite-user.html',
-                    msg='That user already exists, please try again')
-    else:
-        return flask.render_template('login-required.html')
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])
 def reset_password_html():
@@ -382,6 +374,35 @@ def _form_login():
 def logout_json():
     _set_session_user(None)
     return flask.jsonify({'success': True})
+
+
+@app.route('/validate-account-email/<hash_id>.html', methods=['GET'])
+def validate_account(hash_id):
+    """
+    A user should only be directed to this page if they received a confirmation
+    email on an account creation. This page only acts as a redirect to mark the
+    account as validated
+    :param hash_id:
+    :return:
+    """
+    db = mds.get_db()
+    user_to_validate = db.users.find_one({'password': usrmgmt.hash_str(hash_id)})
+
+    if user_to_validate:
+        if user_to_validate['validated']:
+            raise Exception('It appears your account has already been validated')
+        else:
+            db.users.find_one_and_update({'password': usrmgmt.hash_str(hash_id)},
+                                         {'$set': {'validated': True}})
+
+            user = usrmgmt.authenticate_user(user_to_validate['email_address'],
+                                             user_to_validate['password_hash'],
+                                             db)
+            _set_session_user(user)
+            return flask.redirect(flask.url_for('index_html'), 303)
+    else:
+        return flask.render_template(flask.url_for('index_html'))
+
 
 
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])

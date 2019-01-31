@@ -47,7 +47,7 @@
 
         $(document).ready(function() {
             if(flashMessages.length) {
-                showErrorMessage(flashMessages[0]);
+                showNotificationMessage(flashMessages[0]);
             }
 
             var loginBannerEmail = $('#login-banner-email');
@@ -185,7 +185,6 @@
                             {% if g.user.administrator == True or g.user.curator == True%}
                                 <li><a href="{{ url_for('hap_cands') }}">Haplotype Candidate Samples</a></li>
                                 <li><a href="{{ url_for('st_des_admin') }}">Strain Name Admin</a></li>
-                                <li><a href="{{ url_for('invite_user_html') }}">Invite New User</a></li>
                                 <li><a href="{{ url_for('sample_data_export_html') }}">Sample Data Export</a></li>
                             {% endif %}
                             {% if g.user.administrator == True %}
@@ -196,6 +195,12 @@
                         </ul>
                     </li>
                 {% else %}
+                    <li style="background-color:#2e6da4">
+                        <a href="{{ url_for('create_account_html') }}" style="color:#fff">
+                            <span class="glyphicon glyphicon-edit" aria-hidden="true"></span>
+                            Sign Up
+                        </a>
+                    </li>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             <span class="glyphicon glyphicon-user" aria-hidden="true"></span>
@@ -204,10 +209,10 @@
                         <div class="dropdown-menu" style="width: 400px;">
                             <form class="form dropdown-form">
                                 <div class="form-group">
-                                    <input type="email" class="form-control" id="login-banner-email" name="email" placeholder="name@example.com">
+                                    <input type="email" class="form-control" id="login-banner-email" name="email" placeholder="Email address">
                                 </div>
                                 <div class="form-group">
-                                    <input type="password" class="form-control" id="login-banner-password" name="password">
+                                    <input type="password" class="form-control" id="login-banner-password" name="password" placeholder="Password">
                                 </div>
                                 <div class="form-group">
                                     <button id="login-banner-button" class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Login</button>
@@ -234,7 +239,7 @@
                 </div>
                 <div id="error-modal-message" class="modal-body"></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">OK</button>
                 </div>
             </div>
         </div>
@@ -259,8 +264,15 @@
     <!-- Notification Modal -->
     <div id="notification-modal" class="modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
+            <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span
+                            aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            </div>
             <div class="modal-content">
                 <div id="modal-message" class="modal-body"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">OK</button>
             </div>
         </div>
     </div>

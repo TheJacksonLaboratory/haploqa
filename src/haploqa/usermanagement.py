@@ -106,56 +106,63 @@ def authenticate_user(email_address, password, db):
             user.pop('salt', None)
             # record login timestamp
             ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
-            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login' : ts}})
+            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login': ts}})
             return user
         else:
             return None
     else:
         return None
 
-def invite_user(email_address, affiliation, db=None):
-    '''
+
+def create_account(email_address, password, affiliation, db=None):
+    """
     invite regular user
     :param email_address:
+    :param password:
     :param affiliation
     :param db:
     :return:
-    '''
+    """
     if db is None:
         db = mds.get_db()
 
     email_address = email_address.strip()
 
-    #check and see if user already exists first
+    # check and see if user already exists first
     user = db.users.find_one({
         'email_address_lowercase': email_address.strip().lower(),
     })
 
     if user is None:
         ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
-        password_reset_id = str(uuid4())
+        new_salt = str(uuid4())
+
         db.users.insert({
             'created': ts,
             'email_address': email_address,
             'email_address_lowercase': email_address.lower(),
             'affiliation': affiliation,
             'administrator': False,
-            'password_reset_hash': hash_str(password_reset_id),
+            'salt': new_salt,
+            'password_hash': hash_str(password + new_salt),
+            'validated': False
         })
 
         msg_template = \
-            '''You have been invited to create a HaploQA account. ''' \
-            '''To validate your account and create a password, visit this link: {} ''' \
-            '''Please ignore this message if it was sent in error.'''
-        msg = MIMEText(msg_template.format(flask.url_for(
-            'validate_reset',
-            password_reset_id=password_reset_id,
-            _external=True)))
+            '''An account for HaploQA has been created for this email address. '''\
+            '''If you have requested an account to be made, ''' \
+            '''please follow this link to validate your account: {} ''' \
+            '''If you did not request an account, please ignore this email.'''
+        msg = MIMEText(msg_template.format(flask.url_for('validate_account',
+                                                         hash_id=new_salt,
+                                                         _external=True)))
 
         from_addr = noreply_address()
         msg['Subject'] = 'Confirm HaploQA Account'
         msg['From'] = from_addr
         msg['To'] = email_address
+
+        print(msg)
 
         # Send the message via our own SMTP server, but don't include the
         # envelope header.
