@@ -415,29 +415,6 @@ def logout_json():
     return flask.jsonify({'success': True})
 
 
-class EmailAlreadyValidated(Exception):
-    status_code = 400
-
-    def __init__(self, message, status_code=None, payload=None):
-        Exception.__init__(self)
-        self.message = message
-        if status_code is not None:
-            self.status_code = status_code
-        self.payload = payload
-
-    def to_dict(self):
-        rv = dict(self.payload or ())
-        rv['message'] = self.message
-        return rv
-
-
-@app.errorhandler(EmailAlreadyValidated)
-def handle_email_already_validated(error):
-    response = flask.jsonify(error.to_dict())
-    response.status_code = error.status_code
-    return response
-
-
 @app.route('/validate-account-email/<hash_id>.html', methods=['GET'])
 def validate_account(hash_id):
     """
@@ -452,8 +429,8 @@ def validate_account(hash_id):
 
     if user_to_validate is not None:
         if user_to_validate['validated']:
-            raise EmailAlreadyValidated('It appears the account for this '
-                                        'email has already been validated')
+            flask.flash("It appears the account for this email has already been validated")
+            return flask.redirect(flask.url_for('index_html'), 303)
         else:
             db.users.find_one_and_update({'password_hash': hash_id},
                                          {'$set': {'validated': True}})
