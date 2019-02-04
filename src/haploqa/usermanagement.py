@@ -41,6 +41,7 @@ def lookup_salt(email_address, db):
     else:
         return None
 
+
 def switch_user_privs(email_address, user_type):
     """
     updates a users status
@@ -65,6 +66,7 @@ def switch_user_privs(email_address, user_type):
     else:
         return None
 
+
 def remove_user(email_address):
     """
     remove a user from the system
@@ -84,6 +86,7 @@ def remove_user(email_address):
         return True
     else:
         return None
+
 
 def authenticate_user(email_address, password, db):
     """

@@ -32,6 +32,6 @@ HAPLOQA_CONFIG = {
     # space for tmp files (they will be removed once the samples are imported)
     # and change 'TMP_DIRECTORY' to the absolute path of that directory. If
     # running locally, it may be easier to set this to True
-    'USE_DEFAULT_TMP': True,
+    'USE_DEFAULT_TMP': False,
     'TMP_DIRECTORY': '/data/data_upload/'
 }
