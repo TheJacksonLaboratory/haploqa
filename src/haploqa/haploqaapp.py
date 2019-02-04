@@ -122,6 +122,7 @@ def _make_celery(app):
     celery.Task = ContextTask
     return celery
 
+
 celery = _make_celery(app)
 
 
@@ -177,6 +178,7 @@ def lookup_user_from_session():
                 _set_session_user(None)
         else:
             flask.g.user = None
+
 
 @app.route('/hap-candidates.html')
 def hap_cands():
@@ -270,6 +272,7 @@ def show_users():
         users=users,
     )
 
+
 @app.route('/update_user_privs.json', methods=['POST'])
 def update_user_privs():
     """
@@ -285,6 +288,7 @@ def update_user_privs():
         return flask.jsonify({'success': True})
     else:
         return flask.jsonify({'success': False})
+
 
 @app.route('/remove-user.json', methods=['POST'])
 def remove_user():
@@ -303,6 +307,29 @@ def remove_user():
         return flask.jsonify({'success': False})
 
 
+class UserExists(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+
+@app.errorhandler(UserExists)
+def handle_user_exists(error):
+    response = flask.jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+
 @app.route('/create-account.html', methods=['GET', 'POST'])
 def create_account_html():
     """
@@ -310,14 +337,25 @@ def create_account_html():
     template is rendered. Upon successful POST the validation email is sent out
     and message displayed about invite being sent
     """
-    if flask.request.method == 'GET':
-        return flask.render_template('create-account.html')
-    elif flask.request.method == 'POST':
-        form = flask.request.form
-        if (usrmgmt.create_account(form['email'], form['password'], form['affiliation'])) is not None:
-            return flask.jsonify({'success': True})
-        else:
-            return flask.jsonify({'success': False, 'msg': 'user already exists'})
+
+    user = flask.g.user
+    if user is None:
+        if flask.request.method == 'GET':
+            return flask.render_template('create-account.html')
+        elif flask.request.method == 'POST':
+            form = flask.request.form
+            u = usrmgmt.create_account(form['email'],
+                                       form['password'],
+                                       form['affiliation'])
+
+            if u is not None:
+                return flask.jsonify({'success': True})
+            else:
+                raise UserExists('user already exists')
+    else:
+        return flask.redirect(flask.url_for('index_html',
+                                            msg='You are already logged into an account'),
+                              303)
 
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])
@@ -332,6 +370,7 @@ def reset_password_html():
                 msg='An email has been sent to you with instructions for resetting your password')
         else:
             return flask.render_template('reset-password.html', msg="That email does not exist in the system")
+
 
 @app.route('/login.json', methods=['POST'])
 def login_json():
@@ -376,6 +415,29 @@ def logout_json():
     return flask.jsonify({'success': True})
 
 
+class EmailAlreadyValidated(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+
+@app.errorhandler(EmailAlreadyValidated)
+def handle_email_already_validated(error):
+    response = flask.jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+
 @app.route('/validate-account-email/<hash_id>.html', methods=['GET'])
 def validate_account(hash_id):
     """
@@ -386,23 +448,25 @@ def validate_account(hash_id):
     :return:
     """
     db = mds.get_db()
-    user_to_validate = db.users.find_one({'password': usrmgmt.hash_str(hash_id)})
+    user_to_validate = db.users.find_one({'password_hash': hash_id})
 
-    if user_to_validate:
+    if user_to_validate is not None:
         if user_to_validate['validated']:
-            raise Exception('It appears your account has already been validated')
+            raise EmailAlreadyValidated('It appears the account for this '
+                                        'email has already been validated')
         else:
-            db.users.find_one_and_update({'password': usrmgmt.hash_str(hash_id)},
+            db.users.find_one_and_update({'password_hash': hash_id},
                                          {'$set': {'validated': True}})
 
-            user = usrmgmt.authenticate_user(user_to_validate['email_address'],
-                                             user_to_validate['password_hash'],
-                                             db)
+            user = usrmgmt.authenticate_user_hash(user_to_validate['email_address'],
+                                                  user_to_validate['password_hash'],
+                                                  db)
             _set_session_user(user)
+            flask.flash("Your email has successfully been validated")
             return flask.redirect(flask.url_for('index_html'), 303)
     else:
-        return flask.render_template(flask.url_for('index_html'))
-
+        flask.flash("You don't have permission to view this page")
+        return flask.redirect(flask.url_for('index_html'), 303)
 
 
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])

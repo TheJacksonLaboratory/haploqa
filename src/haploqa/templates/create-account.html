@@ -8,6 +8,10 @@
     {{ super() }}
     <script>
         $(function() {
+            $('#notification-dismiss').on('click', function() {
+                location.href = "{{ url_for('index_html') }}"
+            });
+
             $('#create-account-button').on('click', function() {
             var allFieldChecksPass = checkEmails() && checkPasswords() && checkAffiliation();
             if(allFieldChecksPass) {
@@ -20,22 +24,19 @@
                         affiliation: $("#affiliation").val()
                     },
                     dataType: 'json',
-                    success: function(data) {
+                    success: function() {
+                        showNotificationMessage('You should receive an email with a link to follow to finish the set up ' +
+                                                'process. Note: Some SPAM filters may mistakenly mark this email as spam ' +
+                                                'so if you do not receive an email, make sure to check your spam.')
+                    }}).error(function(data) {
                         console.log(data);
-                        showNotificationMessage('You should receive an email with a link to follow to finish the set up process. ' +
-                            'Note: Some SPAM filters may mistakenly mark this email as spam so if you do not ' +
-                            'receive an email, make sure to check your spam.')
-                    },
-                    fail: function(data) {
-                        console.log(data);
-                        if(data.msg === 'user already exists') {
-                            showErrorMessage('There is already an account associated with this email address. Please try to' +
-                                ' log in or reset your password (located under login fields in dropdown).')
+                        if(data.responseJSON && data.responseJSON.message === 'user already exists') {
+                            showErrorMessage('There is already an account associated with this email address. Please try ' +
+                                             'to log in or reset your password (located under login fields in dropdown).')
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            });
 
         function checkEmails() {
             var email = $("#email").val();

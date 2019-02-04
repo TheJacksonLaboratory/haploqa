@@ -114,6 +114,34 @@ def authenticate_user(email_address, password, db):
         return None
 
 
+def authenticate_user_hash(email_address, hash_id, db):
+    """
+    Perform authentication for a user using a hash_id instead of password
+    :param email_address: the email address to authenticate
+    :param hash_id: the hash to check
+    :param db: the database
+    :return: the user dict from mongo upon success and None upon failure
+    """
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    }, {
+        'password_reset_hash': 0,
+    })
+    if user is not None:
+        if hash_id == user['password_hash']:
+            # remove the password_hash to prevent it from leaking out
+            user.pop('password_hash', None)
+            user.pop('salt', None)
+            # record login timestamp
+            ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login': ts}})
+            return user
+        else:
+            return None
+    else:
+        return None
+
+
 def create_account(email_address, password, affiliation, db=None):
     """
     invite regular user
@@ -154,15 +182,13 @@ def create_account(email_address, password, affiliation, db=None):
             '''please follow this link to validate your account: {} ''' \
             '''If you did not request an account, please ignore this email.'''
         msg = MIMEText(msg_template.format(flask.url_for('validate_account',
-                                                         hash_id=new_salt,
+                                                         hash_id=hash_str(password + new_salt),
                                                          _external=True)))
 
         from_addr = noreply_address()
         msg['Subject'] = 'Confirm HaploQA Account'
         msg['From'] = from_addr
         msg['To'] = email_address
-
-        print(msg)
 
         # Send the message via our own SMTP server, but don't include the
         # envelope header.

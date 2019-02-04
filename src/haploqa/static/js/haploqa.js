@@ -42,6 +42,11 @@ function showConfirmMessage(msg) {
     $('#confirm-modal-message').text(msg);
 }
 
+function showNotificationMessage(msg) {
+    $('#notification-modal').modal();
+    $('#notification-modal-message').text(msg);
+}
+
 function showErrorMessage(msg) {
     $('#error-modal').modal();
     $('#error-modal-message').text(msg);
