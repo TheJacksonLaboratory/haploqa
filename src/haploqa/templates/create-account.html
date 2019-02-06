@@ -8,10 +8,20 @@
     {{ super() }}
     <script>
         $(function() {
+            /**
+             * When the notification modal is dismissed, redirect the user to the home page
+             */
             $('#notification-dismiss').on('click', function() {
                 location.href = "{{ url_for('index_html') }}"
             });
 
+            /**
+             * When the create button is clicked, check that all of the necessary fields are filled out and that the
+             * emails and passwords entered match; if all conditions pass, make a POST with the new user's email,
+             * password, and affiliation; if the POST is successful, show a notification modal describing that the user
+             * should receive an email to confirm their account; if the POST returns a UserAlreadyExists error, show a
+             * relevant modal to instruct the user to login with their account, otherwise, provide a general error message
+             */
             $('#create-account-button').on('click', function() {
             var allFieldChecksPass = checkEmails() && checkPasswords() && checkAffiliation();
             if(allFieldChecksPass) {
@@ -33,55 +43,73 @@
                         if(data.responseJSON && data.responseJSON.message === 'user already exists') {
                             showErrorMessage('There is already an account associated with this email address. Please try ' +
                                              'to log in or reset your password (located under login fields in dropdown).')
+                        } else {
+                            showErrorMessage('Sorry, we ran into an issue, if this issue persists, please contact ' +
+                                             'haploqa@jax.org. Please try again.')
                         }
                     });
                 }
             });
 
-        function checkEmails() {
-            var email = $("#email").val();
-            var emailConf = $("#email-confirm").val();
+            /**
+             * Check that both email fields are filled and they match; if they don't, show appropriate message to
+             * instruct user how to fix
+             * @returns {boolean}
+             */
+            function checkEmails() {
+                var email = $("#email").val();
+                var emailConf = $("#email-confirm").val();
 
-            if(email.length === 0) {
-                showErrorMessage('You need to enter an email address');
-                return false;
-            } else if(emailConf.length === 0) {
-                showErrorMessage('You need to confirm your email address');
-                return false;
-            } else if(email !== emailConf) {
-                showErrorMessage('The emails you entered do not match');
-                return false;
+                if(email.length === 0) {
+                    showErrorMessage('You need to enter an email address');
+                    return false;
+                } else if(emailConf.length === 0) {
+                    showErrorMessage('You need to confirm your email address');
+                    return false;
+                } else if(email !== emailConf) {
+                    showErrorMessage('The emails you entered do not match');
+                    return false;
+                }
+
+                return true;
             }
 
-            return true;
-        }
+            /**
+             * Check that both password fields are filled, they match, and the password is at least 6 characters long;
+             * if they don't, show appropriate message to instruct user how to fix
+             * @returns {boolean}
+             */
+            function checkPasswords() {
+                var pass = $("#password").val();
+                var passConf = $("#password-confirm").val();
 
-        function checkPasswords() {
-            var pass = $("#password").val();
-            var passConf = $("#password-confirm").val();
+                if(pass.length < 6) {
+                    showErrorMessage('Your password needs to be at least 6 characters');
+                    return false;
+                } else if(passConf.length === 0) {
+                    showErrorMessage('Your need to confirm your password');
+                    return false;
+                } else if(pass !== passConf) {
+                    showErrorMessage('The passwords you entered do not match');
+                    return false;
+                }
 
-            if(pass.length < 6) {
-                showErrorMessage('Your password needs to be at least 6 characters');
-                return false;
-            } else if(passConf.length === 0) {
-                showErrorMessage('Your need to confirm your password');
-                return false;
-            } else if(pass !== passConf) {
-                showErrorMessage('The passwords you entered do not match');
-                return false;
+                return true;
             }
 
-            return true;
-        }
+            /**
+             * Check that the affiliation field is filled; if it isn't, show appropriate message to instruct user
+             * how to fix
+             * @returns {boolean}
+             */
+            function checkAffiliation() {
+                if($("#affiliation").val().length === 0) {
+                    showErrorMessage('You need to enter an affiliation');
+                    return false;
+                }
 
-        function checkAffiliation() {
-            if($("#affiliation").val().length === 0) {
-                showErrorMessage('You need to enter an affiliation');
-                return false;
+                return true;
             }
-
-            return true;
-        }
         });
     </script>
 {% endblock %}
@@ -93,7 +121,7 @@
 
 <form id="create-account-form" class="form-horizontal">
     <div class="form-group">
-        <label for="email" class="col-md-3 control-label">Email <b class="required">*</b> </label>
+        <label for="email" class="col-md-3 control-label">Email <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-envelope" aria-hidden="true"></span></span>
             <input type="email" size="50" class="form-control" required id="email" name="email" placeholder="Email address">
@@ -101,7 +129,7 @@
     </div>
 
     <div class="form-group">
-        <label for="email-confirm" class="col-md-3 control-label">Confirm email <b class="required">*</b> </label>
+        <label for="email-confirm" class="col-md-3 control-label">Confirm email <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-envelope" aria-hidden="true"></span></span>
             <input type="email" size="50" class="form-control" required id="email-confirm" name="email-confirm" placeholder="Confirm email address">
@@ -111,7 +139,7 @@
     <br/>
 
     <div class="form-group">
-        <label for="password" class="col-md-3 control-label">Password <b class="required">*</b> </label>
+        <label for="password" class="col-md-3 control-label">Password <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-lock" aria-hidden="true"></span></span>
             <input type="password" size="50" class="form-control" data-minlength="6" required id="password" name="password" placeholder="Create password">
@@ -119,7 +147,7 @@
     </div>
 
     <div class="form-group">
-        <label for="password-confirm" class="col-md-3 control-label">Confirm password <b class="required">*</b> </label>
+        <label for="password-confirm" class="col-md-3 control-label">Confirm password <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-lock" aria-hidden="true"></span></span>
             <input type="password" size="50" class="form-control" data-minlength="6" required id="password-confirm" name="password-confirm" placeholder="Confirm password">
@@ -129,7 +157,7 @@
     <br/>
 
     <div class="form-group">
-        <label for="affiliation" class="col-md-3 control-label">Affiliation <b class="required">*</b> </label>
+        <label for="affiliation" class="col-md-3 control-label">Affiliation <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-briefcase" aria-hidden="true"></span></span>
             <input type="text" size="50" class="form-control" required id="affiliation" name="affiliation" placeholder="Affiliation">

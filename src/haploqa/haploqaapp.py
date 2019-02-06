@@ -421,7 +421,7 @@ def validate_account(hash_id):
     A user should only be directed to this page if they received a confirmation
     email on an account creation. This page only acts as a redirect to mark the
     account as validated
-    :param hash_id:
+    :param hash_id: the hash_id created from the new users password plus a salt
     :return:
     """
     db = mds.get_db()
