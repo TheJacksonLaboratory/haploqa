@@ -23,8 +23,7 @@
              * relevant modal to instruct the user to login with their account, otherwise, provide a general error message
              */
             $('#create-account-button').on('click', function() {
-            var allFieldChecksPass = checkEmails() && checkPasswords() && checkAffiliation();
-            if(allFieldChecksPass) {
+            if(checkEmails() && checkPasswords() && checkAffiliation()) {
                 $.ajax({
                     type: "POST",
                     url: "{{ url_for('create_account_html') }}",
