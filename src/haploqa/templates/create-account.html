@@ -82,7 +82,7 @@
                 var pass = $("#password").val();
                 var passConf = $("#password-confirm").val();
 
-                if(pass.length < 6) {
+                if(pass.length < 8) {
                     showErrorMessage('Your password needs to be at least 6 characters');
                     return false;
                 } else if(passConf.length === 0) {
@@ -123,7 +123,8 @@
         <label for="email" class="col-md-3 control-label">Email <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-envelope" aria-hidden="true"></span></span>
-            <input type="email" size="50" class="form-control" required id="email" name="email" placeholder="Email address">
+            <input type="email" size="50" class="form-control" required
+                   id="email" name="email" placeholder="Email address">
         </div>
     </div>
 
@@ -131,7 +132,8 @@
         <label for="email-confirm" class="col-md-3 control-label">Confirm email <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-envelope" aria-hidden="true"></span></span>
-            <input type="email" size="50" class="form-control" required id="email-confirm" name="email-confirm" placeholder="Confirm email address">
+            <input type="email" size="50" class="form-control" required
+                   id="email-confirm" name="email-confirm" placeholder="Confirm email address">
         </div>
     </div>
 
@@ -141,7 +143,8 @@
         <label for="password" class="col-md-3 control-label">Password <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-lock" aria-hidden="true"></span></span>
-            <input type="password" size="50" class="form-control" data-minlength="6" required id="password" name="password" placeholder="Create password">
+            <input type="password" size="50" class="form-control" data-minlength="8" required
+                   id="password" name="password" placeholder="Password must be at least 8 characters">
         </div>
     </div>
 
@@ -149,7 +152,8 @@
         <label for="password-confirm" class="col-md-3 control-label">Confirm password <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-lock" aria-hidden="true"></span></span>
-            <input type="password" size="50" class="form-control" data-minlength="6" required id="password-confirm" name="password-confirm" placeholder="Confirm password">
+            <input type="password" size="50" class="form-control" data-minlength="8" required
+                   id="password-confirm" name="password-confirm" placeholder="Confirm password">
         </div>
     </div>
 
@@ -159,7 +163,8 @@
         <label for="affiliation" class="col-md-3 control-label">Affiliation <b class="required">*</b></label>
         <div class="input-group col-md-6 col-md-offset-3">
             <span class="input-group-addon"><span class="glyphicon glyphicon-briefcase" aria-hidden="true"></span></span>
-            <input type="text" size="50" class="form-control" required id="affiliation" name="affiliation" placeholder="Affiliation">
+            <input type="text" size="50" class="form-control" required
+                   id="affiliation" name="affiliation" placeholder="Affiliation">
         </div>
     </div>
 
