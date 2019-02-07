@@ -123,7 +123,7 @@ def authenticate_user_hash(email_address, hash_id, db):
     :param email_address: the email address to authenticate
     :param hash_id: the hash to check
     :param db: the database
-    :return: the user dict from mongo upon success ot None upon failure
+    :return: the user dict from mongo upon success or None upon failure
     """
     user = db.users.find_one({
         'email_address_lowercase': email_address.strip().lower(),

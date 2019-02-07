@@ -74,7 +74,6 @@
                         document.location.reload(true);
                     }
                 }).fail(function(data) {
-                    console.log(data);
                     if(data.responseJSON && data.responseJSON.msg === 'account not validated') {
                         showNotificationMessage('This account has not been verified yet. Please follow ' +
                                                 'the link in the validation email you should have received.');
