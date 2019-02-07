@@ -33,6 +33,7 @@ BROKER_URL = 'amqp://guest:guest@localhost:5672//'
 app.config.update(
     CELERY_BROKER_URL=BROKER_URL,
     CELERY_RESULT_BACKEND=BROKER_URL,
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=1),
 )
 
 app.jinja_env.globals.update(isnan=math.isnan)
@@ -162,7 +163,6 @@ def do_after(response):
 
 @app.before_request
 def lookup_user_from_session():
-    flask.session.permanent = True
     if not flask.request.path.startswith(app.static_url_path):
         # lookup the current user if the user_id is found in the session
         user_email_address = flask.session.get('user_email_address')
@@ -369,7 +369,8 @@ def reset_password_html():
                 'reset-password.html',
                 msg='An email has been sent to you with instructions for resetting your password')
         else:
-            return flask.render_template('reset-password.html', msg="That email does not exist in the system")
+            return flask.render_template('reset-password.html',
+                                         msg="That email does not exist in the system")
 
 
 @app.route('/login.json', methods=['POST'])
@@ -382,7 +383,31 @@ def login_json():
 
         return response
     else:
-        return flask.jsonify(user)
+        # if the validated field doesn't exist for user, then it's not a new
+        # account: send them a validation email and flash a message in the
+        # interface but allow them to use the application (they will be prodded
+        # every time they log in)
+        if 'validated' not in user:
+            flask.flash("We don't mean to interrupt your important work but we've "
+                        "added a little extra security to HaploQA and are hoping "
+                        "that you are willing to help. You should receive an email "
+                        "from us momentarily with a validation link. We ask that "
+                        "you follow that validation link, where you will be "
+                        "returned here and can continue using as usual! If you "
+                        "have any questions or concerns about this, please let "
+                        "us know at haploqa@jax.org.")
+            usrmgmt.send_validation_email(user['email_address'])
+
+            return flask.jsonify(user)
+
+        elif user['validated'] is False:
+            response = flask.jsonify({'success': False,
+                                      'msg': 'account not validated'})
+            response.status_code = 400
+
+            return response
+        else:
+            return flask.jsonify(user)
 
 
 def _set_session_user(user):
@@ -428,10 +453,7 @@ def validate_account(hash_id):
     user_to_validate = db.users.find_one({'password_hash': hash_id})
 
     if user_to_validate is not None:
-        if user_to_validate['validated']:
-            flask.flash("It appears the account for this email has already been validated")
-            return flask.redirect(flask.url_for('index_html'), 303)
-        else:
+        if 'validated' not in user_to_validate or not user_to_validate['validated']:
             db.users.find_one_and_update({'password_hash': hash_id},
                                          {'$set': {'validated': True}})
 
@@ -441,6 +463,9 @@ def validate_account(hash_id):
             _set_session_user(user)
             flask.flash("Your email has successfully been validated")
             return flask.redirect(flask.url_for('index_html'), 303)
+        else:
+            flask.flash("It appears this account has already been validated")
+            return flask.redirect(flask.url_for('index_html'), 303)
     else:
         flask.flash("You don't have permission to view this page")
         return flask.redirect(flask.url_for('index_html'), 303)
@@ -449,6 +474,7 @@ def validate_account(hash_id):
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])
 def validate_reset(password_reset_id):
     """
+    TODO: CHANGE THIS FORM SO THAT FIELD ISSUES ARE HANDLED IN INTERFACE NOT API
     A user should only arrive at this page if they have received a password reset email. Upon GET
     the reset password template is rendered. Upon POST we attempt to actually update the password
     :param password_reset_id: this ID is the secret that authorizes a password reset. It should
@@ -500,6 +526,7 @@ def validate_reset(password_reset_id):
 @app.route('/change-password.html', methods=['GET', 'POST'])
 def change_password_html():
     """
+    TODO: CHANGE THIS FORM SO THAT FIELD ISSUES ARE HANDLED IN INTERFACE NOT API
     Render the HTML change-password template for gets and try to actually change
     the password for posts (followed by a redirect to index.html on success)
     """
@@ -1123,10 +1150,11 @@ def update_st_des_color(st_des_id):
 
     return '{"status": "success"}'
 
-#TODO: rename
+
 @app.route('/strain-name-admin.html')
 def st_des_admin():
     """
+    TODO: RENAME THIS ENDPOINT
     standard designation admin page
     :return:
     """
@@ -1275,6 +1303,7 @@ def index_html():
         my_tags = [{'name': my_tag['_id'], 'sample_count': my_tag['count']} for my_tag in my_tags]
 
     return flask.render_template('index.html', user=user, tags=tags, my_tags=my_tags, total_sample_count=sample_count)
+
 
 @app.route('/user-tags.html')
 def user_tags():
