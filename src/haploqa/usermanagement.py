@@ -41,6 +41,7 @@ def lookup_salt(email_address, db):
     else:
         return None
 
+
 def switch_user_privs(email_address, user_type):
     """
     updates a users status
@@ -65,6 +66,7 @@ def switch_user_privs(email_address, user_type):
     else:
         return None
 
+
 def remove_user(email_address):
     """
     remove a user from the system
@@ -84,6 +86,7 @@ def remove_user(email_address):
         return True
     else:
         return None
+
 
 def authenticate_user(email_address, password, db):
     """
@@ -106,54 +109,135 @@ def authenticate_user(email_address, password, db):
             user.pop('salt', None)
             # record login timestamp
             ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
-            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login' : ts}})
+            db.users.update_one({'_id': user['_id']}, {'$set': {'last_login': ts}})
             return user
         else:
             return None
     else:
         return None
 
-def invite_user(email_address, affiliation, db=None):
-    '''
+
+def authenticate_user_hash(email_address, hash_id, db):
+    """
+    Perform authentication for a user using a hash_id instead of password
+    :param email_address: the email address to authenticate
+    :param hash_id: the hash to check
+    :param db: the database
+    :return: the user dict from mongo upon success or None upon failure
+    """
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    }, {
+        'password_reset_hash': 0,
+    })
+    if user is not None:
+        if hash_id == user['password_hash']:
+            # remove the password_hash to prevent it from leaking out
+            user.pop('password_hash', None)
+            user.pop('salt', None)
+            # record login timestamp
+            ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
+            db.users.update_one(
+                {'_id': user['_id']},
+                {'$set': {
+                    'last_login': ts
+                }}
+            )
+
+            return user
+        else:
+            return None
+    else:
+        return None
+
+
+def create_account(email_address, password, affiliation, db=None):
+    """
     invite regular user
     :param email_address:
+    :param password:
     :param affiliation
     :param db:
     :return:
-    '''
+    """
     if db is None:
         db = mds.get_db()
 
     email_address = email_address.strip()
 
-    #check and see if user already exists first
+    # check and see if user already exists first
     user = db.users.find_one({
         'email_address_lowercase': email_address.strip().lower(),
     })
 
     if user is None:
         ts = '{:%m/%d/%Y %H:%M %p}'.format(datetime.datetime.now())
-        password_reset_id = str(uuid4())
+        new_salt = str(uuid4())
+
         db.users.insert({
             'created': ts,
             'email_address': email_address,
             'email_address_lowercase': email_address.lower(),
             'affiliation': affiliation,
             'administrator': False,
-            'password_reset_hash': hash_str(password_reset_id),
+            'salt': new_salt,
+            'password_hash': hash_str(password + new_salt),
+            'validated': False
         })
 
-        msg_template = \
-            '''You have been invited to create a HaploQA account. ''' \
-            '''To validate your account and create a password, visit this link: {} ''' \
-            '''Please ignore this message if it was sent in error.'''
-        msg = MIMEText(msg_template.format(flask.url_for(
-            'validate_reset',
-            password_reset_id=password_reset_id,
-            _external=True)))
+        send_validation_email(email_address, db)
+        return True
+    else:
+        return None
+
+
+def send_validation_email(email_address, db=None):
+    new_account_msg_template = \
+        '''An account for HaploQA has been created for this email address. ''' \
+        '''If you have requested an account to be made, ''' \
+        '''please follow this link to validate your account: {} ''' \
+        '''If you did not request an account, please ignore this email.'''
+
+    existing_account_msg_template = \
+        '''Thank you for using HaploQA! We're asking all of our existing users 
+        to validate their account. To do this, simply follow this link: {}  ''' \
+        '''If you have any questions or concern about this request, let us know 
+        at haploqa@jax.org! If you do not have an account, please ignore this 
+        email.'''
+
+    if db is None:
+        db = mds.get_db()
+
+    user = db.users.find_one({
+        'email_address_lowercase': email_address.strip().lower(),
+    })
+    msg_content = None
+    subject = None
+
+    # double check that the user is legit
+    if user is not None:
+        # if user doesn't have a validated field, this indicates that it's an
+        # existing account and send an existing account message
+        if 'validated' not in user:
+            msg_content = existing_account_msg_template
+            subject = 'Validate your HaploQA Account'
+
+        # if user isn't validated, this indicates that it's a new account
+        # and send a new account message
+        elif user['validated'] is False:
+            msg_content = new_account_msg_template
+            subject = 'Welcome to HaploQA'
+
+        # if somehow we got here and the user is validated, don't send email
+        else:
+            return
+
+        msg = MIMEText(msg_content.format(flask.url_for('validate_account',
+                                                        hash_id=user['password_hash'],
+                                                        _external=True)))
 
         from_addr = noreply_address()
-        msg['Subject'] = 'Confirm HaploQA Account'
+        msg['Subject'] = subject
         msg['From'] = from_addr
         msg['To'] = email_address
 
@@ -162,9 +246,7 @@ def invite_user(email_address, affiliation, db=None):
         s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
         s.sendmail(from_addr, [email_address], msg.as_string())
         s.quit()
-        return True
-    else:
-        return None
+
 
 def get_all_users(db=None):
     if db is None:

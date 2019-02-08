@@ -33,6 +33,7 @@ BROKER_URL = 'amqp://guest:guest@localhost:5672//'
 app.config.update(
     CELERY_BROKER_URL=BROKER_URL,
     CELERY_RESULT_BACKEND=BROKER_URL,
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=1),
 )
 
 app.jinja_env.globals.update(isnan=math.isnan)
@@ -122,6 +123,7 @@ def _make_celery(app):
     celery.Task = ContextTask
     return celery
 
+
 celery = _make_celery(app)
 
 
@@ -161,7 +163,6 @@ def do_after(response):
 
 @app.before_request
 def lookup_user_from_session():
-    flask.session.permanent = True
     if not flask.request.path.startswith(app.static_url_path):
         # lookup the current user if the user_id is found in the session
         user_email_address = flask.session.get('user_email_address')
@@ -177,6 +178,7 @@ def lookup_user_from_session():
                 _set_session_user(None)
         else:
             flask.g.user = None
+
 
 @app.route('/hap-candidates.html')
 def hap_cands():
@@ -270,6 +272,7 @@ def show_users():
         users=users,
     )
 
+
 @app.route('/update_user_privs.json', methods=['POST'])
 def update_user_privs():
     """
@@ -285,6 +288,7 @@ def update_user_privs():
         return flask.jsonify({'success': True})
     else:
         return flask.jsonify({'success': False})
+
 
 @app.route('/remove-user.json', methods=['POST'])
 def remove_user():
@@ -303,30 +307,56 @@ def remove_user():
         return flask.jsonify({'success': False})
 
 
-@app.route('/invite-user.html', methods=['GET', 'POST'])
-def invite_user_html():
+class UserExists(Exception):
+    status_code = 400
+
+    def __init__(self, message, status_code=None, payload=None):
+        Exception.__init__(self)
+        self.message = message
+        if status_code is not None:
+            self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = dict(self.payload or ())
+        rv['message'] = self.message
+        return rv
+
+
+@app.errorhandler(UserExists)
+def handle_user_exists(error):
+    response = flask.jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+
+@app.route('/create-account.html', methods=['GET', 'POST'])
+def create_account_html():
     """
-    Invite a new user to the application using their email address. Upon get
-    the invite-user template is rendered. Upon successful POST the
-    invite email is sent out and message displayed about invite being sent
+    Creates a new account for the application. Upon get the create-account
+    template is rendered. Upon successful POST the validation email is sent out
+    and message displayed about invite being sent
     """
 
     user = flask.g.user
-    if user['administrator'] or user['curator']:
+    if user is None:
         if flask.request.method == 'GET':
-            return flask.render_template('invite-user.html')
+            return flask.render_template('create-account.html')
         elif flask.request.method == 'POST':
             form = flask.request.form
-            if (usrmgmt.invite_user(form['email'], form['affiliation'])) is not None:
-                return flask.render_template(
-                    'invite-user.html',
-                    msg='Your invite has been sent')
+            u = usrmgmt.create_account(form['email'],
+                                       form['password'],
+                                       form['affiliation'])
+
+            if u is not None:
+                return flask.jsonify({'success': True})
             else:
-                return flask.render_template(
-                    'invite-user.html',
-                    msg='That user already exists, please try again')
+                raise UserExists('user already exists')
     else:
-        return flask.render_template('login-required.html')
+        return flask.redirect(flask.url_for('index_html',
+                                            msg='You are already logged into an account'),
+                              303)
+
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])
 def reset_password_html():
@@ -339,7 +369,9 @@ def reset_password_html():
                 'reset-password.html',
                 msg='An email has been sent to you with instructions for resetting your password')
         else:
-            return flask.render_template('reset-password.html', msg="That email does not exist in the system")
+            return flask.render_template('reset-password.html',
+                                         msg="That email does not exist in the system")
+
 
 @app.route('/login.json', methods=['POST'])
 def login_json():
@@ -351,7 +383,31 @@ def login_json():
 
         return response
     else:
-        return flask.jsonify(user)
+        # if the validated field doesn't exist for user, then it's not a new
+        # account: send them a validation email and flash a message in the
+        # interface but allow them to use the application (they will be prodded
+        # every time they log in)
+        if 'validated' not in user:
+            flask.flash("We don't mean to interrupt your important work but we've "
+                        "added a little extra security to HaploQA and are hoping "
+                        "that you are willing to help. You should receive an email "
+                        "from us momentarily with a validation link. We ask that "
+                        "you follow that validation link, where you will be "
+                        "returned here and can continue using as usual! If you "
+                        "have any questions or concerns about this, please let "
+                        "us know at haploqa@jax.org.")
+            usrmgmt.send_validation_email(user['email_address'])
+
+            return flask.jsonify(user)
+
+        elif user['validated'] is False:
+            response = flask.jsonify({'success': False,
+                                      'msg': 'account not validated'})
+            response.status_code = 400
+
+            return response
+        else:
+            return flask.jsonify(user)
 
 
 def _set_session_user(user):
@@ -384,9 +440,41 @@ def logout_json():
     return flask.jsonify({'success': True})
 
 
+@app.route('/validate-account-email/<hash_id>.html', methods=['GET'])
+def validate_account(hash_id):
+    """
+    A user should only be directed to this page if they received a confirmation
+    email on an account creation. This page only acts as a redirect to mark the
+    account as validated
+    :param hash_id: the hash_id created from the new users password plus a salt
+    :return:
+    """
+    db = mds.get_db()
+    user_to_validate = db.users.find_one({'password_hash': hash_id})
+
+    if user_to_validate is not None:
+        if 'validated' not in user_to_validate or not user_to_validate['validated']:
+            db.users.find_one_and_update({'password_hash': hash_id},
+                                         {'$set': {'validated': True}})
+
+            user = usrmgmt.authenticate_user_hash(user_to_validate['email_address'],
+                                                  user_to_validate['password_hash'],
+                                                  db)
+            _set_session_user(user)
+            flask.flash("Your email has successfully been validated")
+            return flask.redirect(flask.url_for('index_html'), 303)
+        else:
+            flask.flash("It appears this account has already been validated")
+            return flask.redirect(flask.url_for('index_html'), 303)
+    else:
+        flask.flash("You don't have permission to view this page")
+        return flask.redirect(flask.url_for('index_html'), 303)
+
+
 @app.route('/validate-reset/<password_reset_id>.html', methods=['GET', 'POST'])
 def validate_reset(password_reset_id):
     """
+    TODO: CHANGE THIS FORM SO THAT FIELD ISSUES ARE HANDLED IN INTERFACE NOT API
     A user should only arrive at this page if they have received a password reset email. Upon GET
     the reset password template is rendered. Upon POST we attempt to actually update the password
     :param password_reset_id: this ID is the secret that authorizes a password reset. It should
@@ -438,6 +526,7 @@ def validate_reset(password_reset_id):
 @app.route('/change-password.html', methods=['GET', 'POST'])
 def change_password_html():
     """
+    TODO: CHANGE THIS FORM SO THAT FIELD ISSUES ARE HANDLED IN INTERFACE NOT API
     Render the HTML change-password template for gets and try to actually change
     the password for posts (followed by a redirect to index.html on success)
     """
@@ -1061,10 +1150,11 @@ def update_st_des_color(st_des_id):
 
     return '{"status": "success"}'
 
-#TODO: rename
+
 @app.route('/strain-name-admin.html')
 def st_des_admin():
     """
+    TODO: RENAME THIS ENDPOINT
     standard designation admin page
     :return:
     """
@@ -1213,6 +1303,7 @@ def index_html():
         my_tags = [{'name': my_tag['_id'], 'sample_count': my_tag['count']} for my_tag in my_tags]
 
     return flask.render_template('index.html', user=user, tags=tags, my_tags=my_tags, total_sample_count=sample_count)
+
 
 @app.route('/user-tags.html')
 def user_tags():
