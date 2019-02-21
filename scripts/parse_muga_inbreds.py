@@ -46,7 +46,7 @@ import csv
 import logging
 import re
 
-logging.basicConfig(filename='parse_muga_inbreds.log', level=logging.DEBUG)
+logging.basicConfig(filename='parse_muga_inbreds.log', level=logging.INFO)
 
 
 class FinalReportGenerator(object):
