@@ -249,12 +249,8 @@ def main():
     logging.info("Start processing...")
     with open(args.input) as csv_file:
         csv_reader = csv.DictReader(csv_file)
-
+        next(csv_reader)
         for row in csv_reader:
-            # Skip header
-            if line_count == 0:
-                line_count += 1
-                continue
             # Process each line... This will include writing out to files
             # by sample
             final_report.parse_genotype(row)
