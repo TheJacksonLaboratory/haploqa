@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Script to take a CSV file containing a list of inbred strain sample for the
 MUGA genotyping platform and generate a FinalReport.txt and a Sample_Map.txt
