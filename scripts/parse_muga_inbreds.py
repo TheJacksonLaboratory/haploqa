@@ -101,8 +101,6 @@ class FinalReportGenerator(object):
         # Master sample index.  Increment as we process a new sample
         self.sample_index = 0
 
-        # TODO: Get rid of if don't need to parse strain name from sample_alias
-        #self.exp = re.compile('.+?(?=[\:\-])')
         self.exp = re.compile('.+?(?=[ ])')
 
     def parse_genotype(self, entry):
@@ -151,14 +149,6 @@ class FinalReportGenerator(object):
             # Last add the new sample map entry
             self._create_sample_entry(entry)
         self._add_sample_row(entry)
-
-    # TODO: Get rid of this function if we don't need it
-    def _make_id(self, sample_alias):
-        strain = self.exp.match(sample_alias)
-        if strain:
-            return strain.group()
-        else:
-            return sample_alias
 
     def _create_sample_entry(self, entry):
         """
