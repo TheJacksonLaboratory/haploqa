@@ -15,13 +15,13 @@
                 location.href = "{{ url_for('index_html') }}"
             });
 
-            // turn off cut/copy/paste ability for field confirmation fields
-            $('#email-confirm').bind("cut copy paste",function(e) {
+            // turn off cut/copy/paste ability for email confirmation field
+            $('#email-confirm').bind("cut copy paste", function(e) {
                 e.preventDefault();
             });
 
-            // turn off cut/copy/paste ability for field confirmation fields
-            $('#password-confirm').bind("cut copy paste",function(e) {
+            // turn off cut/copy/paste ability for password confirmation field
+            $('#password-confirm').bind("cut copy paste", function(e) {
                 e.preventDefault();
             });
 
