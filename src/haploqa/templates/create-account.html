@@ -15,6 +15,16 @@
                 location.href = "{{ url_for('index_html') }}"
             });
 
+            // turn off cut/copy/paste ability for email confirmation field
+            $('#email-confirm').bind("cut copy paste", function(e) {
+                e.preventDefault();
+            });
+
+            // turn off cut/copy/paste ability for password confirmation field
+            $('#password-confirm').bind("cut copy paste", function(e) {
+                e.preventDefault();
+            });
+
             /**
              * When the create button is clicked, check that all of the necessary fields are filled out and that the
              * emails and passwords entered match; if all conditions pass, make a POST with the new user's email,
