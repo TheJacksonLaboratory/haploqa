@@ -169,8 +169,11 @@ def lookup_user_from_session():
         if user_email_address:
             if flask.request.remote_addr == flask.session.get('remote_addr'):
                 user = usrmgmt.lookup_user(user_email_address, mds.get_db())
-                flask.g.user = user
-                flask.session['admin'] = user['administrator']
+                if 'validated' in user and user['validated'] is False:
+                    flask.g.user = None
+                else:
+                    flask.g.user = user
+                    flask.session['admin'] = user['administrator']
             else:
                 # If IP addresses don't match we're going to reset the session for
                 # a bit of extra safety. Unfortunately this also means that we're
