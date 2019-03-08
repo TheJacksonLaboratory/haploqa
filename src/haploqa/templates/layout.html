@@ -78,7 +78,8 @@
                         showNotificationMessage('This account has not been verified yet. Please follow ' +
                                                 'the link in the validation email you should have received.');
                     } else {
-                        showErrorMessage('login attempt failed');
+                        showErrorMessage('No account with that email and password exists OR ' +
+                                         'you have not yet validated your email');
                     }
                 }).always(function() {
                     loginRequest = null;

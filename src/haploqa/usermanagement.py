@@ -199,11 +199,11 @@ def send_validation_email(email_address, db=None):
         '''If you did not request an account, please ignore this email.'''
 
     existing_account_msg_template = \
-        '''Thank you for using HaploQA! We're asking all of our existing users 
-        to validate their account. To do this, simply follow this link: {}  ''' \
-        '''If you have any questions or concern about this request, let us know 
-        at haploqa@jax.org! If you do not have an account, please ignore this 
-        email.'''
+        '''Thank you for using HaploQA! We're asking all of our existing ''' \
+        '''users to validate their account. To do this, simply follow this ''' \
+        '''link: {} If you have any questions or concern about this request, ''' \
+        '''let us know at haploqa@jax.org! If you do not have an account, ''' \
+        '''please ignore this email.'''
 
     if db is None:
         db = mds.get_db()
