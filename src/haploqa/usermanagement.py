@@ -4,7 +4,7 @@ from haploqa.config import HAPLOQA_CONFIG
 import haploqa.mongods as mds
 from hashlib import sha512
 from os import EX_USAGE
-import smtplib
+from smtplib import SMTP
 import socket
 from uuid import uuid4
 import datetime
@@ -42,6 +42,32 @@ def lookup_salt(email_address, db):
         return None
 
 
+def sendmail(dest_addr, msg):
+    """
+    Sends an email to the specified email address with the specified message content
+    :param dest_addr: the email address to send the email to
+    :param msg: the msg content (includes to, from, and subject)
+    :return:
+    """
+
+    from_addr = noreply_address()
+    smtp_host = HAPLOQA_CONFIG['SMTP_HOST']
+    smtp_port = HAPLOQA_CONFIG['SMTP_PORT']
+
+    print(msg)
+
+    # Send the message via our own SMTP server, but don't include the
+    # envelope header.
+    s = SMTP(smtp_host, smtp_port)
+
+    try:
+        s.sendmail(from_addr, [dest_addr], msg.as_string())
+    except Exception as e:
+        print(e)
+    finally:
+        s.quit()
+
+
 def switch_user_privs(email_address, user_type):
     """
     updates a users status
@@ -61,7 +87,11 @@ def switch_user_privs(email_address, user_type):
 
     if user is not None:
         db.users.update_one({'_id': user['_id']},
-                            {'$set': {'administrator': is_admin, 'curator': is_curator}})
+                            {'$set': {
+                                'administrator': is_admin,
+                                'curator': is_curator
+                            }}
+                            )
         return True
     else:
         return None
@@ -71,7 +101,6 @@ def remove_user(email_address):
     """
     remove a user from the system
     :param email_address: the email address of the user to remove
-    :param db: the database
     :return: true on success, None upon failure
     """
 
@@ -187,6 +216,7 @@ def create_account(email_address, password, affiliation, db=None):
 
         send_validation_email(email_address, db)
         return True
+
     else:
         return None
 
@@ -211,11 +241,12 @@ def send_validation_email(email_address, db=None):
     user = db.users.find_one({
         'email_address_lowercase': email_address.strip().lower(),
     })
-    msg_content = None
-    subject = None
 
     # double check that the user is legit
     if user is not None:
+        msg_content = None
+        subject = None
+
         # if user doesn't have a validated field, this indicates that it's an
         # existing account and send an existing account message
         if 'validated' not in user:
@@ -228,9 +259,8 @@ def send_validation_email(email_address, db=None):
             msg_content = new_account_msg_template
             subject = 'Welcome to HaploQA'
 
-        # if somehow we got here and the user is validated, don't send email
         else:
-            return
+            print('We are trying to validate an already validated account')
 
         msg = MIMEText(msg_content.format(flask.url_for('validate_account',
                                                         hash_id=user['password_hash'],
@@ -241,11 +271,7 @@ def send_validation_email(email_address, db=None):
         msg['From'] = from_addr
         msg['To'] = email_address
 
-        # Send the message via our own SMTP server, but don't include the
-        # envelope header.
-        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
-        s.sendmail(from_addr, [email_address], msg.as_string())
-        s.quit()
+        sendmail(email_address, msg)
 
 
 def get_all_users(db=None):
@@ -293,11 +319,8 @@ def invite_admin(email_address, db=None):
         msg['From'] = from_addr
         msg['To'] = email_address
 
-        # Send the message via our own SMTP server, but don't include the
-        # envelope header.
-        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
-        s.sendmail(from_addr, [email_address], msg.as_string())
-        s.quit()
+        sendmail(email_address, msg)
+
     else:
         return None
 
@@ -337,11 +360,7 @@ def reset_password(email_address, db=None):
         msg['From'] = from_addr
         msg['To'] = user['email_address']
 
-        # Send the message via our own SMTP server, but don't include the
-        # envelope header.
-        s = smtplib.SMTP(HAPLOQA_CONFIG['SMTP_HOST'], HAPLOQA_CONFIG['SMTP_PORT'])
-        s.sendmail(from_addr, [user['email_address']], msg.as_string())
-        s.quit()
+        sendmail(user['email_address'], msg)
         return True
 
 
@@ -382,6 +401,7 @@ def main():
         exit(EX_USAGE)
     else:
         _create_admin(email, password)
+
 
 if __name__ == '__main__':
     main()
