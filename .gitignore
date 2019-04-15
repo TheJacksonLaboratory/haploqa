@@ -22,3 +22,5 @@ erl_crash.dump
 /scratch/
 /doc/
 /logs/
+/venv/
+/dump_archive/
