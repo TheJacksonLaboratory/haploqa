@@ -8,6 +8,9 @@ from smtplib import SMTP
 import socket
 from uuid import uuid4
 import datetime
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def hash_str(s):
@@ -54,7 +57,7 @@ def sendmail(dest_addr, msg):
     smtp_host = HAPLOQA_CONFIG['SMTP_HOST']
     smtp_port = HAPLOQA_CONFIG['SMTP_PORT']
 
-    print(msg)
+    logging.debug(msg)
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
@@ -63,7 +66,7 @@ def sendmail(dest_addr, msg):
     try:
         s.sendmail(from_addr, [dest_addr], msg.as_string())
     except Exception as e:
-        print(e)
+        logging.debug(e)
     finally:
         s.quit()
 
@@ -260,7 +263,7 @@ def send_validation_email(email_address, db=None):
             subject = 'Welcome to HaploQA'
 
         else:
-            print('We are trying to validate an already validated account')
+            logging.debug('We are trying to validate an already validated account')
 
         msg = MIMEText(msg_content.format(flask.url_for('validate_account',
                                                         hash_id=user['password_hash'],
