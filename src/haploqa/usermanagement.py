@@ -45,26 +45,22 @@ def lookup_salt(email_address, db):
         return None
 
 
-def sendmail(dest_addr, msg):
+def sendmail(msg):
     """
     Sends an email to the specified email address with the specified message content
-    :param dest_addr: the email address to send the email to
     :param msg: the msg content (includes to, from, and subject)
     :return:
     """
 
-    from_addr = noreply_address()
     smtp_host = HAPLOQA_CONFIG['SMTP_HOST']
     smtp_port = HAPLOQA_CONFIG['SMTP_PORT']
-
-    logging.debug(msg)
 
     # Send the message via our own SMTP server, but don't include the
     # envelope header.
     s = SMTP(smtp_host, smtp_port)
 
     try:
-        s.sendmail(from_addr, [dest_addr], msg.as_string())
+        s.sendmail(msg['From'], [msg['To']], msg.as_string())
     except Exception as e:
         logging.debug(e)
     finally:
@@ -269,12 +265,11 @@ def send_validation_email(email_address, db=None):
                                                         hash_id=user['password_hash'],
                                                         _external=True)))
 
-        from_addr = noreply_address()
         msg['Subject'] = subject
-        msg['From'] = from_addr
+        msg['From'] = noreply_address()
         msg['To'] = email_address
 
-        sendmail(email_address, msg)
+        sendmail(msg)
 
 
 def get_all_users(db=None):
@@ -317,12 +312,11 @@ def invite_admin(email_address, db=None):
             password_reset_id=password_reset_id,
             _external=True)))
 
-        from_addr = noreply_address()
         msg['Subject'] = 'Confirm HaploQA Account'
-        msg['From'] = from_addr
+        msg['From'] = noreply_address()
         msg['To'] = email_address
 
-        sendmail(email_address, msg)
+        sendmail(msg)
 
     else:
         return None
@@ -358,12 +352,11 @@ def reset_password(email_address, db=None):
             password_reset_id=password_reset_id,
             _external=True)))
 
-        from_addr = noreply_address()
         msg['Subject'] = 'Reset password request for HaploQA'
-        msg['From'] = from_addr
+        msg['From'] = noreply_address()
         msg['To'] = user['email_address']
 
-        sendmail(user['email_address'], msg)
+        sendmail(msg)
         return True
 
 
