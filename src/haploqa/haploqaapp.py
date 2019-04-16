@@ -100,8 +100,8 @@ class CustomJSONEncoder(flask.json.JSONEncoder):
 app.json_encoder = CustomJSONEncoder
 
 # TODO: remove to non-version tracked config file
-app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
-#app.secret_key = os.urandom(24)
+# app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
+app.secret_key = os.urandom(24)
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION
