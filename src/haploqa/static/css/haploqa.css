@@ -77,6 +77,12 @@ th {
     white-space: nowrap;
 }
 
+#sent-icon {
+    margin-left: 10px;
+    margin-right: 5px;
+    color: #3E8F3E;
+}
+
 .axis text {
     font-size: 12px !important;
 }

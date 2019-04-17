@@ -181,12 +181,12 @@ def authenticate_user_hash(email_address, hash_id, db):
 
 def create_account(email_address, password, affiliation, db=None):
     """
-    invite regular user
-    :param email_address:
-    :param password:
-    :param affiliation
-    :param db:
-    :return:
+    Creates a new account for the specified email and password
+    :param email_address: email address associated with the new account request
+    :param password: password associated with the new account request
+    :param affiliation: affiliation of user requesting the new account
+    :param db: database reference, if any
+    :return: True if user is created, None if the user already exists
     """
     if db is None:
         db = mds.get_db()
@@ -221,6 +221,15 @@ def create_account(email_address, password, affiliation, db=None):
 
 
 def send_validation_email(email_address, db=None):
+    """
+    Sends a validation email with a body specific to what kind of email should
+    be sent (new accounts vs existing accounts where "existing" refers to
+    accounts that were created before self-registration was introduced) and returns
+    a boolean status flag
+    :param email_address: the email address to check in the database
+    :param db: database reference, if any
+    :return: True if email is sent, False if user exists and is already validated
+    """
     new_account_msg_template = \
         '''An account for HaploQA has been created for this email address. ''' \
         '''If you have requested an account to be made, ''' \
@@ -259,7 +268,7 @@ def send_validation_email(email_address, db=None):
             subject = 'Welcome to HaploQA'
 
         else:
-            logging.debug('We are trying to validate an already validated account')
+            return False
 
         msg = MIMEText(msg_content.format(flask.url_for('validate_account',
                                                         hash_id=user['password_hash'],
@@ -270,6 +279,7 @@ def send_validation_email(email_address, db=None):
         msg['To'] = email_address
 
         sendmail(msg)
+        return True
 
 
 def get_all_users(db=None):
