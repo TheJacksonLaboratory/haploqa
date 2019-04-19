@@ -98,10 +98,7 @@ class CustomJSONEncoder(flask.json.JSONEncoder):
         return flask.json.JSONEncoder.default(self, o)
 
 app.json_encoder = CustomJSONEncoder
-
-# TODO: remove to non-version tracked config file
-app.secret_key = b'\xddU\x94\xf4\x14h$\xdd\x110h\xe1x\xd1\xcf4\xd1\xf1#\x18BsY\xb3'
-#app.secret_key = os.urandom(24)
+app.secret_key = os.urandom(24)
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION
@@ -347,18 +344,46 @@ def create_account_html():
             return flask.render_template('create-account.html')
         elif flask.request.method == 'POST':
             form = flask.request.form
+
             u = usrmgmt.create_account(form['email'],
                                        form['password'],
                                        form['affiliation'])
 
+            # if a *new* account is created
             if u is not None:
                 return flask.jsonify({'success': True})
+            # else the email entered already exists in the database
             else:
-                raise UserExists('user already exists')
+                # if user already exists but hasn't been validated,
+                # the validation email will be sent
+                if usrmgmt.send_validation_email(form['email']) is True:
+                    raise UserExists('resent validation email')
+
+                # if the user already exists and is validated, the user needs to login
+                else:
+                    raise UserExists('user already exists')
     else:
         return flask.redirect(flask.url_for('index_html',
                                             msg='You are already logged into an account'),
                               303)
+
+
+@app.route('/resend_validation', methods=['POST'])
+def resend_validation_email():
+    """
+    Will resend a validation email to the specified email address
+    """
+
+    form = flask.request.form
+    u = usrmgmt.send_validation_email(form['email'])
+
+    # if the return value is True, the email has been sent
+    if u is True:
+        return flask.jsonify({'success': True})
+    # if the return value is False, the specified email is already validated
+    # and the user needs to login
+    else:
+        raise UserExists('already validated')
 
 
 @app.route('/reset-password.html', methods=['POST', 'GET'])

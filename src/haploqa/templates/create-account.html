@@ -8,10 +8,61 @@
     {{ super() }}
     <script>
         $(function() {
+            var resendButton = '<button class="btn btn-default btn-sm" id="resend-button">Resend email</button>';
+            var resentIcon = '<span id="sent-icon" class="glyphicon glyphicon-ok" aria-hidden="true"></span>';
+            var resentText = '<p id="sent-text" style="color:#3E8F3E;">Sent</p>';
+            var sent = '<div id="sent" style="display:inline-flex;">' + resentIcon + resentText + '</div>';
+
+            /**
+             * Customized notification modal that has a resend button and flashed '<checkmark> Sent' after sending
+             */
+            function showNotificationModal(htmlString, resend) {
+                $('#notification-modal').modal();
+                if(resend) {
+                    $('#notification-modal-message').html(htmlString + resendButton + sent);
+                    $("#sent").show().delay(2000).fadeOut();
+                } else {
+                    $('#notification-modal-message').html(htmlString + resendButton);
+                }
+
+                /**
+                 * When the resent button is clicked, ping the API to send a new validation email to the entered address
+                 */
+                $('#resend-button').click(function() {
+                    $.ajax({
+                        type: "POST",
+                        url: "{{ url_for('resend_validation_email') }}",
+                        data: {
+                            email: $("#email").val()
+                        },
+                        dataType: 'json',
+                        success: function() {
+                            showNotificationModal('<p>Another email has been sent to <b>' + $("#email").val() +
+                                                  '</b>. You will need to follow the link in order to finish the set up ' +
+                                                  'process. If you continue to not receive the validation emails, please ' +
+                                                  'contact HaploQA admin at haploqa@jax.org.</p>', true);
+                        }
+                    }).error(function(data) {
+                        // hide the notification modal to make room for the error modal
+                        $('#notification-modal').modal('hide');
+                        if(data.responseJSON && data.responseJSON.message === 'already validated') {
+                            showNotificationMessage('It looks like there is already a validated account associated with this ' +
+                                                    'email address. Please try to log in or reset your password (located under ' +
+                                                    'login fields in dropdown).');
+                        } else {
+                            showErrorMessage('Sorry, we ran into an issue, please try again. If this issue persists, ' +
+                                             'please contact haploqa@jax.org.');
+
+                            // print out the response data to browser console for debugging purposes
+                            console.log(data);
+                        }
+                    });
+                });
+            }
             /**
              * When the notification modal is dismissed, redirect the user to the home page
              */
-            $('#notification-dismiss').on('click', function() {
+            $('#notification-dismiss, #notification-modal button.close').on('click', function() {
                 location.href = "{{ url_for('index_html') }}"
             });
 
@@ -44,19 +95,30 @@
                         },
                         dataType: 'json',
                         success: function() {
-                            showNotificationMessage('You should receive an email momentarily at ' + $("#email").val() +
-                                                    ' containing a validation link. You will need to follow the link in ' +
-                                                    'order to finish the set up process. Note: Some SPAM filters may ' +
-                                                    'mistakenly mark this email as spam so if you do not receive an ' +
-                                                    'email, make sure to check your spam folder.')
+                            showNotificationModal('<p>You should receive an email momentarily at <b>' + $("#email").val() +
+                                                  '</b> containing a validation link. You will need to follow the link in ' +
+                                                  'order to finish the set up process. Note: Some SPAM filters may ' +
+                                                  'mistakenly mark this email as spam so if you do not receive an ' +
+                                                  'email, make sure to check your spam folder.</p>', false);
                         }
                     }).error(function(data) {
                         if(data.responseJSON && data.responseJSON.message === 'user already exists') {
-                            showErrorMessage('There is already an account associated with this email address. Please try ' +
-                                             'to log in or reset your password (located under login fields in dropdown).')
+                            showNotificationMessage('It looks like there is already a validated account associated with this ' +
+                                                    'email address. Please try to log in or reset your password (located under ' +
+                                                    'login fields in dropdown).');
+                        } else if(data.responseJSON && data.responseJSON.message === 'resent validation email') {
+                           showNotificationModal('<p>There is already an account associated with this email but it has ' +
+                                                 'not yet been validated. You should receive an email momentarily at <b>' +
+                                                 $("#email").val() + '</b> containing a validation link. You will need to ' +
+                                                 'follow the link in order to finish the set up process. The login ' +
+                                                 'password you will need to use is the one that you have previously ' +
+                                                 'set unless you choose to reset the password.</p>', false);
                         } else {
                             showErrorMessage('Sorry, we ran into an issue, please try again. If this issue persists, ' +
-                                             'please contact haploqa@jax.org.')
+                                             'please contact haploqa@jax.org.');
+
+                            // print out the response data to browser console for debugging purposes
+                            console.log(data);
                         }
                     });
                 }
