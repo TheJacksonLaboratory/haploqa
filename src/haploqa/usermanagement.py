@@ -10,7 +10,7 @@ from uuid import uuid4
 import datetime
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def hash_str(s):
