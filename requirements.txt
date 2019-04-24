@@ -1,6 +1,6 @@
 celery>=3.1
-Flask>=0.10.1
-Jinja2>=2.7.3
+Flask>=1.0.0
+Jinja2>=2.10.1
 pymongo>=3.0.3
 numpy>=1.9.2
 scipy>=0.15.1
