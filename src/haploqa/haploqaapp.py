@@ -98,7 +98,7 @@ class CustomJSONEncoder(flask.json.JSONEncoder):
         return flask.json.JSONEncoder.default(self, o)
 
 app.json_encoder = CustomJSONEncoder
-app.secret_key = os.urandom(24)
+app.secret_key = HAPLOQA_CONFIG['SECRET']
 
 #####################################################################
 # FLASK/CELERY INITIALIZATION
