@@ -65,16 +65,9 @@ Instructions fro starting are below.
 
 
 ## Running a local (development) instance
-
-> NOTE:  If you are running Mongo 3.2 or greater in your development we highly recommend you launch Mongo using the MMAPV1 Storage Engine.  MMAPV1 is recommended because the default of WiredTiger 
-> shows significant performance degradation for our database when it becomes large.
-> In order to run using MMAPV1 in Mongo 3.2 or greater you'll need to start Mongo the first time using the following command:
->
->       mongod --dbpath db --storageEngine mmapv1
-
 Start Mongo like:
 
-    mongod --dbpath db
+    mongod --dbpath db --storageEngine mmapv1
 
 Stop mongo with `crtl+c`
 
@@ -95,7 +88,14 @@ On OSX we can start the local postfix server like:
 
 On OSX to run the app from the command-line (for development purposes only):
 
-    PYTHONPATH=src python src/haploqa/haploqaapp.py
+For the first time running:
+
+    $ export FLASK_ENV=development
+    $ export FLASK_APP=src/haploqa/haploqaapp.py
+    $ flask run
+
+After the first time, all it should take to run is:
+    $ flask run
 
 ## Running on Linux (tested on CentOS)
 
