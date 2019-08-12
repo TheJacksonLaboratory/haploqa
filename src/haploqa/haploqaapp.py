@@ -100,6 +100,7 @@ class CustomJSONEncoder(flask.json.JSONEncoder):
 app.json_encoder = CustomJSONEncoder
 app.secret_key = HAPLOQA_CONFIG['SECRET']
 
+
 #####################################################################
 # FLASK/CELERY INITIALIZATION
 #####################################################################
@@ -971,6 +972,7 @@ def all_samples_html():
             all_tags=all_tags,
     )
 
+
 @app.route('/user-samples/<user_id>')
 def user_samples(user_id):
     # look up all samples by user id.
@@ -1044,6 +1046,7 @@ def sample_tag_html(tag_id):
             all_owners=all_owners,
             tag_id=tag_id)
 
+
 @app.route('/owner-tags/<escfwd:tag_id>.html')
 def owner_tags(tag_id):
 
@@ -1057,7 +1060,7 @@ def owner_tags(tag_id):
     db = mds.get_db()
     matching_samples = _find_and_anno_samples(
         {'tags': tag_id,
-         'owner': flask.g.user['email_address'],
+         'owner': flask.g.user['email_address_lowercase'],
         },
         {
             'chromosome_data': 0,
@@ -1080,6 +1083,7 @@ def owner_tags(tag_id):
             all_owners=all_owners,
             tag_id=tag_id,
             edit=True)
+
 
 @app.route('/standard-designation.json/<escfwd:standard_designation>')
 def standard_designation_json(standard_designation):
