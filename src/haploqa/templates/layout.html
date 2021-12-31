@@ -17,9 +17,6 @@
         <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap-3.4.1/css/bootstrap.min.css') }}">
         <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-3.4.1/js/bootstrap.min.js') }}"></script>
 
-        <!-- validator -->
-        <script type="text/javascript" src="{{ url_for('static', filename='js/validator.js') }}"></script>
-
         <!-- bootstrap tokenfield -->
         <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield/css/bootstrap-tokenfield.css') }}">
         <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield/bootstrap-tokenfield.js') }}"></script>
@@ -49,7 +46,8 @@
         var user = {% if g.user %}{{ g.user|tojson }}{% else %}null{% endif %};
         var flashMessages = {{ get_flashed_messages()|tojson }};
 
-        $(document).ready(function() {
+        // run this when document is ready (jQuery 3.0 recommended method of ready handling)
+        $(function() {
             if(flashMessages.length) {
                 showNotificationMessage(flashMessages[0]);
             }
