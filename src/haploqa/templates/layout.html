@@ -8,44 +8,46 @@
 
         <title>{% block title %}{% endblock %}</title>
 
-        <!-- JQuery -->
-        <link href="{{ url_for('static', filename='jquery-ui-1.11.1/jquery-ui.min.css') }}" type="text/css" rel="stylesheet">
-        <script type="text/javascript" src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
-        <script type="text/javascript" src="{{ url_for('static', filename='jquery-ui-1.11.1/jquery-ui.min.js') }}"></script>
+        <!-- jquery -->
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='jquery-ui-1.13.0/jquery-ui.min.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+        <script type="text/javascript" src="{{ url_for('static', filename='jquery-ui-1.13.0/jquery-ui.min.js') }}"></script>
 
-        <!-- bootstrap stuff -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-3.3.5-dist/css/bootstrap.min.css') }}">
-        <script src="{{ url_for('static', filename='bootstrap-3.3.5-dist/js/bootstrap.min.js') }}"></script>
+        <!-- bootstrap -->
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap-3.4.1/css/bootstrap.min.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-3.4.1/js/bootstrap.min.js') }}"></script>
 
-        <script src="{{ url_for('static', filename='js/validator.js') }}"></script>
+        <!-- bootstrap tokenfield -->
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield/css/bootstrap-tokenfield.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield/bootstrap-tokenfield.js') }}"></script>
 
-        <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/css/bootstrap-tokenfield.css') }}">
-        <script type="text/javascript" src="{{ url_for('static', filename='bootstrap-tokenfield-9c06df4/bootstrap-tokenfield.js') }}"></script>
+        <!-- jquery minicolors -->
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='jquery-minicolors-2.2.1/jquery.minicolors.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='jquery-minicolors-2.2.1/jquery.minicolors.min.js') }}"></script>
 
-        <link rel="stylesheet" href="{{ url_for('static', filename='jquery-minicolors-2.2.1/jquery.minicolors.css') }}">
-        <script src="{{ url_for('static', filename='jquery-minicolors-2.2.1/jquery.minicolors.min.js') }}"></script>
-
-        <link rel="stylesheet" href="{{ url_for('static', filename='font-awesome-4.4.0/css/font-awesome.min.css') }}">
+        <!-- fontawesome -->
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='font-awesome-4.4.0/css/font-awesome.min.css') }}">
 
         <!-- bootstrap color picker -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-colorpicker.min.css') }}" type="text/css">
-        <script src="{{ url_for('static', filename='js/bootstrap-colorpicker.min.js') }}"></script>
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-colorpicker.min.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap-colorpicker.min.js') }}"></script>
 
-        <!-- D3 -->
+        <!-- d3 -->
         <script type="text/javascript" src="{{ url_for('static', filename='js/d3.min.js') }}"></script>
 
-        <!-- http://labratrevenge.com/d3-tip/ -->
+        <!-- d3-tip -->
         <script type="text/javascript" src="{{ url_for('static', filename='js/d3.tip.v0.6.3.js') }}"></script>
 
         <!-- application specific -->
-        <script src="{{ url_for('static', filename='js/haploqa.js') }}"></script>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/haploqa.css') }}">
+        <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/haploqa.css') }}">
+        <script type="text/javascript" src="{{ url_for('static', filename='js/haploqa.js') }}"></script>
 
         <script>
         var user = {% if g.user %}{{ g.user|tojson }}{% else %}null{% endif %};
         var flashMessages = {{ get_flashed_messages()|tojson }};
 
-        $(document).ready(function() {
+        // run this when document is ready (jQuery 3.0 recommended method of ready handling)
+        $(function() {
             if(flashMessages.length) {
                 showNotificationMessage(flashMessages[0]);
             }

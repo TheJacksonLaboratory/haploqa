@@ -2,12 +2,14 @@
 
 ## Overview
 
-The HaploQA web application was developed at the [Jackson Laboratory](http://www.jax.org) with support from the Mutant Mouse Regional Resource Centers (NIH OD010921) 
-and the Jackson Laboratory Genetic Resource Science group.  The purpose of the tool is to facilitate genetic quality assurance of mice using genotype data derived from 
-genotyping platforms such as GigaMUGA and MegaMUGA. The application was originally developed by [Keith Sheppard](https://github.com/keithshep) 
-as part of the Jackson Laboratory's [Computational Sciences](https://www.jax.org/research-and-faculty/tools/scientific-research-services/computational-sciences) group.  
-A public instance of the HaploQA web application is available at [https://haploqa.jax.org](https://haploqa.jax.org/) and the source code is made 
-available under an [MIT license](LICENSE.txt).
+The HaploQA web application was developed at the [Jackson Laboratory](http://www.jax.org) with support from the Mutant
+Mouse Regional Resource Centers (NIH OD010921) and the Jackson Laboratory Genetic Resource Science group.  The purpose
+of the tool is to facilitate genetic quality assurance of mice using genotype data derived from genotyping platforms
+such as GigaMUGA and MegaMUGA. The application was originally developed by [Keith Sheppard](https://github.com/keithshep)
+as part of the Jackson Laboratory's [Computational Sciences]
+(https://www.jax.org/research-and-faculty/tools/scientific-research-services/computational-sciences) group.  A public
+instance of the HaploQA web application is available at [https://haploqa.jax.org](https://haploqa.jax.org/) and the
+source code is made available under an [MIT license](LICENSE.txt).
 
 Major Contributions:
 * Laura Reinholdt
@@ -21,13 +23,16 @@ Major Contributions:
 
 ## Installation
 
-HaploQA requires Python 3.  Begin by installing that. In order to install HaploQA you must first install and configure MongoDB, RabbitMQ, Celery and apache with mod_wsgi. Assuming for a development installation you are working on a mac you can use the following instructions.  For CENTOS there will be simalar commands using yum.
+HaploQA requires Python 3.  Begin by installing that. In order to install HaploQA you must first install and configure
+MongoDB, RabbitMQ, Celery and apache with mod_wsgi. Assuming for a development installation you are working on a mac you
+can use the following instructions.  For CENTOS there will be similar commands using yum.
 
 I prefer to work from a VirtualEnv.  If you don't already have virtualenv you'll want to install it:
 
     pip install virtualenv
 
-once that's installed create your virtual environment.  Note: That if python3 is not in your path, you'll need to give the explicit path to it's location.
+once that's installed create your virtual environment.  Note: That if python3 is not in your path, you'll need to give
+the explicit path to it's location.
 
     virtualenv -p python3 HaploQA
 
@@ -57,7 +62,7 @@ Instructions for starting Mongo are below.
 
     brew install rabbitmq
 
-Instructions fro starting are below.
+Instructions for starting are below.
 
 ### To install Celery
 
@@ -116,7 +121,8 @@ Start/Stop celery Like:
 
 ## Create an admin account
 
-For a new installation you are going to need an administrative account to work through the system.  Once you have that first account created, you can create other user accounts through the UI.  
+For a new installation you are going to need an administrative account to work through the system.  Once you have that
+first account created, you can create other user accounts through the UI.
 
 From the project root directory (where src is a subdirectory), run the following command:
 
