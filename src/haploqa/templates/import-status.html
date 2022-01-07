@@ -17,7 +17,7 @@
             var errorAlert = $('#error-alert');
             var errorAlertMessage = $('#error-alert-message');
 
-            function hanleError(data) {
+            function handleError(data) {
                 console.log('failure occurred');
                 console.log(data);
                 importTaskProgressBar.text('data import failed');
@@ -33,13 +33,13 @@
             }
 
             function checkStatus() {
-                $.getJSON("{{ url_for('sample_import_status_json', task_id=task_id) }}", function(data) {
+                $.getJSON("{{ url_for('sample_import_status_json', task_id=task_id, platform=platform) }}", function(data) {
                     console.log(data);
                     if(data.ready) {
                         console.log('OK the data is ready');
                         if(data.failed) {
                             // this shouldn't normally happen since we set the error code
-                            hanleError(data);
+                            handleError(data);
                         } else {
                             importTaskProgressBar.removeClass('active progress-bar-striped');
                             importTaskProgressBar.text('Data Import Complete');
@@ -49,7 +49,7 @@
                     } else {
                         window.setTimeout(checkStatus, intervalDelayMS);
                     }
-                }).fail(hanleError);
+                }).fail(handleError);
             }
             checkStatus();
         });

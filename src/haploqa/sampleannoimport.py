@@ -150,4 +150,25 @@ def sample_anno_dicts(sample_anno_file):
                 err_fmt.format(missing_id_count, total_row_count),
                 file=sys.stderr)
 
+        print(sample_properties_dicts)
         return sample_properties_dicts
+
+
+def minimuga_sample_anno_dict(genotype_file):
+    with open(genotype_file, 'r') as file_handle:
+        table = csv.reader(file_handle, delimiter='\t')
+        header = next(table)
+        header = list(map(normalize_header, header))
+        first_row = [normalize_value(h, v) for h, v in zip(header, next(table))]
+
+        return {
+            'sample_id': first_row[0],
+            'sex': 'Unknown',
+            'properties': {
+                'Index': 'NA',
+                'Name': first_row[0],
+                'Plate': 'NA',
+                'Well': 'NA',
+                'SentrixPosition': 'NA'
+            }
+        }
