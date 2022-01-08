@@ -1006,6 +1006,7 @@ def sample_data_import_task_minimuga(user_email, generate_ids, on_duplicate, gen
         sample_anno_dicts = dict()
 
         for f in genotype_files:
+            filename_for_final_import = f['saved_as']
             if f['is_zip']:
                 try:
                     extract_to_filename = str(f['saved_as']).replace('_temp', '')
@@ -1013,6 +1014,7 @@ def sample_data_import_task_minimuga(user_email, generate_ids, on_duplicate, gen
 
                     # we'll want to remove the extracted file as well as the original .zip file
                     files_to_remove.append(extract_to_filename)
+                    filename_for_final_import = extract_to_filename
                 except BadZipFile:
                     raise BadZipFile('Error: {} is a bad zipfile'.format(f['submitted_filename']))
                 except Exception:
@@ -1020,10 +1022,10 @@ def sample_data_import_task_minimuga(user_email, generate_ids, on_duplicate, gen
 
             files_to_remove.append(f['saved_as'])
             sample_dict = sai.minimuga_sample_anno_dict(f['saved_as'])
-            sample_anno_dicts[sample_dict['Name']] = sample_dict
+            sample_anno_dicts[sample_dict['sample_id']] = sample_dict
 
-        # finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename,
-        #                             sample_anno_dicts, platform_id, tags, db)
+            finalin.import_final_report(user_email, generate_ids, on_duplicate, filename_for_final_import,
+                                        sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
         for f in files_to_remove:
