@@ -977,8 +977,8 @@ def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report
         tags = [sample_group_name, platform_id]
         sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
 
-        # finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename,
-        #                             sample_anno_dicts, platform_id, tags, db)
+        finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename,
+                                    sample_anno_dicts, platform_id, tags, db)
     finally:
         # we don't need the files after the import is complete
         try:
