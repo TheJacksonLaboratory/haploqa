@@ -837,7 +837,8 @@ def sample_data_import_html():
 
             if platform_id == 'MiniMUGA':
                 genotype_files = files.getlist("sample-genotype-files")
-                sample_group_name = user_email.split('@')[0] + '_' + datetime.date.today().isoformat()
+                formatted_now = datetime.datetime.now().strftime('_%Y-%m-%d_%H%M%S')
+                sample_group_name = user_email.split('@')[0] + formatted_now
 
                 saved_genotype_files = []
                 for f in genotype_files:

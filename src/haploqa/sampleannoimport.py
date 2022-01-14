@@ -150,7 +150,6 @@ def sample_anno_dicts(sample_anno_file):
                 err_fmt.format(missing_id_count, total_row_count),
                 file=sys.stderr)
 
-        print(sample_properties_dicts)
         return sample_properties_dicts
 
 
