@@ -17,7 +17,6 @@ import uuid
 from werkzeug.routing import BaseConverter
 from zipfile import ZipFile
 from zipfile import BadZipFile
-import logging
 
 from haploqa.config import HAPLOQA_CONFIG
 import haploqa.gemminference as gemminf
@@ -30,9 +29,6 @@ import haploqa.usermanagement as usrmgmt
 app = flask.Flask(__name__)
 APP_VERSION = 1, 0
 BROKER_URL = 'amqp://guest:guest@localhost:5672//'
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
 
 app.config.update(
     CELERY_BROKER_URL=BROKER_URL,
