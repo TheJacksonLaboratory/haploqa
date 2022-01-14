@@ -15,7 +15,8 @@
                     // change the file inputs to a single input that can take multiple files
                     $('#data-inputs').html(
                         `
-                        <p>
+                        <hr>
+                        <p style="padding: 0 6rem">
                             Use the file input to select multiple files at a time if you have more than one. Each of these files should be
                             using the names they were given by the genotyping service provider which should be in the format of
                             "[sample ID]-raw-genotypes.txt".
@@ -132,7 +133,8 @@
         {% endif %}
 
         {% if platform_id == "MiniMUGA" %}
-        <p>
+        <hr>
+        <p style="padding: 0 6rem">
             Use the file input to select multiple files at a time if you have more than one. Each of these files should be
             using the names they were given by the genotyping service provider which should be in the format of
             "[sample ID]-raw-genotypes.txt".
