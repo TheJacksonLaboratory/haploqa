@@ -14,17 +14,10 @@ data_tag = '[data]'
 tags = {header_tag, data_tag}
 
 snp_name_col_hdr = 'SNP Name'
-sample_id_col_hdr = 'Sample ID'
 x_col_hdr = 'X'
 y_col_hdr = 'Y'
 allele1_fwd_col_hdr = 'Allele1 - Forward'
 allele2_fwd_col_hdr = 'Allele2 - Forward'
-data_col_hdrs = {
-    snp_name_col_hdr, sample_id_col_hdr,
-    x_col_hdr, y_col_hdr,
-    allele1_fwd_col_hdr, allele2_fwd_col_hdr
-}
-
 
 def import_final_report(user_email, generate_ids, on_duplicate, final_report_file, sample_anno_dicts, platform_id, sample_tags, db):
 
@@ -72,6 +65,21 @@ def import_final_report(user_email, generate_ids, on_duplicate, final_report_fil
 
     prev_time = time.time()
     all_sample_ids = set()
+
+    # for MiniMUGA, the files I've had access to had blank values for 'Sample ID'
+    # although the header value is there. The 'Sample Name' values were populated
+    # though so swap the sample ID column header to 'Sample Name'
+    if platform_id == 'MiniMUGA':
+        sample_id_col_hdr = 'Sample Name'
+    else:
+        sample_id_col_hdr = 'Sample ID'
+
+    data_col_hdrs = {
+        snp_name_col_hdr, sample_id_col_hdr,
+        x_col_hdr, y_col_hdr,
+        allele1_fwd_col_hdr, allele2_fwd_col_hdr
+    }
+
     with open(final_report_file, 'r') as final_report_handle:
 
         final_report_table = csv.reader(final_report_handle, delimiter='\t')

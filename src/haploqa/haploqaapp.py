@@ -676,25 +676,30 @@ def _unique_temp_filename():
     return os.path.join(get_temp_directory(), str(uuid.uuid4()))
 
 
-@app.route('/sample-import-status/<task_id>.html')
-def sample_import_status_html(task_id):
+@app.route('/sample-import-status/<platform>/<task_id>.html')
+def sample_import_status_html(platform, task_id):
     """
     Render template for checking the status of a (potentially long-running) sample import task
+    :param platform: the platform of the import
     :param task_id: the celery task ID for the import
     :return: the Flask response object for the template
     """
-    return flask.render_template('import-status.html', task_id=task_id)
+    return flask.render_template('import-status.html', task_id=task_id, platform=platform)
 
 
-@app.route('/sample-import-status/<task_id>.json')
-def sample_import_status_json(task_id):
+@app.route('/sample-import-status/<platform>/<task_id>.json')
+def sample_import_status_json(platform, task_id):
     """
     Render a JSON response describing the status of a (potentially long-running) sample import task.
+    :param platform: the platform of the import
     :param task_id: the celery task ID for the import
     :return: the flask response object for the status
     """
 
-    async_result = sample_data_import_task.AsyncResult(task_id)
+    if platform == 'MiniMUGA':
+        async_result = sample_data_import_task_minimuga.AsyncResult(task_id)
+    else:
+        async_result = sample_data_import_task.AsyncResult(task_id)
 
     user = flask.g.user
     if user is not None:
@@ -820,75 +825,126 @@ def sample_data_import_html():
             platform_id = form['platform-select']
             no_errors = True
             error_msg = ''
-            f_report_is_zip = False
-            s_map_is_zip = False
 
-            if len(files) < 2:
-                return flask.render_template('sample-data-import.html', platform_ids=platform_ids,
-                                             msg='Error: You must provide both a sample map and final report in order to import samples')
-            else:
-                sample_map_filename = _unique_temp_filename()
-                sample_map_file = files['sample-map-file']
-                sample_map_temp_filename = sample_map_filename + '_temp'
+            generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
+            on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
 
-                # if the sample map is a .zip, try to extract and save the content
-                if sample_map_file.filename.endswith('.zip'):
-                    # if it isn't a true zip, we'll catch it later
-                    s_map_is_zip = True
+            user_email = flask.g.user['email_address'].strip().lower()
 
-                # save the file and if it's a zip file, extract it
-                try:
-                    if s_map_is_zip:
-                        sample_map_file.save(sample_map_temp_filename)
-                        extract_zip_file(sample_map_temp_filename, sample_map_filename, get_temp_directory())
-                    else:
-                        sample_map_file.save(sample_map_filename)
-                except BadZipFile:
-                    no_errors = False
-                    error_msg = 'Error: The sample map you provided is a bad zipfile'
-                except Exception:
-                    no_errors = False
-                    error_msg = 'Error: There was an issue with your sample map zip file'
+            if platform_id == 'MiniMUGA':
+                genotype_files = files.getlist("sample-genotype-files")
+                formatted_now = datetime.datetime.now().strftime('_%Y-%m-%d_%H%M%S')
+                sample_group_name = user_email.split('@')[0] + formatted_now
 
-                final_report_filename = _unique_temp_filename()
-                final_report_file = files['final-report-file']
-                final_report_temp_filename = final_report_filename + '_temp'
+                saved_genotype_files = []
+                for f in genotype_files:
+                    # auto-generated filename to be the final save name of the file
+                    filename = _unique_temp_filename()
+                    # temporary filename intended for use only in the case of zip files so extracted file is saved to filename
+                    temp_filename = filename + '_temp'
+                    file_is_zip = True if str(f.filename).endswith('.zip') else False
+                    save_as = temp_filename if file_is_zip else filename
 
-                # if the final report is a .zip, try to extract and save the content
-                if final_report_file.filename.endswith('.zip'):
-                    # if it isn't a true zip, we'll catch it later
-                    f_report_is_zip = True
+                    try:
+                        f.save(save_as)
+                    except Exception:
+                        error_msg = 'Error: There was an issue while saving ' + str(f.filename)
+                    finally:
+                        saved_genotype_files.append({
+                            'submitted_filename': str(f.filename), # name of the file the user uploaded
+                            'saved_as': save_as, # name the file was saved as
+                            'is_zip': file_is_zip # whether the file looks to be a .zip file
+                        })
 
-                # save the file here, regardless of whether it's a zip or not,
-                # we'll extract it in the celery task if it's a zip
-                try:
-                    if f_report_is_zip:
-                        final_report_file.save(final_report_temp_filename)
-                    else:
-                        final_report_file.save(final_report_filename)
-                except Exception:
-                    no_errors = False
-                    error_msg = 'Error: There was an issue saving your final report file'
-
-                generate_ids = HAPLOQA_CONFIG['GENERATE_IDS_DEFAULT']
-                on_duplicate = HAPLOQA_CONFIG['ON_DUPLICATE_ID_DEFAULT']
-
-                user_email = flask.g.user['email_address'].strip().lower()
-
-                sample_group_name = os.path.splitext(final_report_file.filename)[0]
-                import_task = sample_data_import_task.delay(
+                import_task = sample_data_import_task_minimuga.delay(
                     user_email,
                     generate_ids,
                     on_duplicate,
-                    final_report_temp_filename, final_report_filename,
-                    sample_map_filename,
+                    saved_genotype_files,
                     platform_id,
-                    sample_group_name, f_report_is_zip, get_temp_directory()
+                    sample_group_name,
+                    get_temp_directory()
                 )
 
                 # perform a 303 redirect to the URL that uniquely identifies this run
                 if no_errors is True:
-                    new_location = flask.url_for('sample_import_status_html', task_id=import_task.task_id)
+                    new_location = flask.url_for('sample_import_status_html',
+                                                 task_id=import_task.task_id,
+                                                 platform=platform_id)
+                    return flask.redirect(new_location, 303)
+                else:
+                    return flask.render_template('sample-data-import.html',
+                                                 platform_ids=platform_ids,
+                                                 msg=error_msg)
+            else:
+                f_report_is_zip = False
+                s_map_is_zip = False
+
+                if len(files) < 2:
+                    error_msg = 'Error: You must provide both a sample map and final report in order to import samples'
+                    return flask.render_template('sample-data-import.html',
+                                                 platform_ids=platform_ids,
+                                                 msg=error_msg)
+                else:
+                    sample_map_filename = _unique_temp_filename()
+                    sample_map_file = files['sample-map-file']
+                    sample_map_temp_filename = sample_map_filename + '_temp'
+
+                    # if the sample map is a .zip, try to extract and save the content
+                    if sample_map_file.filename.endswith('.zip'):
+                        # if it isn't a true zip, we'll catch it later
+                        s_map_is_zip = True
+
+                    # save the file and if it's a zip file, extract it
+                    try:
+                        if s_map_is_zip:
+                            sample_map_file.save(sample_map_temp_filename)
+                            extract_zip_file(sample_map_temp_filename, sample_map_filename, get_temp_directory())
+                        else:
+                            sample_map_file.save(sample_map_filename)
+                    except BadZipFile:
+                        no_errors = False
+                        error_msg = 'Error: The sample map you provided is a bad zipfile'
+                    except Exception:
+                        no_errors = False
+                        error_msg = 'Error: There was an issue with your sample map zip file'
+
+                    final_report_filename = _unique_temp_filename()
+                    final_report_file = files['final-report-file']
+                    final_report_temp_filename = final_report_filename + '_temp'
+
+                    # if the final report is a .zip, try to extract and save the content
+                    if final_report_file.filename.endswith('.zip'):
+                        # if it isn't a true zip, we'll catch it later
+                        f_report_is_zip = True
+
+                    # save the file here, regardless of whether it's a zip or not,
+                    # we'll extract it in the celery task if it's a zip
+                    try:
+                        if f_report_is_zip:
+                            final_report_file.save(final_report_temp_filename)
+                        else:
+                            final_report_file.save(final_report_filename)
+                    except Exception as e:
+                        no_errors = False
+                        error_msg = 'Error: There was an issue saving your final report file'
+
+                    sample_group_name = os.path.splitext(final_report_file.filename)[0]
+                    import_task = sample_data_import_task.delay(
+                        user_email,
+                        generate_ids,
+                        on_duplicate,
+                        final_report_temp_filename, final_report_filename,
+                        sample_map_filename,
+                        platform_id,
+                        sample_group_name, f_report_is_zip, get_temp_directory()
+                    )
+
+                # perform a 303 redirect to the URL that uniquely identifies this run
+                if no_errors is True:
+                    new_location = flask.url_for('sample_import_status_html',
+                                                 task_id=import_task.task_id,
+                                                 platform=platform_id)
                     return flask.redirect(new_location, 303)
                 else:
                     return flask.render_template('sample-data-import.html',
@@ -917,6 +973,7 @@ def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report
         db = mds.get_db()
         tags = [sample_group_name, platform_id]
         sample_anno_dicts = sai.sample_anno_dicts(sample_map_filename) if sample_map_filename else dict()
+
         finalin.import_final_report(user_email, generate_ids, on_duplicate, final_report_filename,
                                     sample_anno_dicts, platform_id, tags, db)
     finally:
@@ -930,6 +987,50 @@ def sample_data_import_task(user_email, generate_ids, on_duplicate, final_report
 
     return sample_group_name
 
+
+@celery.task(name='sample_data_import_task_minimuga')
+def sample_data_import_task_minimuga(user_email, generate_ids, on_duplicate, genotype_files,
+                                     platform_id, sample_group_name, temp_dir):
+    """
+    Our long-running import task, triggered from the import page of the app for specifically importing minimuga
+    data as the format of files is different from previous MUGA platforms
+    """
+    files_to_remove = []
+
+    try:
+        db = mds.get_db()
+        tags = [sample_group_name, platform_id]
+        sample_anno_dicts = dict()
+
+        for f in genotype_files:
+            filename_for_final_import = f['saved_as']
+            if f['is_zip']:
+                try:
+                    extract_to_filename = str(f['saved_as']).replace('_temp', '')
+                    extract_zip_file(f['saved_as'], extract_to_filename, temp_dir)
+
+                    # we'll want to remove the extracted file as well as the original .zip file
+                    files_to_remove.append(extract_to_filename)
+                    filename_for_final_import = extract_to_filename
+                except BadZipFile:
+                    raise BadZipFile('Error: {} is a bad zipfile'.format(f['submitted_filename']))
+                except Exception:
+                    raise Exception('Error: There was an issue extracting {}'.format(f['submitted_filename']))
+
+            files_to_remove.append(f['saved_as'])
+            sample_dict = sai.minimuga_sample_anno_dict(f['saved_as'])
+            sample_anno_dicts[sample_dict['sample_id']] = sample_dict
+
+            finalin.import_final_report(user_email, generate_ids, on_duplicate, filename_for_final_import,
+                                        sample_anno_dicts, platform_id, tags, db)
+    finally:
+        # we don't need the files after the import is complete
+        for f in files_to_remove:
+            if f is not None and os.path.isfile(f):
+                os.remove(f)
+
+
+    return sample_group_name
 
 #####################################################################
 # SAMPLE LISTING PAGES

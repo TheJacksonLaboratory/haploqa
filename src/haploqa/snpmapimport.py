@@ -6,6 +6,15 @@ import sys
 
 import haploqa.mongods as mds
 
+"""
+To use this file, first you'll need a SNP_Map.txt file for the new platform. Please 
+ensure that all trailing newlines and spaces are removed as this can cause issues 
+associating SNPs with the platform. Then have a terminal session running within 
+your virtual environment at the root directory for Haploqa (level with README file) 
+and run the following command, replacing 'new_platform_name' with the name of the 
+platform you're importing (e.g. MiniMUGA) and the path to the SNP_Map.txt file:
+PYTHONPATH=src python -m haploqa.snpmapimport new_platform_name "./path-to/SNP_Map.txt"
+"""
 
 valid_nonnumeric_chromosome_names = ['X', 'Y', 'M', 'MT']
 

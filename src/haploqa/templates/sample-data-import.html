@@ -4,6 +4,77 @@
 
 {% block title %}Sample Data Import{% endblock %}
 
+{% block head %}
+    {{ super() }}
+    <script>
+        $(function() {
+            var platformSelect = $('#platform-select');
+
+            platformSelect.on('change', function() {
+                if(platformSelect.val() === 'MiniMUGA') {
+                    // change the file inputs to a single input that can take multiple files
+                    $('#data-inputs').html(
+                        `
+                        <hr>
+                        <p style="padding: 0 6rem">
+                            Use the file input to select multiple files at a time if you have more than one. Each of these files should be
+                            using the names they were given by the genotyping service provider which should be in the format of
+                            "[sample ID]-raw-genotypes.txt".
+                        </p>
+                        <div class="form-group">
+                            <label for="sample-genotype-files" class="col-md-3 control-label">Genotype Files: <b class="required">*</b> </label>
+
+                            <div class="col-md-6">
+                                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                                <input
+                                        class="tooltip-enabled"
+                                        type="file"
+                                        id="sample-genotype-files"
+                                        name="sample-genotype-files"
+                                        multiple
+                                        style="padding-top: 7px;">
+                            </div>
+                        </div>
+                        `
+                    );
+                } else {
+                    $('#data-inputs').html(
+                        `
+                        <div class="form-group">
+                            <label for="sample-map-file" class="col-md-3 control-label">Sample Map: <b class="required">*</b> </label>
+
+                            <div class="col-md-6">
+                                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                                <input
+                                        class="tooltip-enabled"
+                                        type="file"
+                                        id="sample-map-file"
+                                        name="sample-map-file"
+                                        style="padding-top: 7px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="final-report-file" class="col-md-3 control-label">Final Report: <b class="required">*</b> </label>
+
+                            <div class="col-md-6">
+                                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                                <input
+                                        class="tooltip-enabled"
+                                        type="file"
+                                        id="final-report-file"
+                                        name="final-report-file"
+                                        style="padding-top: 7px;">
+                            </div>
+                        </div>
+                        `
+                    )
+                }
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1>Sample Data Import</h1>
@@ -30,33 +101,61 @@
         </div>
     </div>
 
-    <div class="form-group">
-        <label for="sample-map-file" class="col-md-3 control-label">Sample Map: <b class="required">*</b> </label>
+    <div id="data-inputs">
+        {% if platform_id != "MiniMUGA" %}
+        <div class="form-group">
+            <label for="sample-map-file" class="col-md-3 control-label">Sample Map: <b class="required">*</b> </label>
 
-        <div class="col-md-6">
-            <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
-            <input
-                    class="tooltip-enabled"
-                    type="file"
-                    id="sample-map-file"
-                    name="sample-map-file"
-                    style="padding-top: 7px;">
+            <div class="col-md-6">
+                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                <input
+                        class="tooltip-enabled"
+                        type="file"
+                        id="sample-map-file"
+                        name="sample-map-file"
+                        style="padding-top: 7px;">
+            </div>
         </div>
+
+        <div class="form-group">
+            <label for="final-report-file" class="col-md-3 control-label">Final Report: <b class="required">*</b> </label>
+
+            <div class="col-md-6">
+                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                <input
+                        class="tooltip-enabled"
+                        type="file"
+                        id="final-report-file"
+                        name="final-report-file"
+                        style="padding-top: 7px;">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if platform_id == "MiniMUGA" %}
+        <hr>
+        <p style="padding: 0 6rem">
+            Use the file input to select multiple files at a time if you have more than one. Each of these files should be
+            using the names they were given by the genotyping service provider which should be in the format of
+            "[sample ID]-raw-genotypes.txt".
+        </p>
+        <div class="form-group">
+            <label for="sample-genotype-files" class="col-md-3 control-label">Genotype Files: <b class="required">*</b> </label>
+
+            <div class="col-md-6">
+                <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
+                <input
+                        class="tooltip-enabled"
+                        type="file"
+                        id="sample-genotype-files"
+                        name="sample-genotype-files"
+                        multiple
+                        style="padding-top: 7px;">
+            </div>
+        </div>
+        {% endif %}
     </div>
 
-    <div class="form-group">
-        <label for="final-report-file" class="col-md-3 control-label">Final Report: <b class="required">*</b> </label>
-
-        <div class="col-md-6">
-            <!-- padding-top style is a hack to get the file input to align nicely. There may be a better way. -->
-            <input
-                    class="tooltip-enabled"
-                    type="file"
-                    id="final-report-file"
-                    name="final-report-file"
-                    style="padding-top: 7px;">
-        </div>
-    </div>
     <div class="form-group">
         <div class="col-md-offset-3 col-md-9">
             <button id="sample-upload-submit" class="btn btn-primary" type="submit">
